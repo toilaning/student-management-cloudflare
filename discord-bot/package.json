@@ -1,0 +1,16 @@
+{
+  "name": "student-management-discord-bot",
+  "version": "1.0.0",
+  "description": "Discord Bot Integration for Student Attendance, Art Submissions, and Deadline Reminders",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.18.0",
+    "dotenv": "^16.4.7",
+    "node-cron": "^3.0.3"
+  }
+}
