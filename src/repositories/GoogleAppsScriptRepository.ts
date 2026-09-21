@@ -7,6 +7,7 @@ import { Classroom, ClassEntity } from "@/types/classroom";
 import { ScheduleSlot, ClassRequest } from "@/types/schedule";
 import { AttendanceRecord } from "@/types/attendance";
 import { TuitionInvoice, PayrollRecord } from "@/types/finance";
+import { SessionPackage } from "@/types/package";
 import { AuditLog } from "@/types/audit";
 import { localRepo } from "./LocalRepository";
 
@@ -162,6 +163,11 @@ export class GoogleAppsScriptRepository implements IRepository {
         if (action === "updateRequest") return localRepo.updateRequest(params.request);
         break;
       case "TuitionService":
+        if (action === "getAllSessionPackages") return localRepo.getAllSessionPackages();
+        if (action === "getSessionPackageById") return localRepo.getSessionPackageById(params.id);
+        if (action === "createSessionPackage") return localRepo.createSessionPackage(params.pkg);
+        if (action === "updateSessionPackage") return localRepo.updateSessionPackage(params.pkg);
+        if (action === "deleteSessionPackage") return localRepo.deleteSessionPackage(params.id);
         if (action === "getAllTuitionInvoices") return localRepo.getAllTuitionInvoices();
         if (action === "getTuitionInvoicesByStudentId") return localRepo.getTuitionInvoicesByStudentId(params.studentId);
         if (action === "getTuitionInvoiceById") return localRepo.getTuitionInvoiceById(params.id);
@@ -481,6 +487,27 @@ export class GoogleAppsScriptRepository implements IRepository {
 
   public async updateRequest(request: ClassRequest): Promise<ClassRequest> {
     return this.callGas<ClassRequest>("LeaveRequestService", "updateRequest", { request });
+  }
+
+  // Session Packages
+  public async getAllSessionPackages(): Promise<SessionPackage[]> {
+    return localRepo.getAllSessionPackages();
+  }
+
+  public async getSessionPackageById(id: string): Promise<SessionPackage | null> {
+    return localRepo.getSessionPackageById(id);
+  }
+
+  public async createSessionPackage(pkg: SessionPackage): Promise<SessionPackage> {
+    return localRepo.createSessionPackage(pkg);
+  }
+
+  public async updateSessionPackage(pkg: SessionPackage): Promise<SessionPackage> {
+    return localRepo.updateSessionPackage(pkg);
+  }
+
+  public async deleteSessionPackage(id: string): Promise<boolean> {
+    return localRepo.deleteSessionPackage(id);
   }
 
   // Finance

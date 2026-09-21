@@ -7,6 +7,8 @@ import { Classroom, ClassEntity } from '@/types/classroom';
 import { ScheduleSlot, ClassRequest } from '@/types/schedule';
 import { AttendanceRecord } from '@/types/attendance';
 import { TuitionInvoice, PayrollRecord } from '@/types/finance';
+import { SessionPackage } from '@/types/package';
+import { DEFAULT_PACKAGES } from './seeds/seedPackages';
 import { AuditLog } from '@/types/audit';
 import { generateSeedData } from './seeds/seedData';
 
@@ -21,6 +23,7 @@ export class LocalRepository implements IRepository {
   private scheduleSlots: Map<string, ScheduleSlot> = new Map();
   private attendanceRecords: Map<string, AttendanceRecord> = new Map();
   private classRequests: Map<string, ClassRequest> = new Map();
+  private sessionPackages: Map<string, SessionPackage> = new Map();
   private tuitionInvoices: Map<string, TuitionInvoice> = new Map();
   private payrollRecords: Map<string, PayrollRecord> = new Map();
   private auditLogs: AuditLog[] = [];
@@ -51,6 +54,7 @@ export class LocalRepository implements IRepository {
     seed.scheduleSlots.forEach(ss => this.scheduleSlots.set(ss.id, ss));
     seed.attendanceRecords.forEach(ar => this.attendanceRecords.set(ar.id, ar));
     seed.classRequests.forEach(cr => this.classRequests.set(cr.id, cr));
+    DEFAULT_PACKAGES.forEach(pkg => this.sessionPackages.set(pkg.id, { ...pkg }));
     seed.tuitionInvoices.forEach(ti => this.tuitionInvoices.set(ti.id, ti));
     seed.payrollRecords.forEach(pr => this.payrollRecords.set(pr.id, pr));
     this.auditLogs = [...seed.auditLogs];
@@ -66,6 +70,7 @@ export class LocalRepository implements IRepository {
     this.scheduleSlots.clear();
     this.attendanceRecords.clear();
     this.classRequests.clear();
+    this.sessionPackages.clear();
     this.tuitionInvoices.clear();
     this.payrollRecords.clear();
     this.auditLogs = [];
@@ -286,6 +291,30 @@ export class LocalRepository implements IRepository {
   public async updateRequest(request: ClassRequest): Promise<ClassRequest> {
     this.classRequests.set(request.id, { ...request });
     return request;
+  }
+
+
+  // Session Packages
+  public async getAllSessionPackages(): Promise<SessionPackage[]> {
+    return Array.from(this.sessionPackages.values());
+  }
+
+  public async getSessionPackageById(id: string): Promise<SessionPackage | null> {
+    return this.sessionPackages.get(id) || null;
+  }
+
+  public async createSessionPackage(pkg: SessionPackage): Promise<SessionPackage> {
+    this.sessionPackages.set(pkg.id, { ...pkg });
+    return pkg;
+  }
+
+  public async updateSessionPackage(pkg: SessionPackage): Promise<SessionPackage> {
+    this.sessionPackages.set(pkg.id, { ...pkg });
+    return pkg;
+  }
+
+  public async deleteSessionPackage(id: string): Promise<boolean> {
+    return this.sessionPackages.delete(id);
   }
 
   // Finance

@@ -1,9 +1,12 @@
-export type TuitionStatus = 'Đã nộp' | 'Còn nợ' | 'Quá hạn' | 'DA_NOP' | 'CON_NO';
+export type TuitionStatus = 'Đã nộp' | 'Còn nợ' | 'Quá hạn' | 'Miễn giảm' | 'DA_NOP' | 'CON_NO';
 
 export interface TuitionInvoice {
   id: string; // TUI001..
   studentId: string;
   classId: string;
+  packageId?: string; // Mã gói buổi học (nếu mua theo gói)
+  sessionCount?: number; // Số buổi học tương ứng (10, 20, 30...)
+  usedSessions?: number; // Số buổi đã dùng
   title: string; // "Học phí môn Lập trình React tháng 09/2026"
   amount: number; // Tổng tiền
   paidAmount: number; // Số tiền đã trả
@@ -13,6 +16,7 @@ export interface TuitionInvoice {
   paidDate?: string;
   paymentMethod?: 'Chuyển khoản QR' | 'Tiền mặt' | 'Thẻ ngân hàng';
   transactionCode?: string;
+  note?: string; // Ghi chú hoặc lý do sửa thủ công
 }
 
 export interface PayrollRecord {

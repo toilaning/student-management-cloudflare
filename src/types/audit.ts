@@ -7,6 +7,7 @@ export type AuditAction =
   | 'ATTENDANCE_CHECK' 
   | 'SCHEDULE_CHANGE' 
   | 'PAYMENT_PROCESS' 
+  | 'PACKAGE_PURCHASE'
   | 'REQUEST_DECIDE';
 
 export interface AuditLog {

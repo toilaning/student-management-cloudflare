@@ -13,6 +13,9 @@ export class TuitionPayrollService {
   public async createInvoice(data: {
     studentId: string;
     classId?: string;
+    packageId?: string;
+    sessionCount?: number;
+    usedSessions?: number;
     title: string;
     amount: number;
     dueDate: string;
@@ -43,12 +46,16 @@ export class TuitionPayrollService {
       id: invoiceId,
       studentId: data.studentId,
       classId: effectiveClassId,
+      packageId: data.packageId,
+      sessionCount: data.sessionCount,
+      usedSessions: data.usedSessions || 0,
       title: data.title,
       amount: data.amount,
       paidAmount: 0,
       remainingAmount: data.amount,
       dueDate: data.dueDate,
       status: "Còn nợ",
+      note: data.notes,
     };
 
     await this.repo.createTuitionInvoice(newInvoice);

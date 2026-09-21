@@ -9,7 +9,13 @@ import { TuitionInvoice } from '@/types/finance';
 import { AdminBankConfig, DEFAULT_BANK_CONFIG, SUPPORTED_BANKS } from '@/types/bank';
 import { generateVietQRUrl } from '@/utils/vietqr';
 import { BankWebhookSimulator } from '@/components/tuition/BankWebhookSimulator';
+import { SessionPackage } from '@/types/package';
 import { 
+  Package, 
+  Edit, 
+  Trash2, 
+  ToggleLeft, 
+  ToggleRight, 
   Receipt, 
   Search, 
   Filter, 
@@ -58,6 +64,19 @@ export default function AdminTuitionPage() {
   const [bankError, setBankError] = useState<string | null>(null);
 
   // Modal Cập nhật trạng thái thanh toán thủ công
+  // Session Packages CRUD states
+  const [packages, setPackages] = useState<SessionPackage[]>([]);
+  const [isPackageModalOpen, setIsPackageModalOpen] = useState(false);
+  const [editingPackage, setEditingPackage] = useState<SessionPackage | null>(null);
+  const [pkgName, setPkgName] = useState('');
+  const [pkgSessionCount, setPkgSessionCount] = useState<number | string>(10);
+  const [pkgPrice, setPkgPrice] = useState<number | string>(1000000);
+  const [pkgIsActive, setPkgIsActive] = useState(true);
+  const [pkgDescription, setPkgDescription] = useState('');
+  const [isSavingPkg, setIsSavingPkg] = useState(false);
+  const [packageError, setPackageError] = useState<string | null>(null);
+  const [showPackagesView, setShowPackagesView] = useState(false);
+
   const [updatingInvoice, setUpdatingInvoice] = useState<TuitionInvoice | null>(null);
   const [updateStatus, setUpdateStatus] = useState<string>('Đã nộp');
   const [updateMethod, setUpdateMethod] = useState<string>('Tiền mặt');
@@ -107,7 +126,135 @@ export default function AdminTuitionPage() {
   useEffect(() => {
     fetchInvoices();
     fetchBankConfig();
+    fetchPackages();
   }, []);
+
+  const fetchPackages = async () => {
+    try {
+      const res = await fetch('/api/packages');
+      const data = await res.json();
+      if (data.success && data.packages) {
+        setPackages(data.packages);
+      }
+    } catch (e) {
+      console.error('Error fetching packages:', e);
+    }
+  };
+
+  const openCreatePackageModal = () => {
+    setEditingPackage(null);
+    setPkgName('');
+    setPkgSessionCount(10);
+    setPkgPrice(1000000);
+    setPkgIsActive(true);
+    setPkgDescription('');
+    setPackageError(null);
+    setIsPackageModalOpen(true);
+  };
+
+  const openEditPackageModal = (pkg: SessionPackage) => {
+    setEditingPackage(pkg);
+    setPkgName(pkg.name);
+    setPkgSessionCount(pkg.sessionCount);
+    setPkgPrice(pkg.price);
+    setPkgIsActive(pkg.isActive);
+    setPkgDescription(pkg.description || '');
+    setPackageError(null);
+    setIsPackageModalOpen(true);
+  };
+
+  const handleSavePackageSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingPkg(true);
+    setPackageError(null);
+
+    try {
+      const isEdit = Boolean(editingPackage);
+      const url = '/api/packages';
+      const method = isEdit ? 'PUT' : 'POST';
+      const bodyPayload: any = {
+        name: pkgName,
+        sessionCount: Number(pkgSessionCount),
+        price: Number(pkgPrice),
+        isActive: pkgIsActive,
+        description: pkgDescription,
+        actorId: 'ADMIN001',
+        actorName: 'Quản trị viên',
+      };
+      if (isEdit && editingPackage) {
+        bodyPayload.id = editingPackage.id;
+      }
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyPayload),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Lỗi khi lưu gói buổi học');
+      }
+
+      setIsPackageModalOpen(false);
+      setToastMessage({
+        type: 'success',
+        text: isEdit ? `Đã cập nhật gói ${editingPackage?.name}!` : `Đã tạo gói mới "${pkgName}"!`,
+      });
+      setTimeout(() => setToastMessage(null), 4000);
+      await fetchPackages();
+    } catch (err: any) {
+      setPackageError(err.message || 'Lỗi kết nối khi lưu gói');
+    } finally {
+      setIsSavingPkg(false);
+    }
+  };
+
+  const handleTogglePackageActive = async (pkg: SessionPackage) => {
+    try {
+      const res = await fetch('/api/packages', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: pkg.id,
+          isActive: !pkg.isActive,
+          actorId: 'ADMIN001',
+          actorName: 'Quản trị viên',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setToastMessage({
+          type: 'success',
+          text: `Đã ${!pkg.isActive ? 'bật' : 'tắt'} hiển thị gói "${pkg.name}"!`,
+        });
+        setTimeout(() => setToastMessage(null), 4000);
+        await fetchPackages();
+      }
+    } catch (err) {
+      console.error('Error toggling package:', err);
+    }
+  };
+
+  const handleDeletePackage = async (id: string, name: string) => {
+    if (!confirm(`Bạn có chắc chắn muốn xóa gói "${name}" không?`)) return;
+    try {
+      const res = await fetch(`/api/packages?id=${id}&actorId=ADMIN001`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setToastMessage({
+          type: 'success',
+          text: `Đã xóa gói "${name}"!`,
+        });
+        setTimeout(() => setToastMessage(null), 4000);
+        await fetchPackages();
+      }
+    } catch (err) {
+      console.error('Error deleting package:', err);
+    }
+  };
+
 
   const openCreateModal = async () => {
     setIsCreateModalOpen(true);
@@ -161,9 +308,11 @@ export default function AdminTuitionPage() {
           action: 'UPDATE_STATUS',
           invoiceId: updatingInvoice.id,
           status: updateStatus,
-          paymentMethod: updateStatus === 'Đã nộp' ? updateMethod : undefined,
-          paidDate: updateStatus === 'Đã nộp' ? updatePaidDate : undefined,
+          paymentMethod: (updateStatus === 'Đã nộp' || updateStatus === 'Miễn giảm') ? updateMethod : undefined,
+          paidDate: (updateStatus === 'Đã nộp' || updateStatus === 'Miễn giảm') ? updatePaidDate : undefined,
           transactionCode: updateStatus === 'Đã nộp' ? (updatingInvoice.transactionCode || `MANUAL-${Date.now()}`) : undefined,
+          reason: updateNotes.trim() || undefined,
+          note: updateNotes.trim() || undefined,
           actorId: 'ADMIN001',
           actorName: 'Quản trị viên',
         }),
@@ -380,7 +529,7 @@ export default function AdminTuitionPage() {
 
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
               <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                {['ALL', 'Đã nộp', 'Còn nợ', 'Quá hạn'].map(st => (
+                {['ALL', 'Đã nộp', 'Còn nợ', 'Miễn giảm', 'Quá hạn'].map(st => (
                   <button
                     key={st}
                     onClick={() => handleStatusFilterChange(st)}
@@ -394,6 +543,18 @@ export default function AdminTuitionPage() {
               </div>
 
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowPackagesView(!showPackagesView)}
+                  className={`flex items-center gap-1.5 px-3 py-2 border text-xs font-semibold rounded-lg transition shadow-xs cursor-pointer ${
+                    showPackagesView 
+                      ? 'bg-purple-600 text-white border-purple-600 hover:bg-purple-700' 
+                      : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                  }`}
+                >
+                  <Package size={14} className={showPackagesView ? "text-white" : "text-purple-600"} />
+                  <span>Quản lý Gói ({packages.length})</span>
+                </button>
+
                 <button
                   onClick={() => {
                     setIsBankModalOpen(true);
@@ -432,6 +593,92 @@ export default function AdminTuitionPage() {
             </div>
           )}
 
+                    {/* Panel Quản lý Gói Buổi Học */}
+          {showPackagesView && (
+            <div className="bg-white rounded-2xl border border-purple-200 p-5 shadow-xs space-y-4 animate-in fade-in duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-purple-100">
+                <div className="flex items-center gap-2">
+                  <Package className="text-purple-600" size={20} />
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-sm">Danh Mục Gói Buổi Học (Session Packages)</h3>
+                    <p className="text-xs text-slate-500">Cấu hình các gói 10, 20, 30 buổi để học sinh tự chọn mua hoặc kế toán phân bổ</p>
+                  </div>
+                </div>
+                <button
+                  onClick={openCreatePackageModal}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+                >
+                  <Plus size={14} />
+                  <span>Thêm Gói Mới</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                {packages.map(pkg => (
+                  <div 
+                    key={pkg.id} 
+                    className={`p-4 rounded-xl border transition flex flex-col justify-between ${
+                      pkg.isActive ? 'bg-purple-50/40 border-purple-200' : 'bg-slate-50 border-slate-200 opacity-70'
+                    }`}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-[10px] font-bold text-purple-700 bg-white px-2 py-0.5 rounded border border-purple-200">
+                          {pkg.id}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          pkg.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                        }`}>
+                          {pkg.isActive ? 'Đang kích hoạt' : 'Đã ẩn'}
+                        </span>
+                      </div>
+
+                      <h4 className="font-bold text-slate-800 text-sm">{pkg.name}</h4>
+                      <p className="text-xs text-slate-500 line-clamp-2 min-h-[32px]">
+                        {pkg.description || 'Không có mô tả chi tiết.'}
+                      </p>
+
+                      <div className="pt-2 border-t border-purple-100 flex items-baseline justify-between">
+                        <span className="text-xs text-slate-600 font-medium">Số buổi: <strong className="text-slate-800">{pkg.sessionCount}</strong></span>
+                        <span className="text-sm font-extrabold font-mono text-purple-700">
+                          {pkg.price.toLocaleString('vi-VN')} đ
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 mt-3 border-t border-purple-100/70 flex items-center justify-between gap-1.5">
+                      <button
+                        onClick={() => handleTogglePackageActive(pkg)}
+                        className="p-1.5 text-xs text-slate-600 hover:text-purple-700 hover:bg-white rounded transition flex items-center gap-1 cursor-pointer"
+                        title={pkg.isActive ? 'Tắt hiển thị' : 'Bật hiển thị'}
+                      >
+                        {pkg.isActive ? <ToggleRight className="text-emerald-600" size={18} /> : <ToggleLeft className="text-slate-400" size={18} />}
+                        <span className="text-[11px] font-semibold">{pkg.isActive ? 'Bật' : 'Tắt'}</span>
+                      </button>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => openEditPackageModal(pkg)}
+                          className="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-white rounded transition cursor-pointer"
+                          title="Chỉnh sửa gói"
+                        >
+                          <Edit size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDeletePackage(pkg.id, pkg.name)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-white rounded transition cursor-pointer"
+                          title="Xóa gói"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Table */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
@@ -440,7 +687,8 @@ export default function AdminTuitionPage() {
                   <tr>
                     <th className="whitespace-nowrap px-3 sm:px-4 py-3">Mã HĐ</th>
                     <th className="whitespace-nowrap px-3 sm:px-4 py-3">Học viên</th>
-                    <th className="whitespace-nowrap px-3 sm:px-4 py-3">Tiêu đề / Khoản thu</th>
+                    <th className="whitespace-nowrap px-3 sm:px-4 py-3">Gói / Khoản thu</th>
+                    <th className="whitespace-nowrap px-3 sm:px-4 py-3 text-center">Số buổi</th>
                     <th className="whitespace-nowrap px-3 sm:px-4 py-3">Khoản thu</th>
                     <th className="whitespace-nowrap px-3 sm:px-4 py-3">Đã nộp</th>
                     <th className="whitespace-nowrap px-3 sm:px-4 py-3">Còn lại</th>
@@ -454,7 +702,28 @@ export default function AdminTuitionPage() {
                     <tr key={inv.id} className="hover:bg-slate-50/80 transition">
                       <td className="px-3 sm:px-4 py-2.5 sm:py-3 font-mono font-bold text-slate-800 whitespace-nowrap">{inv.id}</td>
                       <td className="px-3 sm:px-4 py-2.5 sm:py-3 font-mono font-bold text-indigo-600 whitespace-nowrap">{inv.studentId}</td>
-                      <td className="px-3 sm:px-4 py-2.5 sm:py-3 font-medium text-slate-800 max-w-xs truncate">{inv.title || 'Học phí'}</td>
+                      <td className="px-3 sm:px-4 py-2.5 sm:py-3 font-medium text-slate-800 max-w-xs truncate">
+                        <div>{inv.title || 'Học phí'}</div>
+                        {inv.packageId && (
+                          <span className="inline-block text-[10px] font-mono text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-100 mt-0.5">
+                            Gói: {inv.packageId}
+                          </span>
+                        )}
+                        {inv.note && (
+                          <div className="text-[10px] text-slate-400 italic truncate" title={inv.note}>
+                            Lý do: {inv.note}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 sm:px-4 py-2.5 sm:py-3 text-center whitespace-nowrap font-mono text-xs">
+                        {inv.sessionCount ? (
+                          <span className="font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">
+                            {inv.sessionCount} buổi
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
+                      </td>
                       <td className="px-3 sm:px-4 py-2.5 sm:py-3 font-semibold font-mono whitespace-nowrap">{inv.amount.toLocaleString('vi-VN')} đ</td>
                       <td className="px-3 sm:px-4 py-2.5 sm:py-3 text-emerald-600 font-semibold font-mono whitespace-nowrap">{inv.paidAmount.toLocaleString('vi-VN')} đ</td>
                       <td className="px-3 sm:px-4 py-2.5 sm:py-3 text-rose-600 font-semibold font-mono whitespace-nowrap">{inv.remainingAmount.toLocaleString('vi-VN')} đ</td>
@@ -463,6 +732,8 @@ export default function AdminTuitionPage() {
                         <span className={`px-2 py-0.5 rounded-full font-semibold text-[10px] whitespace-nowrap inline-flex ${
                           inv.status === 'Đã nộp'
                             ? 'bg-emerald-100 text-emerald-800'
+                            : inv.status === 'Miễn giảm'
+                            ? 'bg-blue-100 text-blue-800'
                             : inv.status === 'Quá hạn'
                             ? 'bg-rose-100 text-rose-800'
                             : 'bg-amber-100 text-amber-800'
@@ -901,8 +1172,8 @@ export default function AdminTuitionPage() {
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Trạng thái thanh toán mới <span className="text-rose-500">*</span>
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {['Đã nộp', 'Còn nợ', 'Quá hạn'].map(st => (
+                <div className="grid grid-cols-4 gap-2">
+                  {['Đã nộp', 'Còn nợ', 'Miễn giảm', 'Quá hạn'].map(st => (
                     <button
                       key={st}
                       type="button"
@@ -911,6 +1182,8 @@ export default function AdminTuitionPage() {
                         updateStatus === st
                           ? st === 'Đã nộp'
                             ? 'bg-emerald-50 border-emerald-500 text-emerald-800'
+                            : st === 'Miễn giảm'
+                            ? 'bg-blue-50 border-blue-500 text-blue-800'
                             : st === 'Quá hạn'
                             ? 'bg-rose-50 border-rose-500 text-rose-800'
                             : 'bg-amber-50 border-amber-500 text-amber-800'
@@ -953,14 +1226,20 @@ export default function AdminTuitionPage() {
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Ghi chú giao dịch</label>
-                <input
-                  type="text"
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Lý do sửa tay trạng thái / Ghi chú <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  rows={2}
                   value={updateNotes}
                   onChange={e => setUpdateNotes(e.target.value)}
-                  placeholder="Ghi chú xác nhận thu tiền..."
+                  placeholder="VD: Thu tiền mặt tại quầy, Học bổng tuyển sinh, Đối soát lỗi ngân hàng, Gia hạn công nợ..."
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-indigo-600"
+                  required
                 />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  * Lý do này sẽ được ghi nhận chi tiết vào Hệ thống Audit Log để phục vụ kiểm toán và đối soát.
+                </p>
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
@@ -982,6 +1261,126 @@ export default function AdminTuitionPage() {
             </form>
           </Modal>
         )}
+        {/* Modal Quản Lý Gói Buổi Học (Thêm / Sửa) */}
+        <Modal
+          isOpen={isPackageModalOpen}
+          onClose={() => setIsPackageModalOpen(false)}
+          className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-200 overflow-hidden my-8"
+        >
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-purple-50/50">
+            <div className="flex items-center gap-2">
+              <Package className="text-purple-600" size={20} />
+              <h3 className="text-base font-bold text-slate-800">
+                {editingPackage ? 'Chỉnh Sửa Gói Buổi Học' : 'Thêm Gói Buổi Học Mới'}
+              </h3>
+            </div>
+            <button
+              onClick={() => setIsPackageModalOpen(false)}
+              className="text-slate-400 hover:text-slate-600 text-lg cursor-pointer transition p-1"
+            >
+              ✕
+            </button>
+          </div>
+
+          <form onSubmit={handleSavePackageSubmit} className="p-6 space-y-4 text-xs">
+            {packageError && (
+              <div className="p-3 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-xs flex items-center gap-2">
+                <AlertCircle size={16} className="shrink-0" />
+                <span>{packageError}</span>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Tên gói buổi học <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={pkgName}
+                onChange={e => setPkgName(e.target.value)}
+                placeholder="VD: Gói 10 buổi cơ bản, Gói 20 buổi nâng cao..."
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-purple-600"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Số buổi học <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={pkgSessionCount}
+                  onChange={e => setPkgSessionCount(e.target.value)}
+                  placeholder="10"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-mono text-slate-800 focus:outline-purple-600"
+                  required
+                  min="1"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Giá tiền (VNĐ) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={pkgPrice}
+                  onChange={e => setPkgPrice(e.target.value)}
+                  placeholder="1000000"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-mono text-slate-800 focus:outline-purple-600"
+                  required
+                  min="0"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Mô tả quyền lợi gói
+              </label>
+              <textarea
+                rows={3}
+                value={pkgDescription}
+                onChange={e => setPkgDescription(e.target.value)}
+                placeholder="Mô tả số buổi, cố vấn 1-1, cam kết đầu ra..."
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-purple-600"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="checkbox"
+                id="pkgIsActive"
+                checked={pkgIsActive}
+                onChange={e => setPkgIsActive(e.target.checked)}
+                className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+              />
+              <label htmlFor="pkgIsActive" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                Kích hoạt & hiển thị cho học sinh tự chọn mua
+              </label>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsPackageModalOpen(false)}
+                className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-xs font-semibold hover:bg-slate-50 transition cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingPkg}
+                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
+              >
+                {isSavingPkg ? 'Đang lưu...' : (editingPackage ? 'Cập nhật' : 'Tạo gói')}
+              </button>
+            </div>
+          </form>
+        </Modal>
+
       </div>
     </RoleGuard>
   );

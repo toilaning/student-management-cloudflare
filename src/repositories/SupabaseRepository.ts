@@ -7,6 +7,7 @@ import { Classroom, ClassEntity } from '@/types/classroom';
 import { ScheduleSlot, ClassRequest } from '@/types/schedule';
 import { AttendanceRecord } from '@/types/attendance';
 import { TuitionInvoice, PayrollRecord } from '@/types/finance';
+import { SessionPackage } from '@/types/package';
 import { AuditLog } from '@/types/audit';
 import { AppNotification } from '@/types/notification';
 import { getSupabaseAdminClient } from '@/lib/supabase';
@@ -1468,6 +1469,27 @@ export class SupabaseRepository implements IRepository {
   // --------------------------------------------------------------------------
   // FINANCE
   // --------------------------------------------------------------------------
+
+  // Session Packages
+  public async getAllSessionPackages(): Promise<SessionPackage[]> {
+    return localRepo.getAllSessionPackages();
+  }
+
+  public async getSessionPackageById(id: string): Promise<SessionPackage | null> {
+    return localRepo.getSessionPackageById(id);
+  }
+
+  public async createSessionPackage(pkg: SessionPackage): Promise<SessionPackage> {
+    return localRepo.createSessionPackage(pkg);
+  }
+
+  public async updateSessionPackage(pkg: SessionPackage): Promise<SessionPackage> {
+    return localRepo.updateSessionPackage(pkg);
+  }
+
+  public async deleteSessionPackage(id: string): Promise<boolean> {
+    return localRepo.deleteSessionPackage(id);
+  }
 
   public async getAllTuitionInvoices(): Promise<TuitionInvoice[]> {
     const client = this.getClient();

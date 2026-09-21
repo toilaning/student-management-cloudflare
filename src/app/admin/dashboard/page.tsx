@@ -3,6 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Header } from '@/components/common/Header';
+import { LiveSessionTracker } from '@/components/attendance/LiveSessionTracker';
 import { 
   Users, 
   GraduationCap, 
@@ -161,9 +162,9 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Action Shortcuts & Highlights */}
-        {/* Widget Quản lý & Giao bài tập vẽ */}
+        {/* Live Attendance Tracking */}
         <div className="mb-6">
+          <LiveSessionTracker attendancePathPrefix="/admin/attendance" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

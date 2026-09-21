@@ -9,7 +9,9 @@ export function generateVietQRUrl(params: {
   accountNumber: string;
   accountName: string;
   amount: number;
-  studentId: string;
+  studentId?: string;
+  invoiceId?: string;
+  addInfo?: string;
   template?: 'compact' | 'compact2' | 'qr_only' | 'print';
 }): string {
   const {
@@ -18,6 +20,8 @@ export function generateVietQRUrl(params: {
     accountName,
     amount,
     studentId,
+    invoiceId,
+    addInfo,
     template = 'compact2',
   } = params;
 
@@ -25,7 +29,18 @@ export function generateVietQRUrl(params: {
   const cleanAccountNo = (accountNumber || DEFAULT_BANK_CONFIG.accountNumber).trim();
   const cleanAccountName = encodeURIComponent((accountName || DEFAULT_BANK_CONFIG.accountName).trim());
   const cleanAmount = Math.max(0, Math.round(amount));
-  const cleanStudentId = encodeURIComponent((studentId || '').trim());
+  
+  let memo = '';
+  if (addInfo) {
+    memo = addInfo;
+  } else if (studentId && invoiceId) {
+    memo = `TUI ${studentId} ${invoiceId}`;
+  } else if (studentId) {
+    memo = studentId;
+  } else if (invoiceId) {
+    memo = invoiceId;
+  }
+  const cleanAddInfo = encodeURIComponent(memo.trim());
 
-  return `https://img.vietqr.io/image/${cleanBankId}-${cleanAccountNo}-${template}.png?amount=${cleanAmount}&addInfo=${cleanStudentId}&accountName=${cleanAccountName}`;
+  return `https://img.vietqr.io/image/${cleanBankId}-${cleanAccountNo}-${template}.png?amount=${cleanAmount}&addInfo=${cleanAddInfo}&accountName=${cleanAccountName}`;
 }

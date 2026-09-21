@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Header } from '@/components/common/Header';
+import { LiveSessionTracker } from '@/components/attendance/LiveSessionTracker';
 import { useApp } from '@/context/AppContext';
 import { RoleGuard } from '@/components/common/RoleGuard';
 import { BookOpen, CalendarDays, Clock, CheckCircle2, Inbox, ArrowRight, Headphones } from 'lucide-react';
@@ -100,6 +101,11 @@ export default function TeacherDashboardPage() {
           </div>
 
           
+          {/* Live Attendance Tracking */}
+          <div className="mb-6">
+            <LiveSessionTracker teacherId={currentUser?.id} attendancePathPrefix="/teacher/attendance" />
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Lịch dạy gần nhất */}
             <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-xs p-6 space-y-4">

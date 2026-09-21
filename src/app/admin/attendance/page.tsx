@@ -8,8 +8,10 @@ import { AttendanceRecord, AttendanceStatus } from '@/types/attendance';
 import { ScheduleSlot } from '@/types/schedule';
 import { ClassEntity } from '@/types/classroom';
 import { Student } from '@/types/student';
+import Link from 'next/link';
 import { 
   Calendar, 
+  BarChart3, 
   BookOpen, 
   Clock, 
   Save, 
@@ -476,6 +478,26 @@ function AdminAttendanceContent() {
             <span className="text-sm font-semibold">{toastMessage.text}</span>
           </div>
         )}
+
+        {/* Quick Navigation to Monthly Analytics */}
+        <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+              <BarChart3 size={20} />
+            </div>
+            <div>
+              <h4 className="font-bold text-slate-800 text-sm">Bảng Thống Kê Điểm Danh & Chuyên Cần Theo Tháng</h4>
+              <p className="text-xs text-slate-400">Xem tỷ lệ tham gia (Attendance Rate %), phân tích tổng hợp toàn trường</p>
+            </div>
+          </div>
+          <Link
+            href="/admin/attendance/analytics"
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5"
+          >
+            <span>Xem Bảng Tổng Kết Tháng</span>
+            <span>→</span>
+          </Link>
+        </div>
 
         {/* Khối Bộ lọc Điều hành (Control Filter Bar) */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">

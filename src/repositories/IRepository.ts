@@ -6,6 +6,7 @@ import { Classroom, ClassEntity } from '@/types/classroom';
 import { ScheduleSlot, ClassRequest } from '@/types/schedule';
 import { AttendanceRecord } from '@/types/attendance';
 import { TuitionInvoice, PayrollRecord } from '@/types/finance';
+import { SessionPackage } from '@/types/package';
 import { AuditLog } from '@/types/audit';
 
 export interface IRepository {
@@ -66,6 +67,13 @@ export interface IRepository {
   createRequest(request: ClassRequest): Promise<ClassRequest>;
   updateRequest(request: ClassRequest): Promise<ClassRequest>;
 
+  // Session Packages
+  getAllSessionPackages(): Promise<SessionPackage[]>;
+  getSessionPackageById(id: string): Promise<SessionPackage | null>;
+  createSessionPackage(pkg: SessionPackage): Promise<SessionPackage>;
+  updateSessionPackage(pkg: SessionPackage): Promise<SessionPackage>;
+  deleteSessionPackage(id: string): Promise<boolean>;
+
   // Finance
   getAllTuitionInvoices(): Promise<TuitionInvoice[]>;
   getTuitionInvoicesByStudentId(studentId: string): Promise<TuitionInvoice[]>;
@@ -88,8 +96,6 @@ export interface IRepository {
   markNotificationAsRead(id: string): Promise<boolean>;
   markAllNotificationsAsRead(userId?: string): Promise<boolean>;
 
-
-
-    // Reset/Re-seed
+  // Reset/Re-seed
   resetData(): Promise<void>;
 }
