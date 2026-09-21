@@ -1,6 +1,6 @@
-import { AuthService } from '@/services/AuthService';
 import { NextResponse } from 'next/server';
 import { repo } from '@/repositories';
+import { StudentService } from '@/services/StudentService';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   }
 
   let students = await repo.getAllStudents();
-  // Class membership is normalized in the ClassStudents sheet, not duplicated in Students.
+  // Class membership is normalized in the ClassStudents sheet, không trùng lặp trong Students.
   const allClasses = await repo.getAllClasses();
   const classIdsByStudent = new Map<string, string[]>();
   allClasses.forEach(cls => (cls.studentIds || []).forEach(studentId => {
@@ -37,8 +37,10 @@ export async function GET(request: Request) {
     students = students.filter(s => 
       s.id.toLowerCase().includes(search) ||
       s.name.toLowerCase().includes(search) ||
-      s.phone.includes(search) ||
-      s.email.toLowerCase().includes(search)
+      (s.phone && s.phone.includes(search)) ||
+      (s.email && s.email.toLowerCase().includes(search)) ||
+      (s.discordId && s.discordId.includes(search)) ||
+      (s.discordUsername && s.discordUsername.toLowerCase().includes(search))
     );
   }
 
@@ -56,88 +58,80 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, dateOfBirth, gender = 'Nam', phone, email, address, enrolledClassIds = [] } = body;
+    const {
+      name,
+      phone,
+      discordId,
+      discordUsername,
+      dateOfBirth,
+      gender = 'Nam',
+      email,
+      address,
+      enrolledClassIds = [],
+      fastOnboarding = false,
+      actorId = 'ADMIN001',
+      actorName = 'Quản trị viên',
+    } = body;
 
-    if (!name || !phone) {
-      return NextResponse.json({ error: 'Vui lòng cung cấp đầy đủ họ tên và số điện thoại' }, { status: 400 });
+    if (!name || !name.trim()) {
+      return NextResponse.json({ error: 'Vui lòng cung cấp họ và tên học sinh' }, { status: 400 });
     }
 
-    const allStudents = await repo.getAllStudents();
-    const maxStudentNumber = allStudents.reduce((max, student) => {
-      const match = String(student.id || '').match(/^ST(\d+)$/i);
-      return match ? Math.max(max, Number(match[1])) : max;
-    }, 0);
-    const nextNum = maxStudentNumber + 1;
-    const newId = `ST${nextNum.toString().padStart(3, '0')}`;
+    const studentService = new StudentService(repo);
 
-    const studentEmail = email?.trim() ? email.trim() : `${newId.toLowerCase()}@student.local`;
+    // Hỗ trợ Fast Onboarding hoặc Full Form
+    const result = await studentService.createStudentFastOnboarding({
+      name: name.trim(),
+      phone: phone || '',
+      discordId,
+      discordUsername,
+      actorId,
+      actorName,
+    });
 
-    const newStudent = {
-      id: newId,
-      name,
-      dateOfBirth: dateOfBirth || '2008-01-01',
-      gender,
-      phone,
-      email: studentEmail,
-      address: address || 'TP. Hồ Chí Minh',
-      status: 'Đang học' as const,
-      enrolledClassIds,
-      createdAt: new Date().toISOString(),
-    };
+    const student = result.student;
 
-    await repo.createStudent(newStudent);
+    // Nếu form gửi các trường mở rộng (ngày sinh, giới tính, địa chỉ, lớp học...)
+    let updatedDetails = false;
+    if (dateOfBirth && dateOfBirth !== '2008-01-01') {
+      student.dateOfBirth = dateOfBirth;
+      updatedDetails = true;
+    }
+    if (gender && gender !== 'Nam') {
+      student.gender = gender;
+      updatedDetails = true;
+    }
+    if (address && address !== 'TP. Hồ Chí Minh') {
+      student.address = address;
+      updatedDetails = true;
+    }
+    if (email && email.trim()) {
+      student.email = email.trim();
+      updatedDetails = true;
+    }
 
-    // Đồng bộ 2 chiều: Tự động tạo tài khoản người dùng cho học sinh nếu chưa tồn tại
-    try {
-      const existingUser = await repo.getUserById(newId);
-      if (!existingUser) {
-        const authService = new AuthService(repo);
-        const newUser = {
-          id: newId,
-          username: newId.toLowerCase(),
-          passwordHash: authService.hashPassword('student123'),
-          role: 'STUDENT' as const,
-          name: newStudent.name,
-          email: studentEmail,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-        };
-        await repo.createUser(newUser);
-
-        await repo.addAuditLog({
-          action: 'CREATE',
-          userId: 'ADMIN001',
-          userName: 'Quản trị viên',
-          userRole: 'ADMIN',
-          targetResource: 'USER_ACCOUNT',
-          targetId: newId,
-          details: `Tự động tạo tài khoản người dùng [${newId}] cho học viên ${newStudent.name}`,
-        });
-      }
-    } catch (userSyncErr: any) {
-      console.error(`[SYNC-USER-ERROR] Không thể tự động tạo tài khoản cho học viên ${newId}:`, userSyncErr);
+    if (updatedDetails) {
+      await repo.updateStudent(student);
     }
 
     // Gán học sinh vào các lớp nếu có chọn
-    for (const classId of enrolledClassIds) {
-      const cls = await repo.getClassById(classId);
-      if (cls && !cls.studentIds.includes(newId)) {
-        cls.studentIds.push(newId);
-        await repo.updateClass(cls);
+    if (enrolledClassIds && Array.isArray(enrolledClassIds) && enrolledClassIds.length > 0) {
+      for (const classId of enrolledClassIds) {
+        const cls = await repo.getClassById(classId);
+        if (cls && !cls.studentIds.includes(student.id)) {
+          cls.studentIds.push(student.id);
+          await repo.updateClass(cls);
+        }
       }
+      student.enrolledClassIds = enrolledClassIds;
     }
 
-    await repo.addAuditLog({
-      action: 'CREATE',
-      userId: 'ADMIN001',
-      userName: 'Quản trị viên',
-      userRole: 'ADMIN',
-      targetResource: 'STUDENT',
-      targetId: newId,
-      details: `Thêm học viên mới ${newId} - ${name}`,
+    return NextResponse.json({
+      success: true,
+      student,
+      defaultPassword: result.defaultPassword,
+      message: `Thêm học viên ${student.id} (${student.name}) thành công`,
     });
-
-    return NextResponse.json({ success: true, student: newStudent, message: `Thêm học viên ${newId} thành công` });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Lỗi khi tạo học viên' }, { status: 500 });
   }
@@ -158,7 +152,7 @@ export async function DELETE(request: Request) {
     }
 
     // Xoá học viên khỏi các lớp học liên quan
-    for (const classId of student.enrolledClassIds) {
+    for (const classId of student.enrolledClassIds || []) {
       const cls = await repo.getClassById(classId);
       if (cls) {
         cls.studentIds = cls.studentIds.filter(stId => stId !== id);
@@ -167,6 +161,13 @@ export async function DELETE(request: Request) {
     }
 
     await repo.deleteStudent(id);
+
+    // Cũng có thể xóa hoặc khóa tài khoản user tương ứng nếu có
+    try {
+      await repo.deleteUser(id);
+    } catch (e) {
+      // bỏ qua nếu không có user
+    }
 
     await repo.addAuditLog({
       action: 'DELETE',

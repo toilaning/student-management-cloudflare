@@ -1,0 +1,145 @@
+import { IRepository } from '@/repositories/IRepository';
+import { Student } from '@/types/student';
+import { AuthService } from './AuthService';
+
+export class StudentService {
+  constructor(private repo: IRepository) {}
+
+  /**
+   * Sinh mã học sinh dạng nămstt (YYxxx) tự động tăng.
+   * Ví dụ: năm 2026 -> YY = "26". Tìm mã 26xxx lớn nhất và tăng lên 1 (padStart 3 số: 26001).
+   */
+  public async generateNextStudentId(targetYear?: number): Promise<string> {
+    const year = targetYear || new Date().getFullYear();
+    const yearPrefix = year.toString().slice(-2); // '26' for 2026
+
+    const allStudents = await this.repo.getAllStudents();
+    
+    // Tìm các mã dạng {yearPrefix}xxx
+    const regex = new RegExp(`^${yearPrefix}(\\d{3,})$`);
+    let maxSequence = 0;
+
+    for (const student of allStudents) {
+      const match = String(student.id || '').trim().match(regex);
+      if (match) {
+        const seq = parseInt(match[1], 10);
+        if (seq > maxSequence) {
+          maxSequence = seq;
+        }
+      }
+    }
+
+    const nextSeq = maxSequence + 1;
+    return `${yearPrefix}${nextSeq.toString().padStart(3, '0')}`;
+  }
+
+  /**
+   * Tạo nhanh học sinh (1-Click Fast Onboarding):
+   * - Sinh mã học sinh dạng YYxxx (ví dụ 26001)
+   * - Tạo Student trong database/repo
+   * - Tự động tạo tài khoản User: username = 26xxx (lowercase/standard), password mặc định = '123456', role = 'STUDENT'
+   * - Ghi Audit Log
+   */
+  public async createStudentFastOnboarding(params: {
+    name: string;
+    phone?: string;
+    discordId?: string;
+    discordUsername?: string;
+    actorId?: string;
+    actorName?: string;
+  }): Promise<{ student: Student; defaultPassword: string }> {
+    const { name, phone = '', discordId, discordUsername, actorId = 'ADMIN001', actorName = 'Quản trị viên' } = params;
+
+    if (!name || !name.trim()) {
+      throw new Error('Họ và tên học sinh là bắt buộc');
+    }
+
+    const cleanDiscordId = discordId?.trim() || undefined;
+    const cleanDiscordUsername = discordUsername?.trim() || undefined;
+
+    const studentId = await this.generateNextStudentId();
+    const studentEmail = `${studentId.toLowerCase()}@student.local`;
+    const defaultPassword = '123456';
+
+    const newStudent: Student = {
+      id: studentId,
+      name: name.trim(),
+      dateOfBirth: '2008-01-01',
+      gender: 'Nam',
+      phone: phone.trim() || '0900000000',
+      email: studentEmail,
+      address: 'TP. Hồ Chí Minh',
+      status: 'Đang học',
+      enrolledClassIds: [],
+      discordId: cleanDiscordId,
+      discordUsername: cleanDiscordUsername,
+      createdAt: new Date().toISOString(),
+    };
+
+    await this.repo.createStudent(newStudent);
+
+    // Tạo tài khoản User cho học sinh
+    const authService = new AuthService(this.repo);
+    const existingUser = await this.repo.getUserById(studentId);
+    if (!existingUser) {
+      await this.repo.createUser({
+        id: studentId,
+        username: studentId.toLowerCase(),
+        passwordHash: authService.hashPassword(defaultPassword),
+        role: 'STUDENT',
+        name: newStudent.name,
+        email: studentEmail,
+        isActive: true,
+      });
+    }
+
+    await this.repo.addAuditLog({
+      action: 'CREATE',
+      userId: actorId,
+      userName: actorName,
+      userRole: 'ADMIN',
+      targetResource: 'STUDENT',
+      targetId: studentId,
+      details: `Tạo nhanh học sinh mới [${studentId}] - ${name.trim()} (Discord ID: ${cleanDiscordId || 'chưa liên kết'})`,
+    });
+
+    return {
+      student: newStudent,
+      defaultPassword,
+    };
+  }
+
+  /**
+   * Cập nhật thông tin Discord ID (Snowflake) / Discord Username linh hoạt
+   */
+  public async updateDiscordInfo(
+    studentId: string,
+    params: { discordId?: string | null; discordUsername?: string | null; actorId?: string; actorRole?: string }
+  ): Promise<Student> {
+    const student = await this.repo.getStudentById(studentId);
+    if (!student) {
+      throw new Error(`Không tìm thấy học sinh có mã ${studentId}`);
+    }
+
+    const oldDiscordId = student.discordId || 'chưa có';
+    const cleanDiscordId = params.discordId !== undefined ? (params.discordId ? params.discordId.trim() : undefined) : student.discordId;
+    const cleanDiscordUsername = params.discordUsername !== undefined ? (params.discordUsername ? params.discordUsername.trim() : undefined) : student.discordUsername;
+
+    student.discordId = cleanDiscordId;
+    student.discordUsername = cleanDiscordUsername;
+
+    const updated = await this.repo.updateStudent(student);
+
+    await this.repo.addAuditLog({
+      action: 'UPDATE',
+      userId: params.actorId || studentId,
+      userName: params.actorRole === 'STUDENT' ? student.name : 'Quản trị viên',
+      userRole: params.actorRole || 'STUDENT',
+      targetResource: 'STUDENT',
+      targetId: studentId,
+      details: `Cập nhật thông tin Discord cho học sinh [${studentId}]: Snowflake ID "${oldDiscordId}" -> "${cleanDiscordId || 'đã xóa'}"`,
+    });
+
+    return updated;
+  }
+}
