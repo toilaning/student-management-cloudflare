@@ -5,6 +5,17 @@ import { AttendanceRecord } from '@/types/attendance';
 
 export const dynamic = 'force-dynamic';
 
+export interface StudentAttendanceDetail {
+  id: string;
+  name: string;
+  phone?: string;
+  discordId?: string;
+  discordUsername?: string;
+  checkinTime?: string;
+  method?: string;
+  note?: string;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -62,15 +73,20 @@ export async function GET(request: Request) {
     const recordMap = new Map<string, AttendanceRecord>();
     records.forEach(r => recordMap.set(r.studentId, r));
 
+    // Lấy toàn bộ danh sách sinh viên để lấy tên và thông tin liên lạc
+    const allStudents = await repo.getAllStudents();
+    const studentInfoMap = new Map<string, any>();
+    allStudents.forEach(st => studentInfoMap.set(st.id, st));
+
     // Thống kê 4 nhóm theo yêu cầu:
-    // 1. Tham gia (Đã điểm danh: Có mặt, Đi muộn, Điểm danh bù)
-    // 2. Chưa tham gia (Chưa được điểm danh)
-    // 3. Vắng có phép
-    // 4. Vắng không phép
-    let attendedCount = 0;
-    let notAttendedCount = 0;
-    let excusedCount = 0;
-    let unexcusedCount = 0;
+    // 1. attended: Tham gia (Đã điểm danh: Có mặt, Đi muộn, Điểm danh bù)
+    // 2. notAttended: Chưa tham gia (Chưa được điểm danh)
+    // 3. excused: Vắng có phép
+    // 4. unexcused: Vắng không phép
+    const attendedList: StudentAttendanceDetail[] = [];
+    const notAttendedList: StudentAttendanceDetail[] = [];
+    const excusedList: StudentAttendanceDetail[] = [];
+    const unexcusedList: StudentAttendanceDetail[] = [];
 
     const allStudentIds = new Set<string>([...rosterStudentIds]);
     records.forEach(r => allStudentIds.add(r.studentId));
@@ -79,17 +95,31 @@ export async function GET(request: Request) {
 
     allStudentIds.forEach(stId => {
       const rec = recordMap.get(stId);
+      const stObj = studentInfoMap.get(stId);
+      const studentName = stObj?.name || `Học viên ${stId}`;
+
+      const detail: StudentAttendanceDetail = {
+        id: stId,
+        name: studentName,
+        phone: stObj?.phone,
+        discordId: stObj?.discordId,
+        discordUsername: stObj?.discordUsername,
+        checkinTime: rec?.checkinTime,
+        method: rec?.method,
+        note: rec?.note,
+      };
+
       if (!rec) {
-        notAttendedCount++;
+        notAttendedList.push(detail);
       } else {
         if (rec.status === 'Có mặt' || rec.status === 'Đi muộn' || rec.status === 'Điểm danh bù') {
-          attendedCount++;
+          attendedList.push(detail);
         } else if (rec.status === 'Vắng có phép') {
-          excusedCount++;
+          excusedList.push(detail);
         } else if (rec.status === 'Vắng không phép') {
-          unexcusedCount++;
+          unexcusedList.push(detail);
         } else {
-          notAttendedCount++;
+          notAttendedList.push(detail);
         }
       }
     });
@@ -101,11 +131,17 @@ export async function GET(request: Request) {
       className: cls?.name || activeSlot.classId,
       stats: {
         totalStudents,
-        attendedCount,       // Tham gia (Đã điểm danh)
-        notAttendedCount,    // Chưa tham gia
-        excusedCount,        // Vắng có phép
-        unexcusedCount,      // Vắng không phép
-        attendanceRate: totalStudents > 0 ? Math.round((attendedCount / totalStudents) * 100) : 0,
+        attendedCount: attendedList.length,
+        notAttendedCount: notAttendedList.length,
+        excusedCount: excusedList.length,
+        unexcusedCount: unexcusedList.length,
+        attendanceRate: totalStudents > 0 ? Math.round((attendedList.length / totalStudents) * 100) : 0,
+      },
+      studentsByStatus: {
+        attended: attendedList,
+        notAttended: notAttendedList,
+        excused: excusedList,
+        unexcused: unexcusedList,
       }
     });
   } catch (err: any) {
