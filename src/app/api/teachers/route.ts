@@ -95,3 +95,44 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: error?.message || 'Lỗi khi xoá giảng viên' }, { status: 500 });
   }
 }
+
+export async function PUT(request: Request) {
+  try {
+    const body = await request.json();
+    const { id, name, specialty, phone, email, bio, status } = body;
+
+    if (!id || !name || !specialty) {
+      return NextResponse.json({ error: "Vui lòng cung cấp ID, họ tên và chuyên môn" }, { status: 400 });
+    }
+
+    const existing = await repo.getTeacherById(id);
+    if (!existing) {
+      return NextResponse.json({ error: "Không tìm thấy giảng viên" }, { status: 404 });
+    }
+
+    const updatedTeacher = {
+      ...existing,
+      name,
+      specialty,
+      phone: phone || existing.phone,
+      email: email || existing.email,
+      bio: bio !== undefined ? bio : existing.bio,
+      status: status || existing.status,
+    };
+    const updated = await repo.updateTeacher(updatedTeacher);
+
+    await repo.addAuditLog({
+      action: "UPDATE",
+      userId: "ADMIN001",
+      userName: "Quản trị viên",
+      userRole: "ADMIN",
+      targetResource: "TEACHER",
+      targetId: id,
+      details: "Cập nhật thông tin giảng viên " + id + " - " + name + " (Chuyên môn: " + specialty + ")",
+    });
+
+    return NextResponse.json({ success: true, teacher: updated, message: "Cập nhật giảng viên " + id + " thành công" });
+  } catch (error: any) {
+    return NextResponse.json({ error: error?.message || "Lỗi khi cập nhật giảng viên" }, { status: 500 });
+  }
+}

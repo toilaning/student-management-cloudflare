@@ -26,7 +26,7 @@ export default function TeacherDashboardPage() {
           fetch(`/api/classes?teacherId=${currentUser?.id || ""}`),
           fetch(`/api/schedule?teacherId=${currentUser?.id || ""}`),
           fetch(`/api/requests?teacherId=${currentUser?.id || ""}`),
-          fetch(`/api/payroll?teacherId=${currentUser?.id || ""}&month=2026-09`),
+          Promise.resolve({ json: () => ({ payroll: null }) }),
         ]);
 
         const clsData = await clsRes.json();

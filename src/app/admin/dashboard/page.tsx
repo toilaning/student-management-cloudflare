@@ -46,7 +46,7 @@ export default function AdminDashboardPage() {
 
         const [tuitionData, payrollData, logsData, slotsData] = await Promise.all([
           fetchSafe('/api/finance'),
-          fetchSafe('/api/payroll?month=2026-09'),
+          Promise.resolve({ payrolls: [] }),
           fetchSafe('/api/audit'),
           fetchSafe('/api/schedule?date=2026-09-02'),
         ]);

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from '@/components/common/Header';
 import { Teacher } from '@/types/teacher';
-import { UserCheck, Mail, Phone, BookOpen, Coins, Search, Plus, Trash2, X, Check } from 'lucide-react';
+import { UserCheck, Mail, Phone, BookOpen, Coins, Search, Plus, Trash2, Edit3, X, Check } from 'lucide-react';
 import { PaginationControls } from '@/components/common/PaginationControls';
 
 export default function AdminTeachersPage() {
@@ -15,6 +15,17 @@ export default function AdminTeachersPage() {
 
   // Modal thêm giảng viên
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    id: '',
+    name: '',
+    specialty: '',
+    hourlyRate: 350000,
+    phone: '',
+    email: '',
+    bio: '',
+    status: 'Đang dạy' as 'Đang dạy' | 'Tạm nghỉ'
+  });
   const [formData, setFormData] = useState({
     name: '',
     specialty: '',
@@ -62,6 +73,47 @@ export default function AdminTeachersPage() {
         await loadTeachers();
       } else {
         alert(data.error || 'Thêm giảng viên thất bại');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Lỗi mạng');
+    }
+  };
+
+  
+  const handleOpenEdit = (tc: Teacher) => {
+    setEditFormData({
+      id: tc.id,
+      name: tc.name,
+      specialty: tc.specialty,
+      hourlyRate: tc.hourlyRate || 350000,
+      phone: tc.phone || '',
+      email: tc.email || '',
+      bio: tc.bio || '',
+      status: (tc.status === 'Đang dạy' ? 'Đang dạy' : 'Tạm nghỉ')
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateTeacher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editFormData.name || !editFormData.phone || !editFormData.specialty) {
+      alert('Vui lòng điền đủ họ tên, chuyên môn và số điện thoại');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/teachers', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editFormData),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setActionMessage(data.message || 'Cập nhật giảng viên thành công');
+        setShowEditModal(false);
+        await loadTeachers();
+      } else {
+        alert(data.error || 'Cập nhật giảng viên thất bại');
       }
     } catch (e: any) {
       alert(e.message || 'Lỗi mạng');
@@ -175,7 +227,15 @@ export default function AdminTeachersPage() {
                     }`}>
                       {tc.status}
                     </span>
+                    
                     <button
+                      onClick={() => handleOpenEdit(tc)}
+                      title="Chỉnh sửa thông tin"
+                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+                    >
+                      <Edit3 size={15} />
+                    </button>
+<button
                       onClick={() => handleDeleteTeacher(tc)}
                       title="Xoá giảng viên"
                       className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
@@ -227,6 +287,117 @@ export default function AdminTeachersPage() {
           />
         </div>
       </main>
+
+
+      {/* Modal Chỉnh sửa Giảng viên */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div>
+                <h3 className="font-bold text-slate-800 text-base">Chỉnh Sửa Thông Tin Giảng Viên</h3>
+                <span className="text-xs text-slate-400 font-semibold">Mã giảng viên: {editFormData.id}</span>
+              </div>
+              <button 
+                onClick={() => setShowEditModal(false)}
+                className="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateTeacher} className="p-5 space-y-4 text-xs overflow-y-auto">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Họ và tên *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ví dụ: Thầy Trần Quang Huy"
+                  value={editFormData.name}
+                  onChange={e => setEditFormData({ ...editFormData, name: e.target.value })}
+                  className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Bộ môn / Chuyên môn (Điền tự do) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Toán Nâng Cao, IELTS, Vẽ..."
+                    value={editFormData.specialty}
+                    onChange={e => setEditFormData({ ...editFormData, specialty: e.target.value })}
+                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Trạng thái giảng dạy *</label>
+                  <select
+                    value={editFormData.status}
+                    onChange={e => setEditFormData({ ...editFormData, status: e.target.value as any })}
+                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs font-semibold"
+                  >
+                    <option value="Đang dạy">Đang dạy</option>
+                    <option value="Tạm nghỉ">Tạm nghỉ</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Số điện thoại *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="0913..."
+                    value={editFormData.phone}
+                    onChange={e => setEditFormData({ ...editFormData, phone: e.target.value })}
+                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    placeholder="teacher@example.com"
+                    value={editFormData.email}
+                    onChange={e => setEditFormData({ ...editFormData, email: e.target.value })}
+                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Mô tả / Tiểu sử ngắn</label>
+                <textarea
+                  rows={3}
+                  placeholder="Kinh nghiệm giảng dạy, chứng chỉ..."
+                  value={editFormData.bio}
+                  onChange={e => setEditFormData({ ...editFormData, bio: e.target.value })}
+                  className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-xs"
+                >
+                  Lưu Thay Đổi
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal Thêm Giảng viên */}
       {showAddModal && (
