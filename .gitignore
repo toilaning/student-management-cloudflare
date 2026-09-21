@@ -42,3 +42,6 @@ tsconfig.tsbuildinfo
 # Cloudflare OpenNext
 .open-next/
 .wrangler/
+
+# Vercel output fallback
+.vercel/

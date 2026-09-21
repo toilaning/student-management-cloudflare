@@ -13,7 +13,7 @@
     "bot:dev": "node --watch discord-bot/src/index.js",
     "build:cf": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion",
     "preview:cf": "opennextjs-cloudflare preview",
-    "pages:build": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion"
+    "pages:build": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion && mkdir -p .vercel/output && rm -rf .vercel/output/static && ln -s ../../.open-next/assets .vercel/output/static"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
