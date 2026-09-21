@@ -484,38 +484,7 @@ function AdminGuidesContent() {
               </div>
             </div>
 
-            {/* Quy trình nộp bài tập qua kênh #nop-bai-tap */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6 shadow-xs space-y-3">
-              <div className="flex items-center gap-2">
-                <MessageSquare size={18} className="text-indigo-600" />
-                <h3 className="font-bold text-slate-800 text-sm sm:text-base">
-                  Quy Trình Nộp Bài Tập Tự Động Tại Kênh <code className="text-indigo-600">#nop-bai-tap</code>
-                </h3>
-              </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Học sinh chỉ cần gửi link bài tập trực tiếp vào kênh quy định mà không cần đăng nhập vào trang web:
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs pt-1">
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
-                  <div className="font-bold text-slate-800">1. Cú pháp gửi tin nhắn</div>
-                  <p className="text-slate-500">
-                    Học sinh gửi tin nhắn kèm link (GitHub, Google Drive, Figma) và mã bài tập (ví dụ: <code className="bg-white px-1.5 py-0.5 rounded border text-indigo-600 font-bold">HW001</code>).
-                  </p>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
-                  <div className="font-bold text-slate-800">2. Bot tiếp nhận &amp; ghi nhận</div>
-                  <p className="text-slate-500">
-                    Discord Bot tự động phân tích cú pháp, gọi API <code className="text-slate-700 font-bold">POST /api/homework/submit</code> và cập nhật trạng thái nộp bài.
-                  </p>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
-                  <div className="font-bold text-slate-800">3. Phản hồi xác nhận</div>
-                  <p className="text-slate-500">
-                    Bot thả reaction hoặc gửi tin nhắn thông báo nộp thành công kèm mốc thời gian chính xác tới học sinh.
-                  </p>
-                </div>
-              </div>
-            </div>
+
           </div>
         )}
       </main>

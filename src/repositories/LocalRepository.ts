@@ -1,4 +1,3 @@
-import { HomeworkTask, HomeworkSubmission } from '@/types/homework';
 import { AppNotification } from '@/types/notification';
 import { IRepository } from './IRepository';
 import { User } from '@/types/auth';
@@ -26,8 +25,6 @@ export class LocalRepository implements IRepository {
   private payrollRecords: Map<string, PayrollRecord> = new Map();
   private auditLogs: AuditLog[] = [];
   private notifications: Map<string, AppNotification> = new Map();
-  private homeworkTasks: Map<string, HomeworkTask> = new Map();
-  private homeworkSubmissions: Map<string, HomeworkSubmission> = new Map();
 
   private isInitialized = false;
 
@@ -57,9 +54,6 @@ export class LocalRepository implements IRepository {
     seed.tuitionInvoices.forEach(ti => this.tuitionInvoices.set(ti.id, ti));
     seed.payrollRecords.forEach(pr => this.payrollRecords.set(pr.id, pr));
     this.auditLogs = [...seed.auditLogs];
-
-
-    this.seedHomework();
     this.isInitialized = true;
   }
 
@@ -400,149 +394,6 @@ export class LocalRepository implements IRepository {
     return newLog;
   }
 
-  // Homework Seeds & CRUD
-  private seedHomework() {
-    const now = new Date();
-    const plus3Days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
-    const plus5Days = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString();
-    const minus1Day = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString();
-    const minus2Days = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString();
-
-    const tasks: HomeworkTask[] = [
-      {
-        id: 'HW0001',
-        classId: 'CLS01',
-        title: 'Bài 01: Phác thảo dáng người cơ bản',
-        description: 'Vẽ 5 dáng người động tác khác nhau bằng chì 2B hoặc 4B trên giấy A3 hoặc Digital. Chú ý trục cơ thể và tỷ lệ đầu-thân.',
-        deadline: plus3Days,
-        createdBy: 'TEA001',
-        createdAt: minus2Days,
-      },
-      {
-        id: 'HW0002',
-        classId: 'CLS01',
-        title: 'Bài 02: Đánh bóng khối cầu & khối lập phương',
-        description: 'Luyện sắc độ 5 bậc (đậm, trung gian, sáng, phản quang, bóng đổ). Chất liệu chì than hoặc than mềm.',
-        deadline: minus1Day,
-        createdBy: 'TEA001',
-        createdAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: 'HW0003',
-        classId: 'CLS02',
-        title: 'Bài 01: Phối màu sắc độ cảnh hoàng hôn',
-        description: 'Sử dụng màu nước (Watercolor) hoặc Gouache, thực hiện bài chuyển màu gradient bầu trời hoàng hôn kèm bóng cây silhouette.',
-        deadline: plus5Days,
-        createdBy: 'TEA002',
-        createdAt: minus1Day,
-      }
-    ];
-
-    tasks.forEach(t => this.homeworkTasks.set(t.id, t));
-
-    const submissions: HomeworkSubmission[] = [
-      {
-        id: 'SUB0001',
-        taskId: 'HW0001',
-        studentId: 'ST001',
-        submittedAt: minus1Day,
-        status: 'DA_NOP',
-        discordMessageUrl: 'https://discord.com/channels/123456789/987654321/100000001',
-        note: 'Em nộp bài phác thảo 5 dáng người ạ. Thầy nhận xét giúp em góc nghiêng 3/4 nhé!',
-      },
-      {
-        id: 'SUB0002',
-        taskId: 'HW0001',
-        studentId: 'ST002',
-        submittedAt: minus1Day,
-        status: 'CHUA_NOP',
-      },
-      {
-        id: 'SUB0003',
-        taskId: 'HW0002',
-        studentId: 'ST001',
-        submittedAt: minus1Day,
-        status: 'DA_NOP',
-        discordMessageUrl: 'https://discord.com/channels/123456789/987654321/100000002',
-        note: 'Bài đánh bóng khối cầu nộp đúng hạn.',
-      },
-      {
-        id: 'SUB0004',
-        taskId: 'HW0002',
-        studentId: 'ST002',
-        submittedAt: now.toISOString(),
-        status: 'QUA_HAN',
-        discordMessageUrl: 'https://discord.com/channels/123456789/987654321/100000003',
-        note: 'Em nộp muộn do máy bị lỗi lưu file ạ.',
-      },
-      {
-        id: 'SUB0005',
-        taskId: 'HW0003',
-        studentId: 'ST003',
-        submittedAt: now.toISOString(),
-        status: 'CHUA_NOP',
-      }
-    ];
-
-    submissions.forEach(s => this.homeworkSubmissions.set(s.id, s));
-  }
-
-  public async getAllHomeworkTasks(): Promise<HomeworkTask[]> {
-    return Array.from(this.homeworkTasks.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }
-
-  public async getHomeworkTasksByClassId(classId: string): Promise<HomeworkTask[]> {
-    return Array.from(this.homeworkTasks.values())
-      .filter(t => t.classId === classId)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }
-
-  public async createHomeworkTask(task: HomeworkTask): Promise<HomeworkTask> {
-    const id = task.id || `HW${(this.homeworkTasks.size + 1).toString().padStart(4, '0')}`;
-    const newTask: HomeworkTask = {
-      ...task,
-      id,
-      createdAt: task.createdAt || new Date().toISOString(),
-    };
-    this.homeworkTasks.set(id, newTask);
-    return newTask;
-  }
-
-  public async getHomeworkSubmissionsByTaskId(taskId: string): Promise<HomeworkSubmission[]> {
-    return Array.from(this.homeworkSubmissions.values())
-      .filter(s => s.taskId === taskId)
-      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
-  }
-
-  public async getHomeworkSubmissionsByStudentId(studentId: string): Promise<HomeworkSubmission[]> {
-    return Array.from(this.homeworkSubmissions.values())
-      .filter(s => s.studentId === studentId)
-      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
-  }
-
-  public async upsertHomeworkSubmission(submission: HomeworkSubmission): Promise<HomeworkSubmission> {
-    let existingKey: string | undefined;
-    if (submission.id && this.homeworkSubmissions.has(submission.id)) {
-      existingKey = submission.id;
-    } else {
-      for (const [key, val] of this.homeworkSubmissions.entries()) {
-        if (val.taskId === submission.taskId && val.studentId === submission.studentId) {
-          existingKey = key;
-          break;
-        }
-      }
-    }
-
-    const id = existingKey || submission.id || `SUB${(this.homeworkSubmissions.size + 1).toString().padStart(4, '0')}`;
-    const updated: HomeworkSubmission = {
-      ...submission,
-      id,
-      submittedAt: submission.submittedAt || new Date().toISOString(),
-    };
-
-    this.homeworkSubmissions.set(id, updated);
-    return updated;
-  }
 }
 
 export const localRepo = LocalRepository.getInstance();

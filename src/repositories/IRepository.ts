@@ -1,4 +1,3 @@
-import { HomeworkTask, HomeworkSubmission } from '@/types/homework';
 import { AppNotification } from '@/types/notification';
 import { User } from '@/types/auth';
 import { Student } from '@/types/student';
@@ -89,15 +88,7 @@ export interface IRepository {
   markNotificationAsRead(id: string): Promise<boolean>;
   markAllNotificationsAsRead(userId?: string): Promise<boolean>;
 
-  // Homework Tasks
-  getAllHomeworkTasks(): Promise<HomeworkTask[]>;
-  getHomeworkTasksByClassId(classId: string): Promise<HomeworkTask[]>;
-  createHomeworkTask(task: HomeworkTask): Promise<HomeworkTask>;
 
-  // Homework Submissions
-  getHomeworkSubmissionsByTaskId(taskId: string): Promise<HomeworkSubmission[]>;
-  getHomeworkSubmissionsByStudentId(studentId: string): Promise<HomeworkSubmission[]>;
-  upsertHomeworkSubmission(submission: HomeworkSubmission): Promise<HomeworkSubmission>;
 
     // Reset/Re-seed
   resetData(): Promise<void>;

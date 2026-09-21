@@ -243,37 +243,7 @@ CREATE INDEX IF NOT EXISTS idx_notifications_recipient_role ON notifications(rec
 CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
 
 
--- 14. HOMEWORK_TASKS TABLE
-CREATE TABLE IF NOT EXISTS homework_tasks (
-    id VARCHAR(50) PRIMARY KEY,
-    class_id VARCHAR(50) NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
-    title VARCHAR(255) NOT NULL,
-    description TEXT,
-    deadline TIMESTAMPTZ NOT NULL,
-    created_by VARCHAR(50) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
 
-CREATE INDEX IF NOT EXISTS idx_homework_tasks_class_id ON homework_tasks(class_id);
-CREATE INDEX IF NOT EXISTS idx_homework_tasks_deadline ON homework_tasks(deadline);
-
--- 15. HOMEWORK_SUBMISSIONS TABLE
-CREATE TABLE IF NOT EXISTS homework_submissions (
-    id VARCHAR(50) PRIMARY KEY,
-    task_id VARCHAR(50) NOT NULL REFERENCES homework_tasks(id) ON DELETE CASCADE,
-    student_id VARCHAR(50) NOT NULL REFERENCES students(id) ON DELETE CASCADE,
-    submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    status VARCHAR(50) NOT NULL DEFAULT 'DA_NOP' CHECK (status IN ('CHUA_NOP', 'DA_NOP', 'TRE_HAN')),
-    discord_message_url TEXT,
-    note TEXT,
-    CONSTRAINT uq_task_student UNIQUE (task_id, student_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_homework_submissions_task_id ON homework_submissions(task_id);
-CREATE INDEX IF NOT EXISTS idx_homework_submissions_student_id ON homework_submissions(student_id);
-
-ALTER TABLE homework_tasks DISABLE ROW LEVEL SECURITY;
-ALTER TABLE homework_submissions DISABLE ROW LEVEL SECURITY;
 
 -- Disable Row Level Security (RLS) for server-side service role access or enable full service-role bypass
 ALTER TABLE users DISABLE ROW LEVEL SECURITY;

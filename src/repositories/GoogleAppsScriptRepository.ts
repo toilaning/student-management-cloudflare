@@ -1,4 +1,3 @@
-import { HomeworkTask, HomeworkSubmission } from '@/types/homework';
 import { IRepository } from "./IRepository";
 import { AppNotification } from "@/types/notification";
 import { User } from "@/types/auth";
@@ -551,31 +550,6 @@ export class GoogleAppsScriptRepository implements IRepository {
   public async resetData(): Promise<void> {
     await this.callGas("Setup", "initializeSheets");
     await localRepo.resetData();
-  }
-
-  // Homework Tasks & Submissions (Delegated to localRepo or GasService)
-  public async getAllHomeworkTasks(): Promise<HomeworkTask[]> {
-    return localRepo.getAllHomeworkTasks();
-  }
-
-  public async getHomeworkTasksByClassId(classId: string): Promise<HomeworkTask[]> {
-    return localRepo.getHomeworkTasksByClassId(classId);
-  }
-
-  public async createHomeworkTask(task: HomeworkTask): Promise<HomeworkTask> {
-    return localRepo.createHomeworkTask(task);
-  }
-
-  public async getHomeworkSubmissionsByTaskId(taskId: string): Promise<HomeworkSubmission[]> {
-    return localRepo.getHomeworkSubmissionsByTaskId(taskId);
-  }
-
-  public async getHomeworkSubmissionsByStudentId(studentId: string): Promise<HomeworkSubmission[]> {
-    return localRepo.getHomeworkSubmissionsByStudentId(studentId);
-  }
-
-  public async upsertHomeworkSubmission(submission: HomeworkSubmission): Promise<HomeworkSubmission> {
-    return localRepo.upsertHomeworkSubmission(submission);
   }
 
 }

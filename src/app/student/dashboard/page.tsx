@@ -1,6 +1,5 @@
 'use client';
 
-import { StudentHomeworkWidget } from '@/components/homework/StudentHomeworkWidget';
 
 import React, { useState, useEffect } from 'react';
 import { Header } from '@/components/common/Header';
@@ -133,11 +132,7 @@ export default function StudentDashboardPage() {
           </div>
 
           {/* Lịch học & Đơn từ */}
-          {/* Widget Bài tập cần hoàn thành */}
-          {currentUser?.id && (
-            <StudentHomeworkWidget studentId={currentUser.id} />
-          )}
-
+          
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-xs p-5 space-y-4">
               <div className="flex items-center justify-between">

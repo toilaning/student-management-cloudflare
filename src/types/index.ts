@@ -6,4 +6,3 @@ export * from './schedule';
 export * from './attendance';
 export * from './finance';
 export * from './audit';
-export * from './homework';

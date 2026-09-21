@@ -3,10 +3,7 @@ import assert from 'node:assert/strict';
 import { repo } from '../src/repositories';
 import { POST as postAttendance } from '../src/app/api/discord/attendance/route';
 import { POST as postSingleAttendance } from '../src/app/api/discord/attendance/single/route';
-import { POST as postHomeworkSubmit } from '../src/app/api/discord/homework-submit/route';
-import { GET as getPendingTasks } from '../src/app/api/discord/pending-tasks/route';
 import { Student } from '../src/types/student';
-import { HomeworkTask } from '../src/types/homework';
 
 const TEST_SECRET = 'secret_discord_bot_key_2026';
 
@@ -70,12 +67,7 @@ test('Discord Bot & Web API Integration Suite (Giai đoạn 3)', async (t) => {
     const resWrongAuth = await postAttendance(reqWrongAuth);
     assert.equal(resWrongAuth.status, 401, 'Sai token phải trả về 401');
 
-    // 1.3 Kiểm tra endpoint pending-tasks với token sai
-    const reqPendingWrong = new Request('http://localhost:3000/api/discord/pending-tasks', {
-      headers: { 'Authorization': 'Bearer wrong_token' },
-    });
-    const resPendingWrong = await getPendingTasks(reqPendingWrong);
-    assert.equal(resPendingWrong.status, 401);
+
   });
 
   await t.test('2. Kiểm tra API điểm danh Voice (batch check-in) lưu đúng checkinTime và method: BOT', async () => {
@@ -189,99 +181,6 @@ test('Discord Bot & Web API Integration Suite (Giai đoạn 3)', async (t) => {
     assert.equal(dataClick2.already_checked_in, true);
   });
 
-  await t.test('4. Kiểm tra API nộp bài vẽ qua Discord (/api/discord/homework-submit)', async () => {
-    // Tạo bài tập vẽ mẫu
-    const testTask: HomeworkTask = {
-      id: 'HW_DISCORD_ART_01',
-      classId: 'CLS01',
-      title: 'Bài tập vẽ tĩnh vật bình hoa và quả',
-      description: 'Chất liệu chì than 4B, chú ý phối mảng sáng tối',
-      deadline: new Date(Date.now() + 18 * 60 * 60 * 1000).toISOString(), // Còn 18 giờ
-      createdBy: 'GV001',
-      createdAt: new Date().toISOString(),
-    };
-    await repo.createHomeworkTask(testTask);
-
-    const messageUrl = 'https://discord.com/channels/123456/789012/345678901234';
-    const imageUrl = 'https://cdn.discordapp.com/attachments/789012/345678901234/still_life.png';
-    const submittedAt = '2026-09-20 20:45:00';
-
-    const reqSubmit = new Request('http://localhost:3000/api/discord/homework-submit', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${TEST_SECRET}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        discord_id: testStudent1.discordId,
-        message_url: messageUrl,
-        image_urls: [imageUrl],
-        content: 'Em gửi bài vẽ tĩnh vật bình hoa chì than ạ',
-        submitted_at: submittedAt,
-      }),
-    });
-
-    const resSubmit = await postHomeworkSubmit(reqSubmit);
-    assert.equal(resSubmit.status, 200, 'Nộp bài qua Discord phải thành công');
-    const dataSubmit = await resSubmit.json();
-
-    assert.equal(dataSubmit.success, true);
-    assert.equal(dataSubmit.task_id, testTask.id);
-    assert.equal(dataSubmit.student_name, testStudent1.name);
-
-    // Kiểm tra submission được lưu trong Repository
-    const submissions = await repo.getHomeworkSubmissionsByTaskId(testTask.id);
-    const sub = submissions.find(s => s.studentId === testStudent1.id);
-    assert.ok(sub, 'Phải tìm thấy bài nộp của học sinh 1');
-    assert.equal(sub?.status, 'DA_NOP');
-    assert.equal(sub?.discordMessageUrl, messageUrl);
-    assert.equal(sub?.submittedAt, submittedAt);
-
-    // Kiểm tra Audit Log
-    const auditLogs = await repo.getAllAuditLogs();
-    const submitLog = auditLogs.find(l => l.targetId === testTask.id && l.action === 'HOMEWORK_SUBMIT');
-    assert.ok(submitLog, 'Phải có Audit Log ghi nhận nộp bài tập');
-  });
-
-  await t.test('5. Kiểm tra API lấy danh sách bài tập cần nhắc nhở (/api/discord/pending-tasks)', async () => {
-    // Tạo thêm 1 bài tập sắp hết hạn trong 3 giờ (khẩn cấp)
-    const urgentTask: HomeworkTask = {
-      id: 'HW_URGENT_02',
-      classId: 'CLS01',
-      title: 'Phác thảo màu nước phong cảnh chiều',
-      description: 'Khổ A3 màu nước chuyên nghiệp',
-      deadline: new Date(Date.now() + 3.5 * 60 * 60 * 1000).toISOString(), // Còn 3.5 giờ (< 4h)
-      createdBy: 'GV001',
-      createdAt: new Date().toISOString(),
-    };
-    await repo.createHomeworkTask(urgentTask);
-
-    // Gọi API pending-tasks trong vòng 24h
-    const reqPending = new Request('http://localhost:3000/api/discord/pending-tasks?hours=24', {
-      headers: {
-        'Authorization': `Bearer ${TEST_SECRET}`,
-      },
-    });
-
-    const resPending = await getPendingTasks(reqPending);
-    assert.equal(resPending.status, 200);
-    const dataPending = await resPending.json();
-
-    assert.equal(dataPending.success, true);
-    assert.ok(Array.isArray(dataPending.tasks));
-
-    // Tìm bài tập urgentTask trong kết quả
-    const foundUrgent = dataPending.tasks.find((t: any) => t.task_id === urgentTask.id);
-    assert.ok(foundUrgent, 'Phải có bài tập khẩn cấp trong danh sách pending-tasks');
-    assert.ok(foundUrgent.hours_left <= 4, 'Thời gian còn lại phải <= 4 giờ');
-
-    // Kiểm tra danh sách học sinh chưa nộp bài có kèm discord_id
-    const pendingStudents = foundUrgent.pending_students;
-    assert.ok(pendingStudents.length > 0, 'Phải có học sinh chưa nộp');
-    const student1InPending = pendingStudents.find((s: any) => s.student_id === testStudent1.id);
-    assert.ok(student1InPending, 'Học sinh 1 chưa nộp bài này nên phải nằm trong pending');
-    assert.equal(student1InPending.discord_id, testStudent1.discordId);
-  });
 });
 
 import { GET as getStudentClass, POST as postStudentClass } from '../src/app/api/discord/student-class/route';

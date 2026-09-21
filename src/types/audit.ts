@@ -7,8 +7,7 @@ export type AuditAction =
   | 'ATTENDANCE_CHECK' 
   | 'SCHEDULE_CHANGE' 
   | 'PAYMENT_PROCESS' 
-  | 'REQUEST_DECIDE'
-  | 'HOMEWORK_SUBMIT';
+  | 'REQUEST_DECIDE';
 
 export interface AuditLog {
   id: string; // AUD0001..

@@ -1,6 +1,5 @@
 'use client';
 
-import { TeacherHomeworkWidget } from '@/components/homework/TeacherHomeworkWidget';
 
 import React, { useEffect, useState } from 'react';
 import { Header } from '@/components/common/Header';
@@ -165,7 +164,6 @@ export default function AdminDashboardPage() {
         {/* Action Shortcuts & Highlights */}
         {/* Widget Quản lý & Giao bài tập vẽ */}
         <div className="mb-6">
-          <TeacherHomeworkWidget title="Quản lý & Giao bài tập vẽ (Toàn trung tâm)" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

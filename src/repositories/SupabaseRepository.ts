@@ -1,4 +1,3 @@
-import { HomeworkTask, HomeworkSubmission } from '@/types/homework';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { IRepository } from './IRepository';
 import { User } from '@/types/auth';
@@ -410,58 +409,6 @@ function mapNotificationToDb(notif: Omit<AppNotification, 'id' | 'createdAt'> & 
 // SUPABASE REPOSITORY IMPLEMENTATION
 // ============================================================================
 
-
-// --------------------------------------------------------------------------
-// HOMEWORK MAPPERS
-// --------------------------------------------------------------------------
-
-function mapHomeworkTaskFromDb(row: any): HomeworkTask {
-  return {
-    id: row.id,
-    classId: row.class_id,
-    title: row.title,
-    description: row.description || '',
-    deadline: row.deadline,
-    createdBy: row.created_by,
-    createdAt: row.created_at || new Date().toISOString(),
-  };
-}
-
-function mapHomeworkTaskToDb(task: HomeworkTask): any {
-  return {
-    id: task.id,
-    class_id: task.classId,
-    title: task.title,
-    description: task.description,
-    deadline: task.deadline,
-    created_by: task.createdBy,
-    created_at: task.createdAt || new Date().toISOString(),
-  };
-}
-
-function mapHomeworkSubmissionFromDb(row: any): HomeworkSubmission {
-  return {
-    id: row.id,
-    taskId: row.task_id,
-    studentId: row.student_id,
-    submittedAt: row.submitted_at || new Date().toISOString(),
-    status: row.status,
-    discordMessageUrl: row.discord_message_url || undefined,
-    note: row.note || undefined,
-  };
-}
-
-function mapHomeworkSubmissionToDb(sub: HomeworkSubmission): any {
-  return {
-    id: sub.id,
-    task_id: sub.taskId,
-    student_id: sub.studentId,
-    submitted_at: sub.submittedAt || new Date().toISOString(),
-    status: sub.status,
-    discord_message_url: sub.discordMessageUrl || null,
-    note: sub.note || null,
-  };
-}
 
 export class SupabaseRepository implements IRepository {
   private static instance: SupabaseRepository;
@@ -1935,108 +1882,6 @@ export class SupabaseRepository implements IRepository {
       } else {
         throw err;
       }
-    }
-  }
-
-  // --------------------------------------------------------------------------
-  // HOMEWORK
-  // --------------------------------------------------------------------------
-
-  public async getAllHomeworkTasks(): Promise<HomeworkTask[]> {
-    const client = this.getClient();
-    if (!client) {
-      return localRepo.getAllHomeworkTasks();
-    }
-    try {
-      const { data, error } = await client.from('homework_tasks').select('*').order('created_at', { ascending: false });
-      if (error) {
-        return localRepo.getAllHomeworkTasks();
-      }
-      return (data || []).map(mapHomeworkTaskFromDb);
-    } catch {
-      return localRepo.getAllHomeworkTasks();
-    }
-  }
-
-  public async getHomeworkTasksByClassId(classId: string): Promise<HomeworkTask[]> {
-    const client = this.getClient();
-    if (!client) {
-      return localRepo.getHomeworkTasksByClassId(classId);
-    }
-    try {
-      const { data, error } = await client.from('homework_tasks').select('*').eq('class_id', classId).order('created_at', { ascending: false });
-      if (error) {
-        return localRepo.getHomeworkTasksByClassId(classId);
-      }
-      return (data || []).map(mapHomeworkTaskFromDb);
-    } catch {
-      return localRepo.getHomeworkTasksByClassId(classId);
-    }
-  }
-
-  public async createHomeworkTask(task: HomeworkTask): Promise<HomeworkTask> {
-    const client = this.getClient();
-    if (!client) {
-      return localRepo.createHomeworkTask(task);
-    }
-    try {
-      const row = mapHomeworkTaskToDb(task);
-      const { data, error } = await client.from('homework_tasks').insert(row).select().single();
-      if (error) {
-        return localRepo.createHomeworkTask(task);
-      }
-      return data ? mapHomeworkTaskFromDb(data) : task;
-    } catch {
-      return localRepo.createHomeworkTask(task);
-    }
-  }
-
-  public async getHomeworkSubmissionsByTaskId(taskId: string): Promise<HomeworkSubmission[]> {
-    const client = this.getClient();
-    if (!client) {
-      return localRepo.getHomeworkSubmissionsByTaskId(taskId);
-    }
-    try {
-      const { data, error } = await client.from('homework_submissions').select('*').eq('task_id', taskId).order('submitted_at', { ascending: false });
-      if (error) {
-        return localRepo.getHomeworkSubmissionsByTaskId(taskId);
-      }
-      return (data || []).map(mapHomeworkSubmissionFromDb);
-    } catch {
-      return localRepo.getHomeworkSubmissionsByTaskId(taskId);
-    }
-  }
-
-  public async getHomeworkSubmissionsByStudentId(studentId: string): Promise<HomeworkSubmission[]> {
-    const client = this.getClient();
-    if (!client) {
-      return localRepo.getHomeworkSubmissionsByStudentId(studentId);
-    }
-    try {
-      const { data, error } = await client.from('homework_submissions').select('*').eq('student_id', studentId).order('submitted_at', { ascending: false });
-      if (error) {
-        return localRepo.getHomeworkSubmissionsByStudentId(studentId);
-      }
-      return (data || []).map(mapHomeworkSubmissionFromDb);
-    } catch {
-      return localRepo.getHomeworkSubmissionsByStudentId(studentId);
-    }
-  }
-
-  public async upsertHomeworkSubmission(submission: HomeworkSubmission): Promise<HomeworkSubmission> {
-    const client = this.getClient();
-    if (!client) {
-      return localRepo.upsertHomeworkSubmission(submission);
-    }
-    try {
-      const row = mapHomeworkSubmissionToDb(submission);
-      const { data, error } = await client.from('homework_submissions').upsert(row, { onConflict: 'task_id,student_id' }).select().single();
-      if (error) {
-        return localRepo.upsertHomeworkSubmission(submission);
-      }
-      return data ? mapHomeworkSubmissionFromDb(data) : submission;
-    } catch {
-      return localRepo.upsertHomeworkSubmission(submission);
     }
   }
 
