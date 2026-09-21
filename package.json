@@ -13,7 +13,7 @@
     "bot:dev": "node --watch discord-bot/src/index.js",
     "build:cf": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion",
     "preview:cf": "opennextjs-cloudflare preview",
-    "pages:build": "opennextjs-cloudflare --dangerouslyUseUnsupportedNextVersion"
+    "pages:build": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

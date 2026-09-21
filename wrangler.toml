@@ -1,8 +1,7 @@
 name = "student-management"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = ".open-next/assets"
 
-# Giữ lại cấu hình worker fallback nếu deploy qua worker
+# Worker entry & assets binding for OpenNext
 main = ".open-next/worker.js"
 assets = { directory = ".open-next/assets", binding = "ASSETS" }
