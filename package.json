@@ -13,7 +13,7 @@
     "bot:dev": "node --watch discord-bot/src/index.js",
     "build:cf": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion",
     "preview:cf": "opennextjs-cloudflare preview",
-    "pages:build": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion",
+    "pages:build": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion && cp -R .open-next/worker.js .open-next/assets/_worker.js && cp -R .open-next/cloudflare .open-next/middleware .open-next/server-functions .open-next/assets/",
     "deploy:cf": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion && wrangler deploy"
   },
   "dependencies": {
