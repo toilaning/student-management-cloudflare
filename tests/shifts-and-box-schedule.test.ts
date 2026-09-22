@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { ShiftService } from '../src/services/ShiftService';
-import { GET as getShifts, PUT as updateShift, POST as createShift } from '../src/app/api/shifts/route';
+import { GET as getShifts, PUT as updateShift, POST as createShift, DELETE as deleteShift } from '../src/app/api/shifts/route';
 import { POST as enrollClass } from '../src/app/api/classes/enroll/route';
 import { PUT as updateClassTeacher } from '../src/app/api/classes/route';
 import { repo } from '../src/repositories';
@@ -137,5 +137,57 @@ describe('Dynamic Shifts & Schedule Box Suite', () => {
 
     const teacher = await repo.getTeacherById(newTeacherId);
     assert.ok(teacher?.assignedClassIds.includes(testClassId), 'assignedClassIds của giáo viên phải chứa lớp');
+  });
+
+  it('8. Thêm ca 7 động và kiểm tra số lượng ca tăng lên', async () => {
+    const req = new Request('http://localhost/api/shifts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Ca 7 Sáng Sớm',
+        startTime: '06:00',
+        endTime: '07:30',
+      }),
+    });
+    const res = await createShift(req);
+    const data = await res.json();
+    assert.ok(data.success);
+    assert.equal(data.shift.name, 'Ca 7 Sáng Sớm');
+
+    const shifts = await ShiftService.getAllShifts();
+    assert.equal(shifts.length, 7);
+  });
+
+  it('9. API DELETE /api/shifts xóa ca học và kiểm tra số lượng ca giảm', async () => {
+    // Xóa Ca 6
+    const reqDelete6 = new Request('http://localhost/api/shifts?id=6', {
+      method: 'DELETE',
+    });
+    const resDelete6 = await deleteShift(reqDelete6);
+    const dataDelete6 = await resDelete6.json();
+    assert.ok(dataDelete6.success);
+
+    // Xóa Ca 5
+    const reqDelete5 = new Request('http://localhost/api/shifts?id=5', {
+      method: 'DELETE',
+    });
+    const resDelete5 = await deleteShift(reqDelete5);
+    const dataDelete5 = await resDelete5.json();
+    assert.ok(dataDelete5.success);
+
+    const shifts = await ShiftService.getAllShifts();
+    assert.equal(shifts.length, 5); // Ban đầu 5 + Ca 6 + Ca 7 = 7, xóa 2 ca còn 5 ca
+    assert.ok(!shifts.some(s => s.id === 6));
+    assert.ok(!shifts.some(s => s.id === 5));
+
+    // Kiểm tra Audit Log của DELETE SHIFT
+    const logs = await repo.getAllAuditLogs();
+    const deleteShiftLog = logs.find(l => l.action === 'DELETE' && l.targetId === 'SHIFT_6');
+    assert.ok(deleteShiftLog, 'Phải có Audit Log DELETE cho SHIFT_6');
+  });
+
+  it('10. ShiftService.deleteShift trả về false khi id không tồn tại', async () => {
+    const ok = await ShiftService.deleteShift(9999);
+    assert.equal(ok, false);
   });
 });
