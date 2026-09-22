@@ -5,7 +5,7 @@ import { Header } from '@/components/common/Header';
 import { ClassEntity } from '@/types/classroom';
 import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
-import { BookOpen, Users, UserCheck, Search, Plus, Trash2, X, Check, Edit3, Video, ExternalLink } from 'lucide-react';
+import { BookOpen, Users, UserCheck, Search, Plus, Trash2, X, Check, Edit3, Video, ExternalLink, Calendar, Clock, RefreshCw, Sparkles } from 'lucide-react';
 import { PaginationControls } from '@/components/common/PaginationControls';
 
 export default function AdminClassesPage() {
@@ -19,8 +19,21 @@ export default function AdminClassesPage() {
     shiftId: 1,
     scheduleDays: [2, 4, 6] as number[],
     tuitionFee: 1500000,
-    meetingLink: ''
+    meetingLink: '',
+    autoGenerateSchedule: false,
+    generateMonths: 1,
   });
+
+  // Modal Sinh lịch nhanh cho riêng 1 lớp
+  const [quickScheduleClass, setQuickScheduleClass] = useState<ClassEntity | null>(null);
+  const [quickScheduleStartDate, setQuickScheduleStartDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [quickScheduleEndDate, setQuickScheduleEndDate] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return d.toISOString().split('T')[0];
+  });
+  const [quickScheduleOverwrite, setQuickScheduleOverwrite] = useState(false);
+  const [quickScheduleSubmitting, setQuickScheduleSubmitting] = useState(false);
   const [classes, setClasses] = useState<ClassEntity[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [shifts, setShifts] = useState<{ id: number; name: string; startTime: string; endTime: string }[]>([]);
@@ -70,7 +83,9 @@ export default function AdminClassesPage() {
           shiftId: 1,
           scheduleDays: [2, 4, 6],
           tuitionFee: 1500000,
-          meetingLink: ''
+          meetingLink: '',
+          autoGenerateSchedule: false,
+          generateMonths: 1,
         });
         await loadData();
       } else {
@@ -78,6 +93,39 @@ export default function AdminClassesPage() {
       }
     } catch (e: any) {
       alert(e.message || 'Lỗi kết nối mạng');
+    }
+  };
+
+  const handleQuickSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickScheduleClass) return;
+    setQuickScheduleSubmitting(true);
+
+    try {
+      const res = await fetch('/api/schedule/bulk-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          classIds: [quickScheduleClass.id],
+          startDate: quickScheduleStartDate,
+          endDate: quickScheduleEndDate,
+          shiftId: quickScheduleClass.shiftId,
+          scheduleDays: quickScheduleClass.scheduleDays,
+          overwriteExisting: quickScheduleOverwrite,
+          actorId: 'ADMIN001',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setActionMessage(`Đã lên lịch thành công cho lớp ${quickScheduleClass.name}: tạo mới ${data.summary.createdCount} ca!`);
+        setQuickScheduleClass(null);
+      } else {
+        alert(data.error || 'Lên lịch thất bại');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Lỗi mạng');
+    } finally {
+      setQuickScheduleSubmitting(false);
     }
   };
 
@@ -415,6 +463,21 @@ export default function AdminClassesPage() {
                 </button>
                 <button
                   onClick={() => {
+                    setQuickScheduleClass(cls);
+                    const now = new Date();
+                    setQuickScheduleStartDate(now.toISOString().split('T')[0]);
+                    const later = new Date(now);
+                    later.setMonth(later.getMonth() + 1);
+                    setQuickScheduleEndDate(later.toISOString().split('T')[0]);
+                    setQuickScheduleOverwrite(false);
+                  }}
+                  className="px-2.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer"
+                  title="Lên lịch học nhanh cho lớp này"
+                >
+                  <Calendar size={14} className="text-emerald-600" /> Lên lịch
+                </button>
+                <button
+                  onClick={() => {
                     setChangingTeacherClass(cls);
                     setNewTeacherId(cls.teacherId);
                   }}
@@ -604,6 +667,39 @@ export default function AdminClassesPage() {
                   onChange={e => setNewClassFormData({ ...newClassFormData, meetingLink: e.target.value })}
                   className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs font-mono"
                 />
+              </div>
+
+              {/* Tùy chọn Tự động sinh lịch học lặp lại */}
+              <div className="p-3.5 bg-gradient-to-r from-indigo-50/60 to-purple-50/60 border border-indigo-200 rounded-xl space-y-3">
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newClassFormData.autoGenerateSchedule}
+                    onChange={e => setNewClassFormData({ ...newClassFormData, autoGenerateSchedule: e.target.checked })}
+                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                  />
+                  <span className="font-bold text-indigo-900 text-xs flex items-center gap-1.5">
+                    <RefreshCw size={14} className="text-indigo-600" /> Tự động sinh lịch học lặp lại cho các ngày về sau
+                  </span>
+                </label>
+
+                {newClassFormData.autoGenerateSchedule && (
+                  <div className="pl-6.5 space-y-2 animate-in fade-in">
+                    <label className="block font-semibold text-slate-700 text-xs">Khoảng thời gian sinh lịch trước:</label>
+                    <select
+                      value={newClassFormData.generateMonths}
+                      onChange={e => setNewClassFormData({ ...newClassFormData, generateMonths: Number(e.target.value) })}
+                      className="w-full sm:w-64 p-2 border border-indigo-200 rounded-lg bg-white font-semibold text-xs text-indigo-900 focus:outline-indigo-600"
+                    >
+                      <option value={1}>🗓️ 1 tháng tới (Mặc định)</option>
+                      <option value={2}>🗓️ 2 tháng tới</option>
+                      <option value={3}>🗓️ 3 tháng tới</option>
+                    </select>
+                    <p className="text-[11px] text-slate-500">
+                      Hệ thống sẽ tự động quét các ngày khớp với thứ học đã chọn và tạo các ca học theo ca tương ứng.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
@@ -853,6 +949,123 @@ export default function AdminClassesPage() {
                 Đóng
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Modal Lên lịch học nhanh cho lớp */}
+      {quickScheduleClass && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-emerald-50 to-teal-50">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-600 text-white shadow-xs">
+                  <Calendar size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800 text-base">Lên Lịch Nhanh Cho Lớp Học</h3>
+                  <p className="text-xs text-slate-500">{quickScheduleClass.name} ({quickScheduleClass.id})</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setQuickScheduleClass(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickSchedule} className="p-5 space-y-4 text-xs">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+                <div className="flex justify-between text-slate-600">
+                  <span>Lịch học tuần:</span>
+                  <strong className="text-indigo-600">Thứ {quickScheduleClass.scheduleDays.join(', ')}</strong>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>Ca học & Giờ:</span>
+                  <strong className="text-slate-800">Ca {quickScheduleClass.shiftId}</strong>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>Phòng học:</span>
+                  <strong className="text-slate-800">{quickScheduleClass.roomId}</strong>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Từ ngày</label>
+                  <input
+                    type="date"
+                    required
+                    value={quickScheduleStartDate}
+                    onChange={e => setQuickScheduleStartDate(e.target.value)}
+                    className="w-full p-2 border border-slate-200 rounded-lg text-xs font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Đến ngày</label>
+                  <input
+                    type="date"
+                    required
+                    value={quickScheduleEndDate}
+                    onChange={e => setQuickScheduleEndDate(e.target.value)}
+                    className="w-full p-2 border border-slate-200 rounded-lg text-xs font-semibold"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500 font-medium">Chọn nhanh:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const base = quickScheduleStartDate ? new Date(quickScheduleStartDate) : new Date();
+                    base.setMonth(base.getMonth() + 1);
+                    setQuickScheduleEndDate(base.toISOString().split('T')[0]);
+                  }}
+                  className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded text-xs font-bold border border-emerald-200"
+                >
+                  +1 Tháng
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const base = quickScheduleStartDate ? new Date(quickScheduleStartDate) : new Date();
+                    base.setMonth(base.getMonth() + 3);
+                    setQuickScheduleEndDate(base.toISOString().split('T')[0]);
+                  }}
+                  className="px-2 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded text-xs font-bold border border-teal-200"
+                >
+                  +3 Tháng
+                </button>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer p-2 rounded-lg bg-slate-50 border border-slate-200">
+                <input
+                  type="checkbox"
+                  checked={quickScheduleOverwrite}
+                  onChange={e => setQuickScheduleOverwrite(e.target.checked)}
+                  className="w-4 h-4 text-emerald-600 rounded"
+                />
+                <span className="text-slate-700 font-semibold text-xs">Ghi đè lịch nếu ngày đó đã có ca của lớp</span>
+              </label>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setQuickScheduleClass(null)}
+                  className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 text-xs font-medium"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={quickScheduleSubmitting}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                >
+                  {quickScheduleSubmitting ? 'Đang tạo...' : <><Sparkles size={14} /> Sinh Lịch Ngay</>}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

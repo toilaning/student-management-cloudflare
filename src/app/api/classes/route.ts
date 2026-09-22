@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { repo } from '@/repositories';
+import { BulkScheduleService } from '@/services/BulkScheduleService';
+import { ShiftService } from '@/services/ShiftService';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +30,14 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const { classId, teacherId, meetingLink, actorId = 'ADMIN001' } = body;
+    const {
+      classId,
+      teacherId,
+      roomId,
+      shiftId,
+      meetingLink,
+      actorId = 'ADMIN001'
+    } = body;
 
     if (!classId) {
       return NextResponse.json({ error: 'Thiếu thông tin classId' }, { status: 400 });
@@ -39,48 +48,96 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Không tìm thấy lớp học' }, { status: 404 });
     }
 
-    const newTeacher = await repo.getTeacherById(teacherId);
-    if (!newTeacher) {
-      return NextResponse.json({ error: 'Không tìm thấy giảng viên được chỉ định' }, { status: 404 });
-    }
-
     let oldTeacherId = cls.teacherId;
-
-    if (meetingLink !== undefined) {
-      cls.meetingLink = meetingLink;
-    }
+    let newTeacher = null;
 
     if (teacherId && teacherId !== oldTeacherId) {
-      const newTeacher = await repo.getTeacherById(teacherId);
+      newTeacher = await repo.getTeacherById(teacherId);
       if (!newTeacher) {
         return NextResponse.json({ error: 'Không tìm thấy giảng viên được chỉ định' }, { status: 404 });
       }
       cls.teacherId = teacherId;
     }
 
+    if (roomId !== undefined) {
+      cls.roomId = roomId;
+    }
+
+    if (shiftId !== undefined) {
+      cls.shiftId = Number(shiftId);
+    }
+
+    if (meetingLink !== undefined) {
+      cls.meetingLink = meetingLink;
+    }
+
     await repo.updateClass(cls);
 
-    // 2. Cập nhật danh sách assignedClassIds của giáo viên cũ và mới
-    if (oldTeacherId && oldTeacherId !== teacherId) {
-      const oldTeacher = await repo.getTeacherById(oldTeacherId);
-      if (oldTeacher) {
-        oldTeacher.assignedClassIds = oldTeacher.assignedClassIds.filter(cid => cid !== classId);
-        await repo.updateTeacher(oldTeacher);
+    // 2. Cập nhật danh sách assignedClassIds của giáo viên cũ và mới (nếu đổi GV)
+    if (teacherId && teacherId !== oldTeacherId && newTeacher) {
+      if (oldTeacherId) {
+        const oldTeacher = await repo.getTeacherById(oldTeacherId);
+        if (oldTeacher && oldTeacher.assignedClassIds) {
+          oldTeacher.assignedClassIds = oldTeacher.assignedClassIds.filter(cid => cid !== classId);
+          await repo.updateTeacher(oldTeacher);
+        }
+      }
+
+      if (!newTeacher.assignedClassIds) newTeacher.assignedClassIds = [];
+      if (!newTeacher.assignedClassIds.includes(classId)) {
+        newTeacher.assignedClassIds.push(classId);
+        await repo.updateTeacher(newTeacher);
       }
     }
 
-    if (!newTeacher.assignedClassIds.includes(classId)) {
-      newTeacher.assignedClassIds.push(classId);
-      await repo.updateTeacher(newTeacher);
+    // 3. Đồng bộ 2 chiều: Khi Admin đổi teacherId, roomId, shiftId, hoặc meetingLink:
+    // Quét tất cả ScheduleSlot của lớp đó có date >= today, cập nhật các thuộc tính mới
+    const today = new Date().toISOString().split('T')[0];
+    const allSlots = await repo.getAllScheduleSlots();
+    
+    // Tìm thông tin shift nếu shiftId thay đổi
+    let shiftInfo = undefined;
+    if (shiftId !== undefined) {
+      const shifts = await ShiftService.getAllShifts();
+      shiftInfo = shifts.find(s => s.id === Number(shiftId));
     }
 
-    // 3. Đồng bộ cập nhật teacherId và meetingLink cho các ScheduleSlots thuộc lớp học này
-    const allSlots = await repo.getAllScheduleSlots();
+    let syncedSlotsCount = 0;
     for (const slot of allSlots) {
-      if (slot.classId === classId) {
-        if (teacherId) slot.teacherId = teacherId;
-        if (meetingLink !== undefined) slot.meetingLink = meetingLink;
-        await repo.updateScheduleSlot(slot);
+      if (slot.classId === classId && slot.date >= today && slot.status !== 'Đã hủy') {
+        let changed = false;
+
+        if (teacherId !== undefined && slot.teacherId !== teacherId) {
+          slot.teacherId = teacherId;
+          changed = true;
+        }
+
+        if (roomId !== undefined && slot.roomId !== roomId) {
+          slot.roomId = roomId;
+          changed = true;
+        }
+
+        if (shiftId !== undefined) {
+          const sNum = Number(shiftId);
+          if (slot.shiftId !== sNum) {
+            slot.shiftId = sNum;
+            if (shiftInfo) {
+              slot.startTime = shiftInfo.startTime;
+              slot.endTime = shiftInfo.endTime;
+            }
+            changed = true;
+          }
+        }
+
+        if (meetingLink !== undefined && slot.meetingLink !== meetingLink) {
+          slot.meetingLink = meetingLink;
+          changed = true;
+        }
+
+        if (changed) {
+          await repo.updateScheduleSlot(slot);
+          syncedSlotsCount++;
+        }
       }
     }
 
@@ -88,27 +145,41 @@ export async function PUT(request: Request) {
     await repo.addAuditLog({
       action: 'UPDATE',
       userId: actorId,
-      userName: 'Quản trị viên',
+      userName: actorId === 'ADMIN001' ? 'Quản trị viên' : actorId,
       userRole: 'ADMIN',
       targetResource: 'CLASS_ASSIGNMENT',
       targetId: classId,
-      details: `Đổi giáo viên phụ trách lớp ${classId} (${cls.name}) từ ${oldTeacherId} sang ${teacherId} (${newTeacher.name})`,
+      details: `Cập nhật lớp ${classId} (${cls.name}) và đồng bộ ${syncedSlotsCount} ca học tương lai (date >= ${today})`,
     });
 
     return NextResponse.json({
       success: true,
       class: cls,
-      message: `Đã đổi giáo viên phụ trách lớp ${cls.name} sang ${newTeacher.name} (${teacherId})`,
+      syncedSlotsCount,
+      message: `Đã cập nhật lớp ${cls.name} và đồng bộ ${syncedSlotsCount} ca học tương lai`,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Lỗi khi cập nhật giáo viên phụ trách lớp' }, { status: 500 });
+    return NextResponse.json({ error: error?.message || 'Lỗi khi cập nhật lớp học' }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, code, subject, teacherId, roomId, shiftId = 1, scheduleDays = [2, 4, 6], tuitionFee = 1500000, meetingLink = '' } = body;
+    const {
+      name,
+      code,
+      subject,
+      teacherId,
+      roomId,
+      shiftId = 1,
+      scheduleDays = [2, 4, 6],
+      tuitionFee = 1500000,
+      meetingLink = '',
+      autoGenerateSchedule = false,
+      generateMonths = 1,
+      actorId = 'ADMIN001',
+    } = body;
 
     if (!name || !code || !subject || !teacherId || !roomId) {
       return NextResponse.json({ error: 'Vui lòng điền đủ Tên lớp, Mã môn, Môn học, Giảng viên và Phòng học' }, { status: 400 });
@@ -152,15 +223,45 @@ export async function POST(request: Request) {
 
     await repo.addAuditLog({
       action: 'CREATE',
-      userId: 'ADMIN001',
-      userName: 'Quản trị viên',
+      userId: actorId,
+      userName: actorId === 'ADMIN001' ? 'Quản trị viên' : actorId,
       userRole: 'ADMIN',
       targetResource: 'CLASS',
       targetId: newId,
       details: `Tạo lớp học mới ${newId} - ${newClass.name} (${newClass.code}) phụ trách bởi ${teacher?.name || teacherId}`,
     });
 
-    return NextResponse.json({ success: true, class: newClass, message: `Tạo lớp ${newClass.name} (${newId}) thành công!` });
+    let bulkScheduleResult = null;
+    // Nếu autoGenerateSchedule = true: sinh lịch tự động từ ngày hôm nay/ngày mai đến hết generateMonths tháng tới
+    if (autoGenerateSchedule) {
+      const bulkService = new BulkScheduleService(repo);
+      const now = new Date();
+      // Bắt đầu từ hôm nay
+      const startDate = now.toISOString().split('T')[0];
+      const endDateObj = new Date(now);
+      const monthsToAdd = Math.max(1, Number(generateMonths) || 1);
+      endDateObj.setMonth(endDateObj.getMonth() + monthsToAdd);
+      const endDate = endDateObj.toISOString().split('T')[0];
+
+      bulkScheduleResult = await bulkService.generateRecurringSlots({
+        classIds: [newId],
+        startDate,
+        endDate,
+        shiftId: newClass.shiftId,
+        scheduleDays: newClass.scheduleDays,
+        overwriteExisting: false,
+        actorId,
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      class: newClass,
+      bulkScheduleResult,
+      message: `Tạo lớp ${newClass.name} (${newId}) thành công!${
+        bulkScheduleResult ? ` Đã sinh tự động ${bulkScheduleResult.summary.createdCount} ca học.` : ''
+      }`,
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Lỗi khi tạo lớp học' }, { status: 500 });
   }
@@ -170,6 +271,7 @@ export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
+    const actorId = searchParams.get('actorId') || 'ADMIN001';
 
     if (!id) {
       return NextResponse.json({ error: 'Thiếu mã lớp học cần xóa' }, { status: 400 });
@@ -189,19 +291,36 @@ export async function DELETE(request: Request) {
       }
     }
 
+    // Tự động xóa (hoặc đánh dấu 'Đã hủy') tất cả ScheduleSlot của lớp đó có date >= today
+    const today = new Date().toISOString().split('T')[0];
+    const allSlots = await repo.getAllScheduleSlots();
+    let cancelledSlotsCount = 0;
+
+    for (const slot of allSlots) {
+      if (slot.classId === id && slot.date >= today && slot.status !== 'Đã hủy') {
+        slot.status = 'Đã hủy';
+        await repo.updateScheduleSlot(slot);
+        cancelledSlotsCount++;
+      }
+    }
+
     await repo.deleteClass(id);
 
     await repo.addAuditLog({
       action: 'DELETE',
-      userId: 'ADMIN001',
-      userName: 'Quản trị viên',
+      userId: actorId,
+      userName: actorId === 'ADMIN001' ? 'Quản trị viên' : actorId,
       userRole: 'ADMIN',
       targetResource: 'CLASS',
       targetId: id,
-      details: `Xóa lớp học ${id} - ${cls.name} (${cls.code})`,
+      details: `Xóa lớp học ${id} - ${cls.name} (${cls.code}) và hủy ${cancelledSlotsCount} ca học tương lai (date >= ${today})`,
     });
 
-    return NextResponse.json({ success: true, message: `Đã xóa lớp học ${id} (${cls.name}) thành công` });
+    return NextResponse.json({
+      success: true,
+      cancelledSlotsCount,
+      message: `Đã xóa lớp học ${id} (${cls.name}) và hủy ${cancelledSlotsCount} ca học tương lai thành công`,
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Lỗi khi xóa lớp học' }, { status: 500 });
   }

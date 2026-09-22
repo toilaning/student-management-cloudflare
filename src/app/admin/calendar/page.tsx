@@ -5,7 +5,7 @@ import { Header } from '@/components/common/Header';
 import { ScheduleSlot, TIME_SHIFTS } from '@/types/schedule';
 import { Teacher } from '@/types/teacher';
 import { Classroom, ClassEntity } from '@/types/classroom';
-import { Calendar, Clock, ChevronLeft, ChevronRight, AlertCircle, Plus, UserCheck, Edit3, Trash2, X, Check, Video, ExternalLink, Headphones } from 'lucide-react';
+import { Calendar, Clock, ChevronLeft, ChevronRight, AlertCircle, Plus, UserCheck, Edit3, Trash2, X, Check, Video, ExternalLink, Headphones, RefreshCw, Layers, Sparkles } from 'lucide-react';
 
 export default function AdminCalendarPage() {
   const [selectedDate, setSelectedDate] = useState('2026-09-02');
@@ -20,6 +20,22 @@ export default function AdminCalendarPage() {
   const [editingShift, setEditingShift] = useState<{ id: number; name: string; startTime: string; endTime: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+
+  // Modal Sinh Lịch Hàng Loạt
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkClassId, setBulkClassId] = useState('all');
+  const [bulkStartDate, setBulkStartDate] = useState(selectedDate);
+  const [bulkEndDate, setBulkEndDate] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return d.toISOString().split('T')[0];
+  });
+  const [bulkOverwrite, setBulkOverwrite] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{
+    summary: { totalAttempted: number; createdCount: number; updatedCount: number; skippedCount: number; conflictCount: number };
+    message?: string;
+  } | null>(null);
 
   // Modal Thêm ca học
   const [showAddModal, setShowAddModal] = useState(false);
@@ -101,6 +117,44 @@ export default function AdminCalendarPage() {
 
   
   
+  const handleBulkGenerate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBulkSubmitting(true);
+    setBulkResult(null);
+
+    try {
+      const res = await fetch('/api/schedule/bulk-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          classIds: bulkClassId === 'all' ? ['all'] : [bulkClassId],
+          startDate: bulkStartDate,
+          endDate: bulkEndDate,
+          overwriteExisting: bulkOverwrite,
+          actorId: 'ADMIN001',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setBulkResult(data);
+        setActionMessage(data.message || 'Sinh lịch thành công!');
+        await loadData(selectedDate);
+      } else {
+        alert(data.error || 'Sinh lịch hàng loạt thất bại');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Lỗi mạng khi sinh lịch');
+    } finally {
+      setBulkSubmitting(false);
+    }
+  };
+
+  const handleAddMonthsToBulkEnd = (months: number) => {
+    const base = bulkStartDate ? new Date(bulkStartDate) : new Date();
+    base.setMonth(base.getMonth() + months);
+    setBulkEndDate(base.toISOString().split('T')[0]);
+  };
+
   const handleCreateShift = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newShiftInput.startTime || !newShiftInput.endTime) {
@@ -311,6 +365,16 @@ export default function AdminCalendarPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setShowBulkModal(true);
+                setBulkResult(null);
+                setBulkStartDate(selectedDate);
+              }}
+              className="flex items-center justify-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-sm rounded-lg shadow-xs transition whitespace-nowrap w-full sm:w-auto shrink-0 cursor-pointer"
+            >
+              <RefreshCw size={16} className="text-emerald-100" /> 🔄 Sinh Lịch Hàng Loạt Dài Hạn
+            </button>
             <button
               onClick={() => setShowShiftModal(true)}
               className="flex items-center justify-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold text-sm rounded-lg shadow-xs transition whitespace-nowrap w-full sm:w-auto shrink-0"
@@ -936,7 +1000,156 @@ export default function AdminCalendarPage() {
               </div>
             </div>
           </div>
-        )}      </main>
+        )}        {/* Modal Sinh Lịch Hàng Loạt Dài Hạn */}
+        {showBulkModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-xl overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-emerald-50 to-teal-50">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-emerald-600 text-white shadow-xs">
+                    <RefreshCw size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-base">Sinh Lịch Tự Động Hàng Loạt</h3>
+                    <p className="text-xs text-slate-500">Tự động tính thứ trong tuần, ca học và kiểm tra xung đột trùng phòng/GV</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowBulkModal(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-white transition"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={handleBulkGenerate} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
+                {bulkResult && (
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-emerald-800 text-sm">
+                      <Check size={18} className="text-emerald-600" /> Kết quả sinh lịch hàng loạt:
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-center">
+                      <div className="bg-white p-2 rounded-lg border border-emerald-100">
+                        <span className="block text-[10px] text-slate-400">Tạo mới</span>
+                        <strong className="text-emerald-600 text-base">{bulkResult.summary.createdCount}</strong>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-emerald-100">
+                        <span className="block text-[10px] text-slate-400">Cập nhật</span>
+                        <strong className="text-blue-600 text-base">{bulkResult.summary.updatedCount}</strong>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-emerald-100">
+                        <span className="block text-[10px] text-slate-400">Bỏ qua</span>
+                        <strong className="text-amber-600 text-base">{bulkResult.summary.skippedCount}</strong>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-emerald-100">
+                        <span className="block text-[10px] text-slate-400">Xung đột</span>
+                        <strong className="text-rose-600 text-base">{bulkResult.summary.conflictCount}</strong>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Chọn Lớp Học Cần Sinh Lịch *</label>
+                  <select
+                    value={bulkClassId}
+                    onChange={e => setBulkClassId(e.target.value)}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-emerald-600 bg-white font-semibold text-xs"
+                    required
+                  >
+                    <option value="all">🌟 Tất cả các lớp đang mở ({classes.filter(c => c.status === 'Đang mở').length} lớp)</option>
+                    {classes.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.id}) • Thứ {c.scheduleDays.join(',')} • Ca {c.shiftId}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-400 mt-1">Lớp được chọn sẽ sinh các ca học theo đúng thứ trong tuần (`scheduleDays`) và ca học (`shiftId`) đã cài đặt.</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Từ ngày (Bắt đầu) *</label>
+                    <input
+                      type="date"
+                      required
+                      value={bulkStartDate}
+                      onChange={e => setBulkStartDate(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-emerald-600 text-xs font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Đến ngày (Kết thúc) *</label>
+                    <input
+                      type="date"
+                      required
+                      value={bulkEndDate}
+                      onChange={e => setBulkEndDate(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-emerald-600 text-xs font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 font-medium">Chọn nhanh khoảng ngày:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleAddMonthsToBulkEnd(1)}
+                    className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold transition border border-emerald-200"
+                  >
+                    +1 Tháng
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddMonthsToBulkEnd(3)}
+                    className="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-lg text-xs font-bold transition border border-teal-200"
+                  >
+                    +3 Tháng
+                  </button>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={bulkOverwrite}
+                      onChange={e => setBulkOverwrite(e.target.checked)}
+                      className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <span className="font-bold text-slate-700">Ghi đè lịch cũ nếu đã có ca học trùng ngày</span>
+                      <p className="text-[11px] text-slate-400">Nếu bỏ chọn, hệ thống sẽ tự động bỏ qua (skip) các ca học đã tồn tại trước đó.</p>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowBulkModal(false)}
+                    className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 text-xs font-medium"
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={bulkSubmitting}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {bulkSubmitting ? (
+                      <>Đang xử lý sinh lịch...</>
+                    ) : (
+                      <>
+                        <Sparkles size={15} /> Bắt đầu sinh lịch
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
