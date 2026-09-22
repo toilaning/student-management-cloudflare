@@ -13,6 +13,9 @@ export default function AdminCalendarPage() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [classes, setClasses] = useState<ClassEntity[]>([]);
   const [rooms, setRooms] = useState<Classroom[]>([]);
+  const [shifts, setShifts] = useState<typeof TIME_SHIFTS>(TIME_SHIFTS);
+  const [showShiftModal, setShowShiftModal] = useState(false);
+  const [editingShift, setEditingShift] = useState<{ id: number; name: string; startTime: string; endTime: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
@@ -47,10 +50,11 @@ export default function AdminCalendarPage() {
   const loadData = async (date: string) => {
     setLoading(true);
     try {
-      const [slotRes, tcRes, clsRes] = await Promise.all([
+      const [slotRes, tcRes, clsRes, shiftRes] = await Promise.all([
         fetch(`/api/schedule?date=${date}`),
         fetch('/api/teachers'),
         fetch('/api/classes'),
+        fetch('/api/shifts'),
       ]);
       const slotData = await slotRes.json();
       const tcData = await tcRes.json();
@@ -59,6 +63,8 @@ export default function AdminCalendarPage() {
       setSlots(slotData.slots || []);
       setTeachers(tcData.teachers || []);
       setClasses(clsData.classes || []);
+      const shiftData = await shiftRes.json();
+      if (shiftData.shifts) setShifts(shiftData.shifts);
     } catch (e) {
       console.error(e);
     } finally {
@@ -91,11 +97,36 @@ export default function AdminCalendarPage() {
     });
   };
 
+  
+  const handleUpdateShift = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingShift) return;
+
+    try {
+      const res = await fetch('/api/shifts', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingShift),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActionMessage('Cập nhật khung giờ ' + data.shift.name + ' thành công!');
+        setShifts(prev => prev.map(s => s.id === data.shift.id ? data.shift : s));
+        setEditingShift(null);
+        setTimeout(() => setActionMessage(null), 3000);
+      } else {
+        alert(data.error || 'Cập nhật thất bại');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Lỗi mạng');
+    }
+  };
+
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSlot) return;
     setConflictError(null);
-    const shift = TIME_SHIFTS.find(s => s.id === Number(editFormData.shiftId)) || TIME_SHIFTS[0];
+    const shift = shifts.find(s => s.id === Number(editFormData.shiftId)) || TIME_SHIFTS[0];
 
     try {
       const res = await fetch('/api/schedule', {
@@ -143,7 +174,7 @@ export default function AdminCalendarPage() {
   const handleCreateSlot = async (e: React.FormEvent) => {
     e.preventDefault();
     setConflictError(null);
-    const shift = TIME_SHIFTS.find(s => s.id === Number(newSlotData.shiftId)) || TIME_SHIFTS[0];
+    const shift = shifts.find(s => s.id === Number(newSlotData.shiftId)) || TIME_SHIFTS[0];
 
     try {
       const res = await fetch('/api/schedule', {
@@ -243,7 +274,7 @@ export default function AdminCalendarPage() {
 
         {/* Schedule Grid by Time Shifts */}
         <div className="space-y-4">
-          {TIME_SHIFTS.map(shift => {
+          {shifts.map(shift => {
             const shiftSlots = slots.filter(s => s.shiftId === shift.id && s.status !== 'Đã hủy');
             return (
               <div key={shift.id} className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
@@ -388,7 +419,7 @@ export default function AdminCalendarPage() {
                       onChange={e => setEditFormData({ ...editFormData, shiftId: Number(e.target.value) })}
                       className="w-full border border-slate-200 rounded-lg p-2 focus:outline-indigo-600 text-xs bg-white"
                     >
-                      {TIME_SHIFTS.map(s => (
+                      {shifts.map(s => (
                         <option key={s.id} value={s.id}>{s.name} ({s.startTime})</option>
                       ))}
                     </select>
@@ -530,7 +561,7 @@ export default function AdminCalendarPage() {
                       onChange={e => setNewSlotData({ ...newSlotData, shiftId: Number(e.target.value) })}
                       className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-indigo-600 bg-white"
                     >
-                      {TIME_SHIFTS.map(s => (
+                      {shifts.map(s => (
                         <option key={s.id} value={s.id}>{s.name}</option>
                       ))}
                     </select>
