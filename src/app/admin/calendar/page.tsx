@@ -7,36 +7,40 @@ import { Header } from '@/components/common/Header';
 import { ScheduleSlot, TIME_SHIFTS } from '@/types/schedule';
 import { Teacher } from '@/types/teacher';
 import { Classroom, ClassEntity } from '@/types/classroom';
-import { Calendar, Clock, ChevronLeft, ChevronRight, AlertCircle, Plus, UserCheck, Edit3, Trash2, X, Check, Video, ExternalLink, Headphones, RefreshCw, Layers, Sparkles } from 'lucide-react';
+import { Calendar, Clock, ChevronLeft, ChevronRight, AlertCircle, Plus, UserCheck, Edit3, Trash2, X, Check, ExternalLink, Headphones, RefreshCw, Sparkles, Zap, CalendarRange } from 'lucide-react';
 
 export default function AdminCalendarPage() {
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr());
   const [slots, setSlots] = useState<ScheduleSlot[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [classes, setClasses] = useState<ClassEntity[]>([]);
-  const [rooms, setRooms] = useState<Classroom[]>([]);
   const [shifts, setShifts] = useState<typeof TIME_SHIFTS>(TIME_SHIFTS);
   const [showShiftModal, setShowShiftModal] = useState(false);
-  const [showDailyActionModal, setShowDailyActionModal] = useState(false);
-  const [dailyActionType, setDailyActionType] = useState<'RESCHEDULE_DAY' | 'SHIFT_MIGRATION' | 'CANCEL_DAY'>('RESCHEDULE_DAY');
-  const [dailyTargetDate, setDailyTargetDate] = useState('');
-  const [dailyFromShift, setDailyFromShift] = useState(1);
-  const [dailyToShift, setDailyToShift] = useState(2);
-
-  const [showFutureUpdateModal, setShowFutureUpdateModal] = useState(false);
-  const [futureClassId, setFutureClassId] = useState('');
-  const [futureFromDate, setFutureFromDate] = useState(selectedDate);
-  const [futureTargetShiftId, setFutureTargetShiftId] = useState(1);
-  const [futureTargetRoomId, setFutureTargetRoomId] = useState('');
-  const [futureTargetTeacherId, setFutureTargetTeacherId] = useState('');
-  const [syncFutureShiftsOption, setSyncFutureShiftsOption] = useState(true);
   const [showCreateShiftForm, setShowCreateShiftForm] = useState(false);
   const [newShiftInput, setNewShiftInput] = useState({ name: '', startTime: '07:00', endTime: '09:00' });
   const [editingShift, setEditingShift] = useState<{ id: number; name: string; startTime: string; endTime: string } | null>(null);
+  const [syncFutureShiftsOption, setSyncFutureShiftsOption] = useState(true);
   const [loading, setLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
-  // Modal Sinh Lịch Hàng Loạt
+  // Modal Thao Tác Lịch Hôm Nay / Theo Ngày
+  const [showDailyModal, setShowDailyModal] = useState(false);
+  const [dailyAction, setDailyAction] = useState<'RESCHEDULE_DAY' | 'SHIFT_MIGRATION' | 'CANCEL_DAY'>('RESCHEDULE_DAY');
+  const [dailyTargetDate, setDailyTargetDate] = useState('');
+  const [dailyFromShift, setDailyFromShift] = useState(1);
+  const [dailyToShift, setDailyToShift] = useState(2);
+  const [dailySubmitting, setDailySubmitting] = useState(false);
+
+  // Modal Đổi Ca/Lịch Từ Nay Về Sau
+  const [showFutureModal, setShowFutureModal] = useState(false);
+  const [futureClassId, setFutureClassId] = useState('');
+  const [futureFromDate, setFutureFromDate] = useState(selectedDate);
+  const [futureShiftId, setFutureShiftId] = useState<string>('');
+  const [futureRoomId, setFutureRoomId] = useState('');
+  const [futureTeacherId, setFutureTeacherId] = useState('');
+  const [futureSubmitting, setFutureSubmitting] = useState(false);
+
+  // Modal Sinh Lịch Hàng Loạt Dài Hạn
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [bulkClassId, setBulkClassId] = useState('all');
@@ -96,6 +100,9 @@ export default function AdminCalendarPage() {
       setSlots(slotData.slots || []);
       setTeachers(tcData.teachers || []);
       setClasses(clsData.classes || []);
+      if (clsData.classes && clsData.classes.length > 0 && !futureClassId) {
+        setFutureClassId(clsData.classes[0].id);
+      }
       const shiftData = await shiftRes.json();
       if (shiftData.shifts) setShifts(shiftData.shifts);
     } catch (e) {
@@ -130,8 +137,6 @@ export default function AdminCalendarPage() {
     });
   };
 
-  
-  
   const handleBulkGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     setBulkSubmitting(true);
@@ -170,89 +175,83 @@ export default function AdminCalendarPage() {
     setBulkEndDate(base.toISOString().split('T')[0]);
   };
 
-  
-  
-  const handleDailyAction = async (e: React.FormEvent) => {
+  // Thao tác hàng loạt theo ngày
+  const handleDailyActionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setDailySubmitting(true);
     try {
+      const body: any = {
+        currentDate: selectedDate,
+        action: dailyAction,
+      };
+      if (dailyAction === 'RESCHEDULE_DAY') {
+        if (!dailyTargetDate) {
+          alert('Vui lòng chọn ngày chuyển đến!');
+          setDailySubmitting(false);
+          return;
+        }
+        body.targetDate = dailyTargetDate;
+      } else if (dailyAction === 'SHIFT_MIGRATION') {
+        body.fromShiftId = Number(dailyFromShift);
+        body.toShiftId = Number(dailyToShift);
+      } else if (dailyAction === 'CANCEL_DAY') {
+        body.cancelStatus = 'Đã hủy';
+      }
+
       const res = await fetch('/api/schedule/bulk-daily-action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          currentDate: selectedDate,
-          action: dailyActionType,
-          targetDate: dailyTargetDate || undefined,
-          fromShiftId: dailyFromShift,
-          toShiftId: dailyToShift,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.success) {
-        setActionMessage(data.message || 'Thao tác thành công!');
-        setShowDailyActionModal(false);
+        setActionMessage(data.message || 'Thực hiện thao tác thành công!');
+        setShowDailyModal(false);
         await loadData(selectedDate);
-        setTimeout(() => setActionMessage(null), 3500);
       } else {
-        alert(data.error || 'Thao tác thất bại');
+        alert(data.error || 'Thực hiện thao tác thất bại');
       }
     } catch (err: any) {
       alert(err.message || 'Lỗi kết nối');
+    } finally {
+      setDailySubmitting(false);
     }
   };
 
-  const handleFutureUpdate = async (e: React.FormEvent) => {
+  // Thay đổi ca/lịch từ nay về sau
+  const handleFutureUpdateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!futureClassId) {
       alert('Vui lòng chọn lớp học');
       return;
     }
-
+    setFutureSubmitting(true);
     try {
+      const body: any = {
+        classId: futureClassId,
+        fromDate: futureFromDate,
+      };
+      if (futureShiftId) body.targetShiftId = Number(futureShiftId);
+      if (futureRoomId) body.targetRoomId = futureRoomId;
+      if (futureTeacherId) body.targetTeacherId = futureTeacherId;
+
       const res = await fetch('/api/schedule/bulk-update-future', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          classId: futureClassId,
-          fromDate: futureFromDate,
-          targetShiftId: futureTargetShiftId,
-          targetRoomId: futureTargetRoomId || undefined,
-          targetTeacherId: futureTargetTeacherId || undefined,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.success) {
-        setActionMessage(data.message || 'Đã cập nhật lịch tương lai thành công!');
-        setShowFutureUpdateModal(false);
+        setActionMessage(data.message || `Đã cập nhật ${data.updatedCount} ca học tương lai thành công!`);
+        setShowFutureModal(false);
         await loadData(selectedDate);
-        setTimeout(() => setActionMessage(null), 3500);
       } else {
         alert(data.error || 'Cập nhật thất bại');
       }
     } catch (err: any) {
-      alert(err.message || 'Lỗi mạng');
-    }
-  };
-
-  const handleApplyPreset = async (presetType: '3_SHIFTS' | '2_SHIFTS' | '5_SHIFTS') => {
-    const label = presetType === '3_SHIFTS' ? '3 ca/ngày (Sáng - Chiều - Tối)' : presetType === '2_SHIFTS' ? '2 ca/ngày (Sáng - Tối)' : '5 ca tiêu chuẩn';
-    if (!confirm(`Bạn có chắc chắn muốn chuyển hệ thống sang mẫu ${label}? Các ca học hiện tại sẽ được thay thế theo mẫu này.`)) return;
-
-    try {
-      const res = await fetch('/api/shifts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ presetType }),
-      });
-      const data = await res.json();
-      if (data.success && data.shifts) {
-        setShifts(data.shifts);
-        setActionMessage(`Đã áp dụng thành công mẫu: ${label}`);
-        setTimeout(() => setActionMessage(null), 3000);
-      } else {
-        alert(data.error || 'Áp dụng mẫu thất bại');
-      }
-    } catch (e: any) {
-      alert(e.message || 'Lỗi mạng');
+      alert(err.message || 'Lỗi kết nối');
+    } finally {
+      setFutureSubmitting(false);
     }
   };
 
@@ -308,16 +307,22 @@ export default function AdminCalendarPage() {
     if (!editingShift) return;
 
     try {
+      // Sử dụng PUT hoặc POST bulkShifts hỗ trợ syncFutureSlots
+      const updatedShifts = shifts.map(s => s.id === editingShift.id ? { ...s, ...editingShift } : s);
       const res = await fetch('/api/shifts', {
-        method: 'PUT',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editingShift),
+        body: JSON.stringify({
+          bulkShifts: updatedShifts,
+          syncFutureSlots: syncFutureShiftsOption,
+        }),
       });
       const data = await res.json();
       if (data.success) {
-        setActionMessage('Cập nhật khung giờ ' + data.shift.name + ' thành công!');
-        setShifts(prev => prev.map(s => s.id === data.shift.id ? data.shift : s));
+        setActionMessage(`Cập nhật khung giờ ${editingShift.name} thành công! ${syncFutureShiftsOption ? `(Đã đồng bộ ${data.syncedSlotsCount || 0} ca học tương lai)` : ''}`);
+        setShifts(data.shifts || updatedShifts);
         setEditingShift(null);
+        await loadData(selectedDate);
         setTimeout(() => setActionMessage(null), 3000);
       } else {
         alert(data.error || 'Cập nhật thất bại');
@@ -474,33 +479,57 @@ export default function AdminCalendarPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Nút Thao Tác Lịch Hôm Nay / Theo Ngày */}
+            <button
+              onClick={() => {
+                setShowDailyModal(true);
+                setDailyTargetDate(selectedDate);
+              }}
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs sm:text-sm rounded-lg shadow-xs transition whitespace-nowrap cursor-pointer"
+            >
+              <Zap size={16} className="text-amber-100" /> ⚡ Thao tác Lịch Hôm Nay / Theo Ngày
+            </button>
+
+            {/* Nút Đổi Ca/Lịch Từ Nay Về Sau */}
+            <button
+              onClick={() => {
+                setShowFutureModal(true);
+                setFutureFromDate(selectedDate);
+              }}
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs sm:text-sm rounded-lg shadow-xs transition whitespace-nowrap cursor-pointer"
+            >
+              <CalendarRange size={16} className="text-blue-100" /> 📅 Đổi Ca/Lịch Từ Nay Về Sau
+            </button>
+
             <button
               onClick={() => {
                 setShowBulkModal(true);
                 setBulkResult(null);
                 setBulkStartDate(selectedDate);
               }}
-              className="flex items-center justify-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-sm rounded-lg shadow-xs transition whitespace-nowrap w-full sm:w-auto shrink-0 cursor-pointer"
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs sm:text-sm rounded-lg shadow-xs transition whitespace-nowrap cursor-pointer"
             >
-              <RefreshCw size={16} className="text-emerald-100" /> 🔄 Sinh Lịch Hàng Loạt Dài Hạn
+              <RefreshCw size={16} className="text-emerald-100" /> Sinh Lịch Định Kỳ
             </button>
+
             <button
               onClick={() => setShowShiftModal(true)}
-              className="flex items-center justify-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold text-sm rounded-lg shadow-xs transition whitespace-nowrap w-full sm:w-auto shrink-0"
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs sm:text-sm rounded-lg shadow-xs transition whitespace-nowrap"
             >
               <Clock size={16} className="text-amber-400" /> Cấu hình Khung giờ Ca học
             </button>
+
             <button
               onClick={() => {
                 setNewSlotData(prev => ({ ...prev, date: selectedDate }));
                 setConflictError(null);
                 setShowAddModal(true);
               }}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg shadow-xs transition whitespace-nowrap w-full sm:w-auto shrink-0"
-          >
-            <Plus size={16} /> Thêm ca học mới
-          </button>
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs sm:text-sm rounded-lg shadow-xs transition whitespace-nowrap"
+            >
+              <Plus size={16} /> Thêm ca học mới
+            </button>
           </div>
         </div>
 
@@ -609,6 +638,249 @@ export default function AdminCalendarPage() {
             );
           })}
         </div>
+
+        {/* Modal Thao tác Lịch Hôm Nay / Theo Ngày */}
+        {showDailyModal && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full flex flex-col border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-amber-50 to-orange-50">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-amber-500 text-white">
+                    <Zap size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-base">Thao Tác Lịch Hàng Loạt Theo Ngày</h3>
+                    <p className="text-xs text-slate-500">Áp dụng cho toàn bộ các ca học ngày: <strong className="text-amber-700">{selectedDate}</strong></p>
+                  </div>
+                </div>
+                <button onClick={() => setShowDailyModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+              </div>
+
+              <form onSubmit={handleDailyActionSubmit} className="p-6 space-y-4 text-xs overflow-y-auto">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-2">Chọn Hành Động Hàng Loạt:</label>
+                  <div className="grid grid-cols-1 gap-2">
+                    <label className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition ${dailyAction === 'RESCHEDULE_DAY' ? 'border-amber-500 bg-amber-50/50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                      <input
+                        type="radio"
+                        name="dailyAction"
+                        checked={dailyAction === 'RESCHEDULE_DAY'}
+                        onChange={() => setDailyAction('RESCHEDULE_DAY')}
+                        className="mt-0.5 text-amber-600"
+                      />
+                      <div>
+                        <span className="font-bold text-slate-800 block text-xs">Dời toàn bộ ca hôm nay sang ngày khác</span>
+                        <span className="text-[11px] text-slate-500">Giữ nguyên ca học, dời tất cả các lớp của ngày sang một ngày mới</span>
+                      </div>
+                    </label>
+
+                    <label className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition ${dailyAction === 'SHIFT_MIGRATION' ? 'border-amber-500 bg-amber-50/50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                      <input
+                        type="radio"
+                        name="dailyAction"
+                        checked={dailyAction === 'SHIFT_MIGRATION'}
+                        onChange={() => setDailyAction('SHIFT_MIGRATION')}
+                        className="mt-0.5 text-amber-600"
+                      />
+                      <div>
+                        <span className="font-bold text-slate-800 block text-xs">Đổi ca hàng loạt trong ngày</span>
+                        <span className="text-[11px] text-slate-500">Chuyển toàn bộ các lớp từ ca nguồn sang ca đích trong cùng ngày</span>
+                      </div>
+                    </label>
+
+                    <label className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition ${dailyAction === 'CANCEL_DAY' ? 'border-rose-500 bg-rose-50/50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                      <input
+                        type="radio"
+                        name="dailyAction"
+                        checked={dailyAction === 'CANCEL_DAY'}
+                        onChange={() => setDailyAction('CANCEL_DAY')}
+                        className="mt-0.5 text-rose-600"
+                      />
+                      <div>
+                        <span className="font-bold text-rose-800 block text-xs">Hủy / Hoãn tất cả các ca trong ngày</span>
+                        <span className="text-[11px] text-slate-500">Đổi trạng thái toàn bộ ca học hôm nay thành "Đã hủy"</span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {dailyAction === 'RESCHEDULE_DAY' && (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <label className="block font-bold text-slate-700">Chọn Ngày Dời Đến (Target Date) *</label>
+                    <input
+                      type="date"
+                      required
+                      value={dailyTargetDate}
+                      onChange={e => setDailyTargetDate(e.target.value)}
+                      className="w-full p-2 border border-slate-200 rounded-lg bg-white text-xs font-semibold"
+                    />
+                  </div>
+                )}
+
+                {dailyAction === 'SHIFT_MIGRATION' && (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">Từ Ca (Nguồn) *</label>
+                        <select
+                          value={dailyFromShift}
+                          onChange={e => setDailyFromShift(Number(e.target.value))}
+                          className="w-full p-2 border border-slate-200 rounded-lg bg-white text-xs font-semibold"
+                        >
+                          {shifts.map(s => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">Chuyển sang Ca (Đích) *</label>
+                        <select
+                          value={dailyToShift}
+                          onChange={e => setDailyToShift(Number(e.target.value))}
+                          className="w-full p-2 border border-slate-200 rounded-lg bg-white text-xs font-semibold"
+                        >
+                          {shifts.map(s => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {dailyAction === 'CANCEL_DAY' && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700">
+                    <p className="font-semibold">⚠️ Cảnh báo:</p>
+                    <p className="text-[11px] mt-0.5">Toàn bộ các ca học đang hoạt động trong ngày <strong>{selectedDate}</strong> sẽ chuyển sang trạng thái <strong>Đã hủy</strong>.</p>
+                  </div>
+                )}
+
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowDailyModal(false)}
+                    className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 text-xs font-medium"
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={dailySubmitting}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition shadow-xs disabled:opacity-50"
+                  >
+                    {dailySubmitting ? 'Đang thực thi...' : 'Xác nhận thực hiện'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Đổi Ca/Lịch Từ Nay Về Sau */}
+        {showFutureModal && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full flex flex-col border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-indigo-600 text-white">
+                    <CalendarRange size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-base">Đổi Ca / Lịch Học Từ Nay Về Sau</h3>
+                    <p className="text-xs text-slate-500">Cập nhật tự động cho tất cả các buổi học tương lai của lớp</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowFutureModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+              </div>
+
+              <form onSubmit={handleFutureUpdateSubmit} className="p-6 space-y-4 text-xs overflow-y-auto">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Chọn Lớp Học *</label>
+                  <select
+                    value={futureClassId}
+                    onChange={e => setFutureClassId(e.target.value)}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-semibold text-xs"
+                    required
+                  >
+                    {classes.map(c => (
+                      <option key={c.id} value={c.id}>{c.name} ({c.id})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Ngày Bắt Đầu Áp Dụng (fromDate) *</label>
+                  <input
+                    type="date"
+                    required
+                    value={futureFromDate}
+                    onChange={e => setFutureFromDate(e.target.value)}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-semibold"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">Chỉ những ca học từ ngày này trở về sau mới được cập nhật thông tin mới.</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Ca Học Mới (tùy chọn)</label>
+                    <select
+                      value={futureShiftId}
+                      onChange={e => setFutureShiftId(e.target.value)}
+                      className="w-full p-2 border border-slate-200 rounded-lg bg-white text-xs"
+                    >
+                      <option value="">-- Giữ nguyên ca hiện tại --</option>
+                      {shifts.map(s => (
+                        <option key={s.id} value={s.id}>{s.name} ({s.startTime} - {s.endTime})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Phòng Học Mới (tùy chọn)</label>
+                    <input
+                      type="text"
+                      placeholder="VD: P.202 (để trống giữ nguyên)"
+                      value={futureRoomId}
+                      onChange={e => setFutureRoomId(e.target.value)}
+                      className="w-full p-2 border border-slate-200 rounded-lg text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Giáo Viên Phụ Trách Mới (tùy chọn)</label>
+                  <select
+                    value={futureTeacherId}
+                    onChange={e => setFutureTeacherId(e.target.value)}
+                    className="w-full p-2 border border-slate-200 rounded-lg bg-white text-xs"
+                  >
+                    <option value="">-- Giữ nguyên giáo viên hiện tại --</option>
+                    {teachers.map(tc => (
+                      <option key={tc.id} value={tc.id}>{tc.name} ({tc.id})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowFutureModal(false)}
+                    className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 text-xs font-medium"
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={futureSubmitting}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-xs disabled:opacity-50"
+                  >
+                    {futureSubmitting ? 'Đang cập nhật...' : 'Áp dụng cho tất cả các buổi tới'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Modal Sửa Nhanh Ca Học */}
         {editingSlot && (
@@ -907,211 +1179,6 @@ export default function AdminCalendarPage() {
           </div>
         )}
 
-        
-        {/* Modal Thao tác Hàng Loạt Theo Ngày */}
-        {showDailyActionModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-amber-50 text-amber-600 border border-amber-200">
-                    <AlertCircle size={20} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-800 text-base">Thao Tác Hàng Loạt Ngày {selectedDate}</h3>
-                    <p className="text-xs text-slate-400">Áp dụng cho toàn bộ các lớp đang xếp lịch trong ngày này</p>
-                  </div>
-                </div>
-                <button onClick={() => setShowDailyActionModal(false)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
-                  <X size={20} />
-                </button>
-              </div>
-
-              <form onSubmit={handleDailyAction} className="p-6 space-y-4 text-xs">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Chọn hành động cần thực hiện:</label>
-                  <select
-                    value={dailyActionType}
-                    onChange={e => setDailyActionType(e.target.value as any)}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-bold bg-white text-xs focus:outline-indigo-600"
-                  >
-                    <option value="RESCHEDULE_DAY">📅 Dời toàn bộ ca học ngày này sang ngày khác</option>
-                    <option value="SHIFT_MIGRATION">⏰ Chuyển ca học đồng loạt trong ngày</option>
-                    <option value="CANCEL_DAY">⛔ Tạm hoãn / Hủy toàn bộ ca học trong ngày (Nghỉ lễ/Sự cố)</option>
-                  </select>
-                </div>
-
-                {dailyActionType === 'RESCHEDULE_DAY' && (
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Dời sang ngày mới *</label>
-                    <input
-                      type="date"
-                      required
-                      value={dailyTargetDate}
-                      onChange={e => setDailyTargetDate(e.target.value)}
-                      className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-mono font-bold"
-                    />
-                  </div>
-                )}
-
-                {dailyActionType === 'SHIFT_MIGRATION' && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">Từ ca:</label>
-                      <select
-                        value={dailyFromShift}
-                        onChange={e => setDailyFromShift(Number(e.target.value))}
-                        className="w-full p-2.5 border border-slate-200 rounded-xl bg-white"
-                      >
-                        {shifts.map(s => <option key={s.id} value={s.id}>{s.name} ({s.startTime} - {s.endTime})</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">Chuyển sang ca:</label>
-                      <select
-                        value={dailyToShift}
-                        onChange={e => setDailyToShift(Number(e.target.value))}
-                        className="w-full p-2.5 border border-slate-200 rounded-xl bg-white"
-                      >
-                        {shifts.map(s => <option key={s.id} value={s.id}>{s.name} ({s.startTime} - {s.endTime})</option>)}
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                {dailyActionType === 'CANCEL_DAY' && (
-                  <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-[11px] leading-relaxed">
-                    ⚠️ Toàn bộ các ca học trong ngày <strong>{selectedDate}</strong> sẽ chuyển sang trạng thái <strong>"Đã hủy"</strong> để phục vụ nghỉ lễ hoặc sự cố đột xuất.
-                  </div>
-                )}
-
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowDailyActionModal(false)}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-xs cursor-pointer"
-                  >
-                    Xác Nhận Thực Hiện
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Modal Đổi Ca/Lịch Hàng Loạt Từ Nay Về Sau */}
-        {showFutureUpdateModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200">
-                    <Calendar size={20} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-800 text-base">Đổi Lịch Hàng Loạt Từ Nay Về Sau</h3>
-                    <p className="text-xs text-slate-400">Áp dụng đồng loạt cho tất cả các buổi học trong tương lai của lớp</p>
-                  </div>
-                </div>
-                <button onClick={() => setShowFutureUpdateModal(false)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
-                  <X size={20} />
-                </button>
-              </div>
-
-              <form onSubmit={handleFutureUpdate} className="p-6 space-y-4 text-xs">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Chọn lớp học cần đổi lịch *</label>
-                  <select
-                    required
-                    value={futureClassId}
-                    onChange={e => {
-                      setFutureClassId(e.target.value);
-                      const cls = classes.find(c => c.id === e.target.value);
-                      if (cls) {
-                        setFutureTargetShiftId(cls.shiftId);
-                        setFutureTargetRoomId(cls.roomId);
-                        setFutureTargetTeacherId(cls.teacherId);
-                      }
-                    }}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl bg-white text-xs font-bold focus:outline-indigo-600"
-                  >
-                    {classes.map(c => <option key={c.id} value={c.id}>{c.code} • {c.name} ({c.id})</option>)}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Áp dụng cho tất cả các buổi từ ngày *</label>
-                  <input
-                    type="date"
-                    required
-                    value={futureFromDate}
-                    onChange={e => setFutureFromDate(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-mono font-bold"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">Các buổi học trước ngày này sẽ được giữ nguyên lịch sử.</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Đổi sang ca học mới:</label>
-                    <select
-                      value={futureTargetShiftId}
-                      onChange={e => setFutureTargetShiftId(Number(e.target.value))}
-                      className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-semibold"
-                    >
-                      {shifts.map(s => <option key={s.id} value={s.id}>{s.name} ({s.startTime} - {s.endTime})</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Đổi sang phòng mới:</label>
-                    <input
-                      type="text"
-                      placeholder="Để trống nếu giữ nguyên"
-                      value={futureTargetRoomId}
-                      onChange={e => setFutureTargetRoomId(e.target.value)}
-                      className="w-full p-2.5 border border-slate-200 rounded-xl"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Đổi giáo viên phụ trách mới:</label>
-                  <select
-                    value={futureTargetTeacherId}
-                    onChange={e => setFutureTargetTeacherId(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl bg-white"
-                  >
-                    <option value="">-- Giữ nguyên giáo viên hiện tại --</option>
-                    {teachers.map(t => <option key={t.id} value={t.id}>{t.id} - {t.name}</option>)}
-                  </select>
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowFutureUpdateModal(false)}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-xs cursor-pointer"
-                  >
-                    Áp Dụng Cho Tất Cả Các Buổi Tới
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
         {/* Modal Cấu hình Khung giờ Ca học */}
         {showShiftModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
@@ -1139,6 +1206,22 @@ export default function AdminCalendarPage() {
               </div>
 
               <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                {/* Tùy chọn Đồng bộ Ca học Tương lai */}
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={syncFutureShiftsOption}
+                      onChange={e => setSyncFutureShiftsOption(e.target.checked)}
+                      className="w-4 h-4 text-amber-600 rounded border-amber-300 focus:ring-amber-500"
+                    />
+                    <div>
+                      <span className="font-bold text-amber-900 text-xs">☑️ Tự động đồng bộ khung giờ mới vào tất cả các ca học từ nay về sau</span>
+                      <p className="text-[11px] text-amber-700">Khi bạn sửa giờ bắt đầu/kết thúc của ca, toàn bộ ca học tương lai thuộc ca này sẽ tự động được cập nhật lại giờ mới.</p>
+                    </div>
+                  </label>
+                </div>
+
                 {/* Thanh thống kê & Nút thêm ca */}
                 <div className="flex items-center justify-between bg-slate-50 p-3.5 rounded-xl border border-slate-200">
                   <div>
@@ -1315,7 +1398,9 @@ export default function AdminCalendarPage() {
               </div>
             </div>
           </div>
-        )}        {/* Modal Sinh Lịch Hàng Loạt Dài Hạn */}
+        )}
+
+        {/* Modal Sinh Lịch Hàng Loạt Dài Hạn */}
         {showBulkModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
             <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-xl overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">

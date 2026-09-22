@@ -1,75 +1,108 @@
 import { NextResponse } from 'next/server';
 import { repo } from '@/repositories';
 import { ShiftService } from '@/services/ShiftService';
+import { ConflictEngine } from '@/services/ConflictEngine';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { classId, fromDate, targetShiftId, targetRoomId, targetTeacherId, targetMeetingLink } = body;
+    const {
+      classId,
+      fromDate,
+      targetShiftId,
+      targetRoomId,
+      targetTeacherId,
+      targetMeetingLink,
+      actorId = 'ADMIN001',
+    } = body;
 
     if (!classId || !fromDate) {
-      return NextResponse.json({ success: false, error: 'Vui lòng cung cấp classId và fromDate' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Vui lòng cung cấp classId và fromDate' },
+        { status: 400 }
+      );
     }
 
-    const cls = await repo.getClassById(classId);
-    if (!cls) {
-      return NextResponse.json({ success: false, error: 'Không tìm thấy lớp học' }, { status: 404 });
-    }
-
-    let targetShift: any = null;
-    if (targetShiftId !== undefined) {
+    let targetShift = null;
+    if (targetShiftId !== undefined && targetShiftId !== null) {
       targetShift = await ShiftService.getShiftById(Number(targetShiftId));
+      if (!targetShift) {
+        return NextResponse.json(
+          { success: false, error: `Không tìm thấy ca học với id ${targetShiftId}` },
+          { status: 400 }
+        );
+      }
     }
 
     const allSlots = await repo.getAllScheduleSlots();
-    const futureSlots = allSlots.filter(s => s.classId === classId && s.date >= fromDate && s.status !== 'Đã hủy');
+    const targetSlots = allSlots.filter(
+      s => s.classId === classId && s.date >= fromDate && s.status !== 'Đã hủy'
+    );
 
-    let updatedCount = 0;
-    for (const slot of futureSlots) {
-      if (targetShiftId !== undefined && targetShift) {
-        slot.shiftId = Number(targetShiftId);
-        slot.startTime = targetShift.startTime;
-        slot.endTime = targetShift.endTime;
-      }
-      if (targetRoomId) {
-        slot.roomId = targetRoomId;
-      }
-      if (targetTeacherId) {
-        slot.teacherId = targetTeacherId;
-      }
-      if (targetMeetingLink !== undefined) {
-        slot.meetingLink = targetMeetingLink;
-      }
-
-      await repo.updateScheduleSlot(slot);
-      updatedCount++;
+    if (targetSlots.length === 0) {
+      return NextResponse.json({
+        success: true,
+        updatedCount: 0,
+        message: 'Không tìm thấy ca học nào phù hợp để cập nhật',
+        updatedSlots: [],
+      });
     }
 
-    // Cập nhật lại thông tin mặc định của lớp học
-    if (targetShiftId !== undefined) cls.shiftId = Number(targetShiftId);
-    if (targetRoomId) cls.roomId = targetRoomId;
-    if (targetTeacherId) cls.teacherId = targetTeacherId;
-    if (targetMeetingLink !== undefined) cls.meetingLink = targetMeetingLink;
-    await repo.updateClass(cls);
+    const conflictEngine = new ConflictEngine(repo);
+    const updatedSlots = [];
+    const conflictErrors = [];
 
+    for (const slot of targetSlots) {
+      const updatedSlot = {
+        ...slot,
+        shiftId: targetShift ? targetShift.id : slot.shiftId,
+        startTime: targetShift ? targetShift.startTime : slot.startTime,
+        endTime: targetShift ? targetShift.endTime : slot.endTime,
+        roomId: targetRoomId !== undefined && targetRoomId !== '' ? targetRoomId : slot.roomId,
+        teacherId: targetTeacherId !== undefined && targetTeacherId !== '' ? targetTeacherId : slot.teacherId,
+        meetingLink: targetMeetingLink !== undefined && targetMeetingLink !== '' ? targetMeetingLink : slot.meetingLink,
+      };
+
+      // Kiểm tra xung đột lịch học trước khi cập nhật
+      const conflictCheck = await conflictEngine.checkScheduleConflict(updatedSlot, slot.id);
+      if (conflictCheck.hasConflict) {
+        conflictErrors.push({
+          slotId: slot.id,
+          date: slot.date,
+          error: conflictCheck.message,
+        });
+        continue;
+      }
+
+      const saved = await repo.updateScheduleSlot(updatedSlot);
+      updatedSlots.push(saved);
+    }
+
+    // Ghi AuditLog
     await repo.addAuditLog({
-      action: 'UPDATE',
-      userId: 'ADMIN001',
-      userName: 'Quản trị viên',
+      action: 'SCHEDULE_CHANGE',
+      userId: actorId,
+      userName: actorId === 'ADMIN001' ? 'Quản trị viên' : actorId,
       userRole: 'ADMIN',
       targetResource: 'SCHEDULE',
       targetId: classId,
-      details: `Thay đổi hàng loạt lịch từ ngày ${fromDate} của lớp ${classId} (${cls.name}): ${updatedCount} ca học đã được cập nhật`,
+      details: `Thay đổi lịch từ ngày ${fromDate} về sau cho lớp ${classId}: đã cập nhật ${updatedSlots.length}/${targetSlots.length} ca.${targetShift ? ` Ca mới: ${targetShift.name}.` : ''}${targetRoomId ? ` Phòng mới: ${targetRoomId}.` : ''}${targetTeacherId ? ` GV mới: ${targetTeacherId}.` : ''}`,
     });
 
     return NextResponse.json({
       success: true,
-      updatedCount,
-      message: `Đã cập nhật thành công ${updatedCount} ca học từ ngày ${fromDate} của lớp ${cls.name}`
+      updatedCount: updatedSlots.length,
+      totalMatched: targetSlots.length,
+      conflicts: conflictErrors,
+      message: `Đã cập nhật thành công ${updatedSlots.length}/${targetSlots.length} ca học từ ngày ${fromDate}`,
+      updatedSlots,
     });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: err?.message || 'Lỗi xử lý thay đổi lịch từ nay về sau' },
+      { status: 500 }
+    );
   }
 }

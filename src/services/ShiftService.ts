@@ -1,5 +1,6 @@
 import { TimeShift, TIME_SHIFTS } from '../types/schedule';
 import { repo } from '../repositories';
+import { getTodayDateStr } from '../utils/date';
 
 export class ShiftService {
   public static async getAllShifts(): Promise<TimeShift[]> {
@@ -12,7 +13,8 @@ export class ShiftService {
 
   public static async updateShift(
     id: number,
-    data: { shiftId?: number; startTime?: string; endTime?: string; name?: string; isActive?: boolean }
+    data: { shiftId?: number; startTime?: string; endTime?: string; name?: string; isActive?: boolean },
+    syncFutureSlots: boolean = false
   ): Promise<TimeShift | null> {
     const targetId = data.shiftId !== undefined ? Number(data.shiftId) : id;
     const old = await repo.getTimeShiftById(targetId);
@@ -31,6 +33,22 @@ export class ShiftService {
 
     await repo.updateTimeShift(updated);
 
+    let syncedSlotsCount = 0;
+    if (syncFutureSlots) {
+      const today = getTodayDateStr();
+      const allSlots = await repo.getAllScheduleSlots();
+      for (const slot of allSlots) {
+        if (slot.shiftId === updated.id && slot.date >= today && slot.status !== 'Đã hủy') {
+          if (slot.startTime !== updated.startTime || slot.endTime !== updated.endTime) {
+            slot.startTime = updated.startTime;
+            slot.endTime = updated.endTime;
+            await repo.updateScheduleSlot(slot);
+            syncedSlotsCount++;
+          }
+        }
+      }
+    }
+
     await repo.addAuditLog({
       action: 'UPDATE',
       userId: 'ADMIN001',
@@ -38,10 +56,78 @@ export class ShiftService {
       userRole: 'ADMIN',
       targetResource: 'SCHEDULE',
       targetId: 'SHIFT_' + updated.id,
-      details: 'Cập nhật khung giờ ' + updated.name + ': ' + updated.startTime + ' - ' + updated.endTime,
+      details: 'Cập nhật khung giờ ' + updated.name + ': ' + updated.startTime + ' - ' + updated.endTime + (syncFutureSlots ? ` (Đồng bộ ${syncedSlotsCount} ca học tương lai)` : ''),
     });
 
     return updated;
+  }
+
+  /**
+   * Thay đổi cấu hình khung giờ ca học hàng loạt và tùy chọn tự động đồng bộ ca học tương lai
+   */
+  public static async bulkUpdateShifts(
+    shifts: TimeShift[],
+    syncFutureSlots: boolean = true
+  ): Promise<{ shifts: TimeShift[]; syncedSlotsCount: number }> {
+    const current = await repo.getAllTimeShifts();
+    const currentMap = new Map(current.map(s => [s.id, s]));
+    const updatedShifts: TimeShift[] = [];
+
+    for (const s of shifts) {
+      const duration = (s.startTime && s.endTime)
+        ? this.calcDuration(s.startTime, s.endTime)
+        : (s.durationHours || 2.0);
+      const shiftObj: TimeShift = {
+        ...s,
+        id: Number(s.id),
+        name: s.name || `Ca ${s.id}`,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        durationHours: duration,
+        isActive: s.isActive !== undefined ? s.isActive : true,
+      };
+
+      if (currentMap.has(shiftObj.id)) {
+        await repo.updateTimeShift(shiftObj);
+      } else {
+        await repo.createTimeShift(shiftObj);
+      }
+      updatedShifts.push(shiftObj);
+    }
+
+    let syncedSlotsCount = 0;
+    if (syncFutureSlots) {
+      const today = getTodayDateStr();
+      const allSlots = await repo.getAllScheduleSlots();
+      const shiftMap = new Map<number, TimeShift>(updatedShifts.map(s => [s.id, s]));
+
+      for (const slot of allSlots) {
+        if (slot.date >= today && slot.status !== 'Đã hủy') {
+          const shift = shiftMap.get(slot.shiftId);
+          if (shift && (slot.startTime !== shift.startTime || slot.endTime !== shift.endTime)) {
+            slot.startTime = shift.startTime;
+            slot.endTime = shift.endTime;
+            await repo.updateScheduleSlot(slot);
+            syncedSlotsCount++;
+          }
+        }
+      }
+    }
+
+    await repo.addAuditLog({
+      action: 'UPDATE',
+      userId: 'ADMIN001',
+      userName: 'Quản trị viên',
+      userRole: 'ADMIN',
+      targetResource: 'SCHEDULE',
+      targetId: 'BULK_SHIFTS',
+      details: `Cập nhật cấu hình ca học hàng loạt (${updatedShifts.length} ca)${syncFutureSlots ? `. Đã đồng bộ ${syncedSlotsCount} ca học tương lai từ ngày ${getTodayDateStr()}` : ''}`,
+    });
+
+    return {
+      shifts: updatedShifts,
+      syncedSlotsCount,
+    };
   }
 
   public static async createShift(data: {
@@ -105,60 +191,6 @@ export class ShiftService {
   /**
    * Áp dụng Presets cấu hình nhanh số ca
    */
-  public static async bulkUpdateShifts(newShifts: TimeShift[], syncFutureSlots: boolean = true): Promise<{ updatedShifts: TimeShift[], syncedSlotsCount: number }> {
-    const current = await repo.getAllTimeShifts();
-    const currentIds = new Set(current.map(s => s.id));
-    const newIds = new Set(newShifts.map(s => s.id));
-
-    // Xóa các ca không còn trong danh sách mới
-    for (const s of current) {
-      if (!newIds.has(s.id)) {
-        await repo.deleteTimeShift(s.id);
-      }
-    }
-
-    // Tạo hoặc cập nhật
-    for (const s of newShifts) {
-      if (currentIds.has(s.id)) {
-        await repo.updateTimeShift(s);
-      } else {
-        await repo.createTimeShift(s);
-      }
-    }
-
-    let syncedSlotsCount = 0;
-    if (syncFutureSlots) {
-      const today = new Date().toISOString().split('T')[0];
-      const allSlots = await repo.getAllScheduleSlots();
-      const futureSlots = allSlots.filter(slot => slot.date >= today && slot.status !== 'Đã hủy');
-      const shiftMap = new Map(newShifts.map(s => [s.id, s]));
-
-      for (const slot of futureSlots) {
-        const matchingShift = shiftMap.get(slot.shiftId);
-        if (matchingShift) {
-          if (slot.startTime !== matchingShift.startTime || slot.endTime !== matchingShift.endTime) {
-            slot.startTime = matchingShift.startTime;
-            slot.endTime = matchingShift.endTime;
-            await repo.updateScheduleSlot(slot);
-            syncedSlotsCount++;
-          }
-        }
-      }
-    }
-
-    await repo.addAuditLog({
-      action: 'UPDATE',
-      userId: 'ADMIN001',
-      userName: 'Quản trị viên',
-      userRole: 'ADMIN',
-      targetResource: 'SCHEDULE',
-      targetId: 'SHIFTS_BATCH',
-      details: `Cập nhật hàng loạt ${newShifts.length} ca học, đồng bộ tự động ${syncedSlotsCount} ca học tương lai`,
-    });
-
-    return { updatedShifts: newShifts, syncedSlotsCount };
-  }
-
   public static async applyPreset(presetType: '3_SHIFTS' | '2_SHIFTS' | '5_SHIFTS'): Promise<TimeShift[]> {
     const current = await repo.getAllTimeShifts();
     for (const s of current) {
