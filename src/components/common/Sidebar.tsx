@@ -44,6 +44,7 @@ export const Sidebar: React.FC = () => {
     { label: 'Đội ngũ Giáo viên', href: '/admin/teachers', icon: UserCheck },
     { label: 'Danh sách Học viên', href: '/admin/students', icon: Users },
     
+    { label: 'Sổ Thu - Chi & Công nợ', href: '/admin/finance', icon: Coins },
     { label: 'Công nợ & Học phí', href: '/admin/tuition', icon: Receipt },
     { label: 'Tài khoản & Mật khẩu', href: '/admin/accounts', icon: KeyRound },
     { label: 'Nhật ký Hệ thống', href: '/admin/audit', icon: History },
