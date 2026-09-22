@@ -105,6 +105,60 @@ export class ShiftService {
   /**
    * Áp dụng Presets cấu hình nhanh số ca
    */
+  public static async bulkUpdateShifts(newShifts: TimeShift[], syncFutureSlots: boolean = true): Promise<{ updatedShifts: TimeShift[], syncedSlotsCount: number }> {
+    const current = await repo.getAllTimeShifts();
+    const currentIds = new Set(current.map(s => s.id));
+    const newIds = new Set(newShifts.map(s => s.id));
+
+    // Xóa các ca không còn trong danh sách mới
+    for (const s of current) {
+      if (!newIds.has(s.id)) {
+        await repo.deleteTimeShift(s.id);
+      }
+    }
+
+    // Tạo hoặc cập nhật
+    for (const s of newShifts) {
+      if (currentIds.has(s.id)) {
+        await repo.updateTimeShift(s);
+      } else {
+        await repo.createTimeShift(s);
+      }
+    }
+
+    let syncedSlotsCount = 0;
+    if (syncFutureSlots) {
+      const today = new Date().toISOString().split('T')[0];
+      const allSlots = await repo.getAllScheduleSlots();
+      const futureSlots = allSlots.filter(slot => slot.date >= today && slot.status !== 'Đã hủy');
+      const shiftMap = new Map(newShifts.map(s => [s.id, s]));
+
+      for (const slot of futureSlots) {
+        const matchingShift = shiftMap.get(slot.shiftId);
+        if (matchingShift) {
+          if (slot.startTime !== matchingShift.startTime || slot.endTime !== matchingShift.endTime) {
+            slot.startTime = matchingShift.startTime;
+            slot.endTime = matchingShift.endTime;
+            await repo.updateScheduleSlot(slot);
+            syncedSlotsCount++;
+          }
+        }
+      }
+    }
+
+    await repo.addAuditLog({
+      action: 'UPDATE',
+      userId: 'ADMIN001',
+      userName: 'Quản trị viên',
+      userRole: 'ADMIN',
+      targetResource: 'SCHEDULE',
+      targetId: 'SHIFTS_BATCH',
+      details: `Cập nhật hàng loạt ${newShifts.length} ca học, đồng bộ tự động ${syncedSlotsCount} ca học tương lai`,
+    });
+
+    return { updatedShifts: newShifts, syncedSlotsCount };
+  }
+
   public static async applyPreset(presetType: '3_SHIFTS' | '2_SHIFTS' | '5_SHIFTS'): Promise<TimeShift[]> {
     const current = await repo.getAllTimeShifts();
     for (const s of current) {

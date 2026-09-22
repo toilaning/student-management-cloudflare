@@ -43,6 +43,11 @@ export async function PUT(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    if (body.bulkShifts && Array.isArray(body.bulkShifts)) {
+      const result = await ShiftService.bulkUpdateShifts(body.bulkShifts, body.syncFutureSlots ?? true);
+      return NextResponse.json({ success: true, ...result, message: 'Đã cập nhật hàng loạt khung giờ ca học' });
+    }
+
     if (body.presetType) {
       const shifts = await ShiftService.applyPreset(body.presetType);
       return NextResponse.json({ success: true, shifts, message: 'Đã áp dụng mẫu cấu hình thành công' });
