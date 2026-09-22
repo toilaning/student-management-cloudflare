@@ -253,7 +253,7 @@ export default function AdminAccountsPage() {
                 <tr>
                   <th className="px-4 py-3">Mã ID / Username</th>
                   <th className="px-4 py-3">Họ và tên</th>
-                  <th className="px-4 py-3">Email liên kết</th>
+                  
                   <th className="px-4 py-3">Vai trò</th>
                   <th className="px-4 py-3">Bảo mật mật khẩu</th>
                   <th className="px-4 py-3">Trạng thái</th>
@@ -471,17 +471,7 @@ export default function AdminAccountsPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Email liên kết *</label>
-                <input
-                  type="email"
-                  required
-                  placeholder="Ví dụ: an.nv@edulocal.edu.vn"
-                  value={newUserFormData.email}
-                  onChange={e => setNewUserFormData({ ...newUserFormData, email: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-indigo-600"
-                />
-              </div>
+
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Vai trò hệ thống *</label>
