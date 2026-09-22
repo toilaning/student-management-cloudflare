@@ -43,6 +43,11 @@ export async function PUT(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    if (body.presetType) {
+      const shifts = await ShiftService.applyPreset(body.presetType);
+      return NextResponse.json({ success: true, shifts, message: 'Đã áp dụng mẫu cấu hình thành công' });
+    }
+
     const { shiftNumber, name, startTime, endTime, isActive } = body;
     if (!startTime || !endTime) {
       return NextResponse.json({ success: false, error: 'Vui lòng cung cấp giờ bắt đầu và kết thúc' }, { status: 400 });

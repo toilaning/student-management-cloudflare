@@ -5,7 +5,7 @@ import { User } from "@/types/auth";
 import { Student } from "@/types/student";
 import { Teacher } from "@/types/teacher";
 import { Classroom, ClassEntity } from "@/types/classroom";
-import { ScheduleSlot, ClassRequest } from "@/types/schedule";
+import { ScheduleSlot, ClassRequest, TimeShift } from "@/types/schedule";
 import { AttendanceRecord } from "@/types/attendance";
 import { TuitionInvoice, PayrollRecord } from "@/types/finance";
 import { SessionPackage } from "@/types/package";
@@ -417,6 +417,13 @@ export class GoogleAppsScriptRepository implements IRepository {
     this.setCache("schedules:all", result);
     return result;
   }
+
+  
+  public async getAllTimeShifts(): Promise<TimeShift[]> { return LocalRepository.getInstance().getAllTimeShifts(); }
+  public async getTimeShiftById(id: number): Promise<TimeShift | null> { return LocalRepository.getInstance().getTimeShiftById(id); }
+  public async createTimeShift(shift: TimeShift): Promise<TimeShift> { return LocalRepository.getInstance().createTimeShift(shift); }
+  public async updateTimeShift(shift: TimeShift): Promise<TimeShift> { return LocalRepository.getInstance().updateTimeShift(shift); }
+  public async deleteTimeShift(id: number): Promise<boolean> { return LocalRepository.getInstance().deleteTimeShift(id); }
 
   public async getScheduleSlotById(id: string): Promise<ScheduleSlot | null> {
     const slot = await this.callGas<any>("ScheduleService", "getScheduleSlotById", { id });

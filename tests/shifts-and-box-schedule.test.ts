@@ -17,6 +17,7 @@ describe('Dynamic Shifts & Schedule Box Suite', () => {
   });
 
   it('2. API GET /api/shifts trả về danh sách ca học', async () => {
+    await ShiftService.resetDefaults();
     const res = await getShifts();
     const data = await res.json();
     assert.ok(data.success);

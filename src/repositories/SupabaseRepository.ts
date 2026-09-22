@@ -5,7 +5,7 @@ import { User } from '@/types/auth';
 import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
 import { Classroom, ClassEntity } from '@/types/classroom';
-import { ScheduleSlot, ClassRequest } from '@/types/schedule';
+import { ScheduleSlot, ClassRequest, TimeShift, TIME_SHIFTS } from '@/types/schedule';
 import { AttendanceRecord } from '@/types/attendance';
 import { TuitionInvoice, PayrollRecord } from '@/types/finance';
 import { SessionPackage } from '@/types/package';
@@ -1102,6 +1102,85 @@ export class SupabaseRepository implements IRepository {
       if (this.fallbackToLocalOnFailure) return localRepo.getAllScheduleSlots();
       throw err;
     }
+  }
+
+  
+  // Time Shifts
+  public async getAllTimeShifts(): Promise<TimeShift[]> {
+    const client = getSupabaseAdminClient();
+    if (!client) {
+      return LocalRepository.getInstance().getAllTimeShifts();
+    }
+    try {
+      const { data, error } = await client.from('time_shifts').select('*').order('id', { ascending: true });
+      if (error || !data || data.length === 0) {
+        return LocalRepository.getInstance().getAllTimeShifts();
+      }
+      return data.map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        startTime: String(r.start_time).substring(0, 5),
+        endTime: String(r.end_time).substring(0, 5),
+        durationHours: Number(r.duration_hours) || 2.0,
+        isActive: r.is_active ?? true
+      }));
+    } catch {
+      return LocalRepository.getInstance().getAllTimeShifts();
+    }
+  }
+
+  public async getTimeShiftById(id: number): Promise<TimeShift | null> {
+    const all = await this.getAllTimeShifts();
+    return all.find(s => s.id === id) || null;
+  }
+
+  public async createTimeShift(shift: TimeShift): Promise<TimeShift> {
+    const client = getSupabaseAdminClient();
+    if (client) {
+      try {
+        await client.from('time_shifts').insert({
+          id: shift.id,
+          name: shift.name,
+          start_time: shift.startTime,
+          end_time: shift.endTime,
+          duration_hours: shift.durationHours || 2.0,
+          is_active: shift.isActive ?? true
+        });
+      } catch (e) {
+        console.warn('Lưu time_shifts vào Supabase thất bại:', e);
+      }
+    }
+    return LocalRepository.getInstance().createTimeShift(shift);
+  }
+
+  public async updateTimeShift(shift: TimeShift): Promise<TimeShift> {
+    const client = getSupabaseAdminClient();
+    if (client) {
+      try {
+        await client.from('time_shifts').update({
+          name: shift.name,
+          start_time: shift.startTime,
+          end_time: shift.endTime,
+          duration_hours: shift.durationHours || 2.0,
+          is_active: shift.isActive ?? true
+        }).eq('id', shift.id);
+      } catch (e) {
+        console.warn('Cập nhật time_shifts trên Supabase thất bại:', e);
+      }
+    }
+    return LocalRepository.getInstance().updateTimeShift(shift);
+  }
+
+  public async deleteTimeShift(id: number): Promise<boolean> {
+    const client = getSupabaseAdminClient();
+    if (client) {
+      try {
+        await client.from('time_shifts').delete().eq('id', id);
+      } catch (e) {
+        console.warn('Xóa time_shifts trên Supabase thất bại:', e);
+      }
+    }
+    return LocalRepository.getInstance().deleteTimeShift(id);
   }
 
   public async getScheduleSlotById(id: string): Promise<ScheduleSlot | null> {

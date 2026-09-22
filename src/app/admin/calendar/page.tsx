@@ -155,6 +155,30 @@ export default function AdminCalendarPage() {
     setBulkEndDate(base.toISOString().split('T')[0]);
   };
 
+  
+  const handleApplyPreset = async (presetType: '3_SHIFTS' | '2_SHIFTS' | '5_SHIFTS') => {
+    const label = presetType === '3_SHIFTS' ? '3 ca/ngày (Sáng - Chiều - Tối)' : presetType === '2_SHIFTS' ? '2 ca/ngày (Sáng - Tối)' : '5 ca tiêu chuẩn';
+    if (!confirm(`Bạn có chắc chắn muốn chuyển hệ thống sang mẫu ${label}? Các ca học hiện tại sẽ được thay thế theo mẫu này.`)) return;
+
+    try {
+      const res = await fetch('/api/shifts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ presetType }),
+      });
+      const data = await res.json();
+      if (data.success && data.shifts) {
+        setShifts(data.shifts);
+        setActionMessage(`Đã áp dụng thành công mẫu: ${label}`);
+        setTimeout(() => setActionMessage(null), 3000);
+      } else {
+        alert(data.error || 'Áp dụng mẫu thất bại');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Lỗi mạng');
+    }
+  };
+
   const handleCreateShift = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newShiftInput.startTime || !newShiftInput.endTime) {

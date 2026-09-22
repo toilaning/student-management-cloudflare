@@ -4,6 +4,7 @@ import { User } from '@/types/auth';
 import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
 import { Classroom, ClassEntity } from '@/types/classroom';
+import { TimeShift, TIME_SHIFTS } from '@/types/schedule';
 import { ScheduleSlot, ClassRequest } from '@/types/schedule';
 import { AttendanceRecord } from '@/types/attendance';
 import { TuitionInvoice, PayrollRecord } from '@/types/finance';
@@ -21,6 +22,8 @@ export class LocalRepository implements IRepository {
   private classrooms: Map<string, Classroom> = new Map();
   private classes: Map<string, ClassEntity> = new Map();
   private scheduleSlots: Map<string, ScheduleSlot> = new Map();
+  
+  private timeShifts: Map<number, TimeShift> = new Map();
   private attendanceRecords: Map<string, AttendanceRecord> = new Map();
   private classRequests: Map<string, ClassRequest> = new Map();
   private sessionPackages: Map<string, SessionPackage> = new Map();
@@ -216,6 +219,37 @@ export class LocalRepository implements IRepository {
   // Schedule
   public async getAllScheduleSlots(): Promise<ScheduleSlot[]> {
     return Array.from(this.scheduleSlots.values());
+  }
+
+  
+  // Time Shifts
+  public async getAllTimeShifts(): Promise<TimeShift[]> {
+    if (this.timeShifts.size === 0) {
+      TIME_SHIFTS.forEach(s => this.timeShifts.set(s.id, { ...s, isActive: true }));
+    }
+    return Array.from(this.timeShifts.values()).sort((a, b) => a.id - b.id);
+  }
+
+  public async getTimeShiftById(id: number): Promise<TimeShift | null> {
+    await this.getAllTimeShifts();
+    return this.timeShifts.get(id) || null;
+  }
+
+  public async createTimeShift(shift: TimeShift): Promise<TimeShift> {
+    await this.getAllTimeShifts();
+    this.timeShifts.set(shift.id, { ...shift });
+    return shift;
+  }
+
+  public async updateTimeShift(shift: TimeShift): Promise<TimeShift> {
+    await this.getAllTimeShifts();
+    this.timeShifts.set(shift.id, { ...shift });
+    return shift;
+  }
+
+  public async deleteTimeShift(id: number): Promise<boolean> {
+    await this.getAllTimeShifts();
+    return this.timeShifts.delete(id);
   }
 
   public async getScheduleSlotById(id: string): Promise<ScheduleSlot | null> {

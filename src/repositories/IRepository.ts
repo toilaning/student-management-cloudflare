@@ -3,13 +3,20 @@ import { User } from '@/types/auth';
 import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
 import { Classroom, ClassEntity } from '@/types/classroom';
-import { ScheduleSlot, ClassRequest } from '@/types/schedule';
+import { ScheduleSlot, ClassRequest, TimeShift } from '@/types/schedule';
 import { AttendanceRecord } from '@/types/attendance';
 import { TuitionInvoice, PayrollRecord } from '@/types/finance';
 import { SessionPackage } from '@/types/package';
 import { AuditLog } from '@/types/audit';
 
 export interface IRepository {
+  // Time Shifts
+  getAllTimeShifts(): Promise<TimeShift[]>;
+  getTimeShiftById(id: number): Promise<TimeShift | null>;
+  createTimeShift(shift: TimeShift): Promise<TimeShift>;
+  updateTimeShift(shift: TimeShift): Promise<TimeShift>;
+  deleteTimeShift(id: number): Promise<boolean>;
+
   // Users
   getUserById(id: string): Promise<User | null>;
   getUserByUsername(username: string): Promise<User | null>;
