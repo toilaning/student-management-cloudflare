@@ -1,5 +1,7 @@
 'use client';
 
+import { getTodayDateStr } from '@/utils/date';
+
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { Header } from '@/components/common/Header';
 import { RoleGuard } from '@/components/common/RoleGuard';
@@ -34,7 +36,7 @@ interface ExtendedAttendanceRecord extends AttendanceRecord {
 
 function AdminAttendanceContent() {
   // Bộ lọc
-  const [selectedDate, setSelectedDate] = useState<string>('2026-09-20');
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayDateStr());
   const [classes, setClasses] = useState<ClassEntity[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('ALL');
   const [slots, setSlots] = useState<ScheduleSlot[]>([]);

@@ -1,5 +1,7 @@
 'use client';
 
+import { getTodayDateStr } from '@/utils/date';
+
 import React, { useState, useEffect } from 'react';
 import { Header } from '@/components/common/Header';
 import { ScheduleSlot, TIME_SHIFTS } from '@/types/schedule';
@@ -8,7 +10,7 @@ import { Classroom, ClassEntity } from '@/types/classroom';
 import { Calendar, Clock, ChevronLeft, ChevronRight, AlertCircle, Plus, UserCheck, Edit3, Trash2, X, Check, Video, ExternalLink, Headphones, RefreshCw, Layers, Sparkles } from 'lucide-react';
 
 export default function AdminCalendarPage() {
-  const [selectedDate, setSelectedDate] = useState('2026-09-02');
+  const [selectedDate, setSelectedDate] = useState(getTodayDateStr());
   const [slots, setSlots] = useState<ScheduleSlot[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [classes, setClasses] = useState<ClassEntity[]>([]);
@@ -44,7 +46,7 @@ export default function AdminCalendarPage() {
     classId: 'CLS01',
     teacherId: 'GV001',
     roomId: 'P.101',
-    date: '2026-09-02',
+    date: getTodayDateStr(),
     shiftId: 1,
     subject: 'Toán Cao Cấp',
     topic: 'Buổi học định kỳ',
@@ -357,25 +359,34 @@ export default function AdminCalendarPage() {
                 onClick={() => {
                   const d = new Date(selectedDate);
                   d.setDate(d.getDate() - 1);
-                  if (d.toISOString().slice(0, 7) === '2026-09') {
-                    setSelectedDate(d.toISOString().split('T')[0]);
-                  }
+                  setSelectedDate(d.toISOString().split('T')[0]);
                 }}
                 className="p-1 hover:bg-white rounded text-slate-600 transition"
               >
                 <ChevronLeft size={18} />
               </button>
-              <span className="px-3 font-semibold text-sm text-slate-800 flex items-center gap-2">
-                <Calendar size={16} className="text-indigo-600" />
-                {selectedDate}
-              </span>
+              <div className="flex items-center gap-1.5 px-2">
+                <Calendar size={16} className="text-indigo-600 shrink-0" />
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={e => e.target.value && setSelectedDate(e.target.value)}
+                  className="font-semibold text-xs sm:text-sm text-slate-800 bg-transparent border-none focus:outline-none cursor-pointer"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedDate(getTodayDateStr())}
+                className="px-2.5 py-1 bg-white hover:bg-slate-200 text-indigo-700 rounded text-xs font-bold transition shadow-2xs border border-slate-200"
+                title="Quay về ngày hôm nay"
+              >
+                Hôm nay
+              </button>
               <button 
                 onClick={() => {
                   const d = new Date(selectedDate);
                   d.setDate(d.getDate() + 1);
-                  if (d.toISOString().slice(0, 7) === '2026-09') {
-                    setSelectedDate(d.toISOString().split('T')[0]);
-                  }
+                  setSelectedDate(d.toISOString().split('T')[0]);
                 }}
                 className="p-1 hover:bg-white rounded text-slate-600 transition"
               >

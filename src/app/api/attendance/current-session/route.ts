@@ -1,3 +1,4 @@
+import { getTodayDateStr } from '@/utils/date';
 import { NextResponse } from 'next/server';
 import { repo } from '@/repositories';
 import { ScheduleSlot } from '@/types/schedule';
@@ -48,7 +49,8 @@ export async function GET(request: Request) {
       }
     } else {
       // Fallback: Lấy 1 ca có sẵn trong seed (ví dụ ngày 2026-09-20 hoặc slot đầu tiên)
-      const sampleDateSlots = slots.filter(s => s.date === '2026-09-20');
+      const today = getTodayDateStr();
+      const sampleDateSlots = slots.filter(s => s.date === today);
       if (teacherId) {
         activeSlot = sampleDateSlots.find(s => s.teacherId === teacherId) || slots.find(s => s.teacherId === teacherId) || null;
       } else {

@@ -1,5 +1,7 @@
 'use client';
 
+import { getTodayDateStr } from '@/utils/date';
+
 import React, { useEffect, useState } from 'react';
 import { Header } from '@/components/common/Header';
 import { LiveSessionTracker } from '@/components/attendance/LiveSessionTracker';
@@ -74,7 +76,7 @@ export default function AdminDashboardPage() {
         const [tuitionData, logsData, slotsData] = await Promise.all([
           fetchSafe('/api/finance'),
           fetchSafe('/api/audit'),
-          fetchSafe('/api/schedule?date=2026-09-02'),
+          fetchSafe(`/api/schedule?date=${getTodayDateStr()}`),
         ]);
 
         let totalRevenue = 0;
