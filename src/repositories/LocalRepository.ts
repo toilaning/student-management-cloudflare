@@ -203,6 +203,11 @@ export class LocalRepository implements IRepository {
     return classEntity;
   }
 
+  public async deleteClass(id: string): Promise<boolean> {
+    const existed = this.classes.delete(id);
+    return existed;
+  }
+
   public async createClass(classEntity: ClassEntity): Promise<ClassEntity> {
     this.classes.set(classEntity.id, { ...classEntity });
     return classEntity;

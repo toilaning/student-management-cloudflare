@@ -1,3 +1,4 @@
+import { LocalRepository } from './LocalRepository';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { IRepository } from './IRepository';
 import { User } from '@/types/auth';
@@ -1040,6 +1041,19 @@ export class SupabaseRepository implements IRepository {
       if (this.fallbackToLocalOnFailure) return localRepo.updateClass(classEntity);
       throw err;
     }
+  }
+
+  public async deleteClass(id: string): Promise<boolean> {
+    const client = getSupabaseAdminClient();
+    if (!client) {
+      return LocalRepository.getInstance().deleteClass(id);
+    }
+    const { error } = await client.from('classes').delete().eq('id', id);
+    if (error) {
+      console.error('Lỗi khi xóa lớp học trên Supabase:', error);
+      throw new Error(error.message);
+    }
+    return true;
   }
 
   public async createClass(classEntity: ClassEntity): Promise<ClassEntity> {

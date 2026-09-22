@@ -42,6 +42,7 @@ export interface IRepository {
   getClassesByStudentId(studentId: string): Promise<ClassEntity[]>;
   updateClass(classEntity: ClassEntity): Promise<ClassEntity>;
   createClass(classEntity: ClassEntity): Promise<ClassEntity>;
+  deleteClass(id: string): Promise<boolean>;
 
   // Schedule
   getAllScheduleSlots(): Promise<ScheduleSlot[]>;

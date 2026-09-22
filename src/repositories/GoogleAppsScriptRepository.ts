@@ -1,3 +1,4 @@
+import { LocalRepository } from './LocalRepository';
 import { IRepository } from "./IRepository";
 import { AppNotification } from "@/types/notification";
 import { User } from "@/types/auth";
@@ -396,6 +397,10 @@ export class GoogleAppsScriptRepository implements IRepository {
   public async updateClass(classEntity: ClassEntity): Promise<ClassEntity> {
     this.invalidateCache("classes");
     return this.callGas<ClassEntity>("ClassService", "updateClass", { classEntity });
+  }
+
+  public async deleteClass(id: string): Promise<boolean> {
+    return LocalRepository.getInstance().deleteClass(id);
   }
 
   public async createClass(classEntity: ClassEntity): Promise<ClassEntity> {

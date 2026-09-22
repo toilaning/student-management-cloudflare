@@ -9,6 +9,18 @@ import { BookOpen, Users, UserCheck, Search, Plus, Trash2, X, Check, Edit3, Vide
 import { PaginationControls } from '@/components/common/PaginationControls';
 
 export default function AdminClassesPage() {
+  const [showAddClassModal, setShowAddClassModal] = useState(false);
+  const [newClassFormData, setNewClassFormData] = useState({
+    name: '',
+    code: '',
+    subject: '',
+    teacherId: '',
+    roomId: 'P.101',
+    shiftId: 1,
+    scheduleDays: [2, 4, 6] as number[],
+    tuitionFee: 1500000,
+    meetingLink: ''
+  });
   const [classes, setClasses] = useState<ClassEntity[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -29,6 +41,66 @@ export default function AdminClassesPage() {
   const [newTeacherId, setNewTeacherId] = useState('');
   const [editingMeetClass, setEditingMeetClass] = useState<ClassEntity | null>(null);
   const [meetLinkInput, setMeetLinkInput] = useState('');
+
+  
+  const handleCreateClass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newClassFormData.name || !newClassFormData.code || !newClassFormData.subject || !newClassFormData.teacherId) {
+      alert('Vui lòng điền đủ Tên lớp, Mã môn, Chuyên môn và Giảng viên');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/classes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newClassFormData),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setActionMessage(data.message || 'Tạo lớp học mới thành công!');
+        setShowAddClassModal(false);
+        setNewClassFormData({
+          name: '',
+          code: '',
+          subject: '',
+          teacherId: teachers[0]?.id || '',
+          roomId: 'P.101',
+          shiftId: 1,
+          scheduleDays: [2, 4, 6],
+          tuitionFee: 1500000,
+          meetingLink: ''
+        });
+        await loadData();
+      } else {
+        alert(data.error || 'Tạo lớp học thất bại');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Lỗi kết nối mạng');
+    }
+  };
+
+  const handleDeleteClass = async (cls: ClassEntity) => {
+    const studentCount = (cls.studentIds || []).length;
+    const confirmMsg = studentCount > 0 
+      ? `CẢNH BÁO: Lớp "${cls.name}" (${cls.id}) hiện có ${studentCount} học viên. Bạn có chắc chắn muốn xóa lớp học này không?`
+      : `Bạn có chắc chắn muốn xóa lớp "${cls.name}" (${cls.id}) không?`;
+    
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch(`/api/classes?id=${cls.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok) {
+        setActionMessage(data.message || 'Đã xóa lớp học thành công');
+        await loadData();
+      } else {
+        alert(data.error || 'Xóa lớp học thất bại');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Lỗi mạng');
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -222,8 +294,22 @@ export default function AdminClassesPage() {
               className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-indigo-600"
             />
           </div>
-          <div className="text-xs text-slate-500 font-medium">
-            Tổng cộng: <span className="font-bold text-slate-800">{classes.length}</span> lớp học
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+            <div className="text-xs text-slate-500 font-medium">
+              Tổng cộng: <span className="font-bold text-slate-800">{classes.length}</span> lớp học
+            </div>
+            <button
+              onClick={() => {
+                setNewClassFormData(prev => ({
+                  ...prev,
+                  teacherId: prev.teacherId || teachers[0]?.id || ''
+                }));
+                setShowAddClassModal(true);
+              }}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0"
+            >
+              <Plus size={15} /> Thêm Lớp Học Mới
+            </button>
           </div>
         </div>
 
@@ -238,9 +324,18 @@ export default function AdminClassesPage() {
                     </span>
                     <h3 className="font-bold text-slate-800 text-base mt-1.5 line-clamp-1">{cls.name}</h3>
                   </div>
-                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
-                    {cls.status}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
+                      {cls.status}
+                    </span>
+                    <button
+                      onClick={() => handleDeleteClass(cls)}
+                      title="Xóa lớp học"
+                      className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-3">
@@ -347,7 +442,187 @@ export default function AdminClassesPage() {
         </div>
       </main>
 
-            {/* Modal Sửa Link Phòng học Discord / Room Link */}
+            
+      {/* Modal Thêm Lớp Học Mới */}
+      {showAddClassModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
+                  <BookOpen size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800 text-base">Thêm Lớp Học Mới</h3>
+                  <p className="text-xs text-slate-400">Khởi tạo lớp học mới và phân công giảng viên</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowAddClassModal(false)}
+                className="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateClass} className="p-5 space-y-4 text-xs overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Tên lớp học *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ví dụ: Toán Tư Duy Khóa 1"
+                    value={newClassFormData.name}
+                    onChange={e => setNewClassFormData({ ...newClassFormData, name: e.target.value })}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Mã lớp / Code môn *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="MTH101, IELTS70..."
+                    value={newClassFormData.code}
+                    onChange={e => setNewClassFormData({ ...newClassFormData, code: e.target.value })}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs font-mono uppercase"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Bộ môn / Chuyên môn (Điền tự do) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Toán, IELTS, Vẽ Manga, Lập trình..."
+                    value={newClassFormData.subject}
+                    onChange={e => setNewClassFormData({ ...newClassFormData, subject: e.target.value })}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Giảng viên phụ trách *</label>
+                  <select
+                    required
+                    value={newClassFormData.teacherId}
+                    onChange={e => setNewClassFormData({ ...newClassFormData, teacherId: e.target.value })}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs bg-white font-semibold"
+                  >
+                    {teachers.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.id} - {t.name} ({t.specialty})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Phòng học *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="P.101, P.201..."
+                    value={newClassFormData.roomId}
+                    onChange={e => setNewClassFormData({ ...newClassFormData, roomId: e.target.value })}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Ca học mặc định *</label>
+                  <select
+                    value={newClassFormData.shiftId}
+                    onChange={e => setNewClassFormData({ ...newClassFormData, shiftId: Number(e.target.value) })}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs bg-white"
+                  >
+                    <option value={1}>Ca 1 (08:00 - 10:00)</option>
+                    <option value={2}>Ca 2 (10:15 - 12:15)</option>
+                    <option value={3}>Ca 3 (13:30 - 15:30)</option>
+                    <option value={4}>Ca 4 (15:45 - 17:45)</option>
+                    <option value={5}>Ca 5 (18:30 - 20:30)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Học phí khóa (VNĐ)</label>
+                  <input
+                    type="number"
+                    step={100000}
+                    value={newClassFormData.tuitionFee}
+                    onChange={e => setNewClassFormData({ ...newClassFormData, tuitionFee: Number(e.target.value) })}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs font-bold text-emerald-600"
+                  />
+                </div>
+              </div>
+
+              {/* Lịch học trong tuần */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1.5">Lịch học trong tuần:</label>
+                <div className="flex flex-wrap gap-2">
+                  {[2, 3, 4, 5, 6, 7].map(day => {
+                    const isSelected = newClassFormData.scheduleDays.includes(day);
+                    return (
+                      <button
+                        type="button"
+                        key={day}
+                        onClick={() => {
+                          let updated = [...newClassFormData.scheduleDays];
+                          if (isSelected) {
+                            updated = updated.filter(d => d !== day);
+                          } else {
+                            updated.push(day);
+                            updated.sort();
+                          }
+                          setNewClassFormData({ ...newClassFormData, scheduleDays: updated });
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                          isSelected 
+                            ? 'bg-indigo-600 text-white shadow-xs' 
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        Thứ {day}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Link phòng Discord / Phòng Online</label>
+                <input
+                  type="url"
+                  placeholder="https://discord.com/channels/edu-center/room-..."
+                  value={newClassFormData.meetingLink}
+                  onChange={e => setNewClassFormData({ ...newClassFormData, meetingLink: e.target.value })}
+                  className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs font-mono"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddClassModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-xs cursor-pointer"
+                >
+                  Lưu Lớp Học
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Sửa Link Phòng học Discord / Room Link */}
       {editingMeetClass && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
