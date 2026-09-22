@@ -736,58 +736,133 @@ export default function AdminCalendarPage() {
         {/* Modal Cấu hình Khung giờ Ca học */}
         {showShiftModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                 <div className="flex items-center gap-2">
-                  <Clock className="text-indigo-600" size={20} />
-                  <h3 className="font-bold text-slate-800 text-base">Cấu hình Khung giờ Ca học Động</h3>
+                  <div className="p-2 rounded-xl bg-amber-50 text-amber-600 border border-amber-200">
+                    <Clock size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-base">Quản Lý & Cấu Hình Khung Giờ Ca Học</h3>
+                    <p className="text-xs text-slate-400">Admin có thể tùy ý thêm ca mới, xóa bớt ca hoặc sửa giờ bắt đầu / kết thúc</p>
+                  </div>
                 </div>
                 <button
                   onClick={() => {
                     setShowShiftModal(false);
                     setEditingShift(null);
+                    setShowCreateShiftForm(false);
                   }}
-                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
                 >
                   <X size={20} />
                 </button>
               </div>
 
               <div className="p-6 overflow-y-auto space-y-4 flex-1">
-                <p className="text-xs text-slate-500">
-                  Admin có thể trực tiếp sửa giờ bắt đầu & kết thúc của từng ca học (Ví dụ: Ca 1 từ 08:00 thành 08:30). Hệ thống sẽ cập nhật tức thì trên toàn bộ lịch giảng dạy và đăng ký học viên.
-                </p>
+                {/* Thanh thống kê & Nút thêm ca */}
+                <div className="flex items-center justify-between bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                  <div>
+                    <span className="text-xs text-slate-500 font-medium">Hiện có:</span>
+                    <strong className="text-indigo-600 font-bold ml-1.5 text-sm">{shifts.length} ca học đang hoạt động</strong>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateShiftForm(!showCreateShiftForm);
+                      setEditingShift(null);
+                    }}
+                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+                  >
+                    <Plus size={14} /> {showCreateShiftForm ? 'Đóng form tạo' : 'Thêm ca học mới'}
+                  </button>
+                </div>
 
-                <div className="space-y-3">
+                {/* Form Thêm Ca Học Mới */}
+                {showCreateShiftForm && (
+                  <form onSubmit={handleCreateShift} className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-200 space-y-3 animate-in fade-in">
+                    <div className="font-bold text-indigo-800 text-xs uppercase tracking-wider">Thêm Ca Học Mới Vào Hệ Thống:</div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 text-xs mb-1">Tên ca (ví dụ: Ca 6, Ca Sáng, Ca VIP Tối, Ca Cuối Tuần...)</label>
+                      <input
+                        type="text"
+                        placeholder="Để trống sẽ tự động đặt tên theo số thứ tự"
+                        value={newShiftInput.name}
+                        onChange={e => setNewShiftInput({ ...newShiftInput, name: e.target.value })}
+                        className="w-full p-2 border border-slate-200 rounded-lg bg-white text-xs font-semibold"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-semibold text-slate-700 text-xs mb-1">Giờ bắt đầu *</label>
+                        <input
+                          type="time"
+                          required
+                          value={newShiftInput.startTime}
+                          onChange={e => setNewShiftInput({ ...newShiftInput, startTime: e.target.value })}
+                          className="w-full p-2 border border-slate-200 rounded-lg bg-white font-mono text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-slate-700 text-xs mb-1">Giờ kết thúc *</label>
+                        <input
+                          type="time"
+                          required
+                          value={newShiftInput.endTime}
+                          onChange={e => setNewShiftInput({ ...newShiftInput, endTime: e.target.value })}
+                          className="w-full p-2 border border-slate-200 rounded-lg bg-white font-mono text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateShiftForm(false)}
+                        className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer"
+                      >
+                        Tạo Ca Học
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Danh Sách Các Ca Học */}
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
                   {shifts.map(s => {
                     const isEditing = editingShift?.id === s.id;
                     return (
-                      <div key={s.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div key={s.id} className="p-3.5 hover:bg-slate-50/80 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-sm text-slate-800">{s.name}</span>
-                            <span className="text-[11px] px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100">
+                            <span className="text-[11px] px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono font-semibold border border-indigo-100">
                               {s.startTime} - {s.endTime}
                             </span>
                           </div>
-                          <span className="text-[11px] text-slate-400">Thời lượng: {s.durationHours || 2.0} giờ</span>
+                          <span className="text-[11px] text-slate-400">Thời lượng: {s.durationHours || 2.0} giờ • ID: #{s.id}</span>
                         </div>
 
                         {isEditing ? (
-                          <form onSubmit={handleUpdateShift} className="flex items-center gap-2 flex-wrap">
+                          <form onSubmit={handleUpdateShift} className="flex items-center gap-2 flex-wrap bg-white p-2 rounded-lg border border-indigo-200 shadow-2xs">
                             <input
                               type="text"
                               value={editingShift.name}
                               onChange={e => setEditingShift({ ...editingShift, name: e.target.value })}
                               placeholder="Tên ca"
-                              className="w-24 px-2 py-1 border border-slate-300 rounded text-xs"
+                              className="w-28 px-2 py-1 border border-slate-300 rounded text-xs font-semibold"
                               required
                             />
                             <input
                               type="time"
                               value={editingShift.startTime}
                               onChange={e => setEditingShift({ ...editingShift, startTime: e.target.value })}
-                              className="px-2 py-1 border border-slate-300 rounded text-xs"
+                              className="px-2 py-1 border border-slate-300 rounded text-xs font-mono"
                               required
                             />
                             <span className="text-xs text-slate-400">-</span>
@@ -795,12 +870,12 @@ export default function AdminCalendarPage() {
                               type="time"
                               value={editingShift.endTime}
                               onChange={e => setEditingShift({ ...editingShift, endTime: e.target.value })}
-                              className="px-2 py-1 border border-slate-300 rounded text-xs"
+                              className="px-2 py-1 border border-slate-300 rounded text-xs font-mono"
                               required
                             />
                             <button
                               type="submit"
-                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold shadow-xs"
+                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold shadow-xs"
                             >
                               Lưu
                             </button>
@@ -813,16 +888,36 @@ export default function AdminCalendarPage() {
                             </button>
                           </form>
                         ) : (
-                          <button
-                            onClick={() => setEditingShift({ id: s.id, name: s.name, startTime: s.startTime, endTime: s.endTime })}
-                            className="px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-400 text-indigo-600 rounded-lg text-xs font-semibold transition flex items-center gap-1 shadow-2xs self-start sm:self-auto"
-                          >
-                            <Edit3 size={13} /> Sửa khung giờ
-                          </button>
+                          <div className="flex items-center gap-2 self-end sm:self-auto">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingShift({ id: s.id, name: s.name, startTime: s.startTime, endTime: s.endTime });
+                                setShowCreateShiftForm(false);
+                              }}
+                              className="px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-400 text-indigo-600 rounded-lg text-xs font-semibold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                            >
+                              <Edit3 size={13} /> Sửa
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteShift(s.id, s.name)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                              title="Xóa ca học này"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
                         )}
                       </div>
                     );
                   })}
+
+                  {shifts.length === 0 && (
+                    <div className="p-8 text-center text-slate-400 text-xs">
+                      Hiện chưa có ca học nào. Bấm <strong>"Thêm ca học mới"</strong> ở trên để tạo.
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -832,6 +927,7 @@ export default function AdminCalendarPage() {
                   onClick={() => {
                     setShowShiftModal(false);
                     setEditingShift(null);
+                    setShowCreateShiftForm(false);
                   }}
                   className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold transition"
                 >
@@ -840,9 +936,7 @@ export default function AdminCalendarPage() {
               </div>
             </div>
           </div>
-        )}
-
-      </main>
+        )}      </main>
     </div>
   );
 }
