@@ -151,7 +151,7 @@ export default function AdminAccountsPage() {
       return (
         u.id.toLowerCase().includes(q) ||
         u.name.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
+        (u.email || "").toLowerCase().includes(q) ||
         u.username.toLowerCase().includes(q)
       );
     }

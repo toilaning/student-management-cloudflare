@@ -162,7 +162,7 @@ export class StudentService {
 
     if (status === 'Đã nghỉ học') {
       const allUsers = await repo.getAllUsers();
-      const linkedUser = allUsers.find(u => u.studentId === studentId || u.username === studentId || u.username === studentId.toLowerCase());
+      const linkedUser = allUsers.find(u => (u as any).studentId === studentId || u.username === studentId || u.username === studentId.toLowerCase());
       if (linkedUser) {
         linkedUser.isActive = false;
         await repo.updateUser(linkedUser);

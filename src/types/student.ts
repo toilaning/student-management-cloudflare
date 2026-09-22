@@ -1,4 +1,4 @@
-export type StudentStatus = 'Đang học' | 'Bảo lưu' | 'Đã tốt nghiệp';
+export type StudentStatus = 'Đang học' | 'Tạm dừng' | 'Đã nghỉ học' | 'Bảo lưu' | 'Đã tốt nghiệp';
 
 export interface Student {
   id: string; // ST001..ST400

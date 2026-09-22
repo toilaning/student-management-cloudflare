@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     users = users.filter(u => 
       u.id.toLowerCase().includes(search) || 
       u.name.toLowerCase().includes(search) ||
-      u.email.toLowerCase().includes(search) ||
+      (u.email || "").toLowerCase().includes(search) ||
       u.username.toLowerCase().includes(search)
     );
   }
