@@ -20,6 +20,39 @@ export async function GET(request: Request) {
     });
   }
 
+  // Tự động đồng bộ đối soát: Quét tất cả user có role STUDENT, nếu thiếu trong hồ sơ students thì tự động bổ sung ngay
+  try {
+    const allUsers = await repo.getAllUsers();
+    const studentUsers = allUsers.filter(u => u.role === 'STUDENT');
+    let existingStudents = await repo.getAllStudents();
+    const existingStudentIds = new Set(existingStudents.map(s => s.id));
+
+    for (const u of studentUsers) {
+      if (!existingStudentIds.has(u.id)) {
+        try {
+          const syncedStudent = {
+            id: u.id,
+            name: u.name,
+            email: u.email || `${u.username}@student.local`,
+            phone: '0900000000',
+            dateOfBirth: '2008-01-01',
+            gender: 'Nam' as const,
+            address: 'TP. Hồ Chí Minh',
+            status: 'Đang học' as const,
+            enrolledClassIds: [],
+            createdAt: new Date().toISOString(),
+          };
+          await repo.createStudent(syncedStudent);
+          existingStudentIds.add(u.id);
+        } catch (e) {
+          console.warn('[AUTO-HEAL-STUDENT] Bỏ qua lỗi đồng bộ hồ sơ cho', u.id, e);
+        }
+      }
+    }
+  } catch (healErr) {
+    console.warn('[AUTO-HEAL-SYNC-ERROR]:', healErr);
+  }
+
   let students = await repo.getAllStudents();
   // Class membership is normalized in the ClassStudents sheet, không trùng lặp trong Students.
   const allClasses = await repo.getAllClasses();

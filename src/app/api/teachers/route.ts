@@ -12,6 +12,39 @@ export async function GET(request: Request) {
     return NextResponse.json({ teacher });
   }
 
+  // Tự động đồng bộ đối soát: Quét tất cả user có role TEACHER, nếu thiếu trong hồ sơ teachers thì tự động bổ sung ngay
+  try {
+    const allUsers = await repo.getAllUsers();
+    const teacherUsers = allUsers.filter(u => u.role === 'TEACHER');
+    let existingTeachers = await repo.getAllTeachers();
+    const existingTeacherIds = new Set(existingTeachers.map(t => t.id));
+
+    for (const u of teacherUsers) {
+      if (!existingTeacherIds.has(u.id)) {
+        try {
+          const syncedTeacher = {
+            id: u.id,
+            name: u.name,
+            email: u.email || `${u.username}@edu.vn`,
+            phone: '0901234567',
+            specialty: 'Bộ môn chung',
+            hourlyRate: 300000,
+            ratePerSession: 250000,
+            status: 'Đang dạy' as const,
+            assignedClassIds: [],
+            createdAt: new Date().toISOString(),
+          };
+          await repo.createTeacher(syncedTeacher);
+          existingTeacherIds.add(u.id);
+        } catch (e) {
+          console.warn('[AUTO-HEAL-TEACHER] Bỏ qua lỗi đồng bộ hồ sơ cho', u.id, e);
+        }
+      }
+    }
+  } catch (healErr) {
+    console.warn('[AUTO-HEAL-SYNC-ERROR]:', healErr);
+  }
+
   const teachers = await repo.getAllTeachers();
   return NextResponse.json({ teachers });
 }
