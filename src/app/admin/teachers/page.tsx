@@ -356,16 +356,7 @@ export default function AdminTeachersPage() {
                     className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs"
                   />
                 </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    placeholder="teacher@example.com"
-                    value={editFormData.email}
-                    onChange={e => setEditFormData({ ...editFormData, email: e.target.value })}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs"
-                  />
-                </div>
+                
               </div>
 
               <div>

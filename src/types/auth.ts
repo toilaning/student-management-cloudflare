@@ -6,7 +6,7 @@ export interface User {
   passwordHash: string; // SHA-256
   role: Role;
   name: string;
-  email: string;
+  email?: string;
   avatar?: string;
   discordId?: string;
   discordUsername?: string;
