@@ -363,7 +363,8 @@ export default function AdminClassesPage() {
               Tổng cộng: <span className="font-bold text-slate-800">{classes.length}</span> lớp học
             </div>
             <button
-              onClick={() => {
+              onClick={(e) => {
+                            e.stopPropagation();
                 setNewClassFormData(prev => ({
                   ...prev,
                   teacherId: prev.teacherId || teachers[0]?.id || ''
@@ -384,7 +385,12 @@ export default function AdminClassesPage() {
             const isRecurringClass = cls.isRecurring !== false;
 
             return (
-              <div key={cls.id} className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 hover:border-indigo-300 transition space-y-4 flex flex-col justify-between">
+              <div 
+                key={cls.id} 
+                onClick={() => openClassStudentsModal(cls)}
+                className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 hover:border-indigo-500 hover:shadow-md transition-all space-y-4 flex flex-col justify-between cursor-pointer group"
+                title="Bấm vào lớp để xem danh sách học viên"
+              >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
@@ -405,7 +411,7 @@ export default function AdminClassesPage() {
                         {cls.status}
                       </span>
                       <button
-                        onClick={() => handleDeleteClass(cls)}
+                        onClick={(e) => { e.stopPropagation(); handleDeleteClass(cls); }}
                         title="Xóa lớp học"
                         className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
                       >
@@ -454,7 +460,8 @@ export default function AdminClassesPage() {
                             href={cls.meetingLink} 
                             target="_blank" 
                             rel="noreferrer"
-                            className="font-bold text-emerald-600 hover:text-emerald-700 underline text-xs inline-flex items-center gap-1 whitespace-nowrap truncate max-w-[150px]"
+                            onClick={(e) => e.stopPropagation()}
+                          className="font-bold text-emerald-600 hover:text-emerald-700 underline text-xs inline-flex items-center gap-1 whitespace-nowrap truncate max-w-[150px]"
                           >
                             Phòng học Discord <ExternalLink size={11} className="shrink-0" />
                           </a>
@@ -479,13 +486,14 @@ export default function AdminClassesPage() {
 
                 <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
                   <button
-                    onClick={() => openClassStudentsModal(cls)}
-                    className="flex-1 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap truncate min-w-0"
+                    onClick={(e) => { e.stopPropagation(); openClassStudentsModal(cls); }}
+                    className="flex-1 py-2 bg-indigo-50 group-hover:bg-indigo-600 group-hover:text-white text-indigo-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap truncate min-w-0 shadow-2xs"
                   >
                     <Users size={14} className="shrink-0" /> <span className="truncate">Quản lý học viên ({(cls.studentIds || []).length})</span>
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setQuickScheduleClass(cls);
                       const now = new Date();
                       setQuickScheduleStartDate(now.toISOString().split('T')[0]);
@@ -503,7 +511,8 @@ export default function AdminClassesPage() {
                     <Calendar size={14} className="text-emerald-600" /> Lên lịch
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setChangingTeacherClass(cls);
                       setNewTeacherId(cls.teacherId);
                     }}

@@ -24,9 +24,14 @@ export async function GET(request: Request) {
     const teacherId = searchParams.get('teacherId');
 
     const now = new Date();
-    // Format YYYY-MM-DD
-    const today = dateParam || now.toISOString().split('T')[0];
-    const nowTime = now.toTimeString().split(' ')[0].substring(0, 5); // HH:mm
+    // Lấy ngày và giờ chuẩn xác theo múi giờ Việt Nam (Asia/Saigon)
+    const today = dateParam || getTodayDateStr();
+    const nowTime = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Saigon',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).format(now);
 
     let slots = await repo.getAllScheduleSlots();
     // Lọc theo ngày
