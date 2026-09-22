@@ -61,6 +61,31 @@ export async function PUT(request: Request) {
 
     await repo.updateUser(user);
 
+    // Đồng bộ 2 chiều: Khi đổi tên/email ở Quản lý tài khoản, tự động cập nhật sang Hồ sơ Học sinh hoặc Giảng viên
+    if (user.role === 'STUDENT') {
+      try {
+        const student = await repo.getStudentById(user.id);
+        if (student) {
+          if (newName) student.name = newName;
+          if (newEmail) student.email = newEmail;
+          await repo.updateStudent(student);
+        }
+      } catch (err) {
+        console.error('[SYNC-USER-TO-STUDENT-ERROR]:', err);
+      }
+    } else if (user.role === 'TEACHER') {
+      try {
+        const teacher = await repo.getTeacherById(user.id);
+        if (teacher) {
+          if (newName) teacher.name = newName;
+          if (newEmail) teacher.email = newEmail;
+          await repo.updateTeacher(teacher);
+        }
+      } catch (err) {
+        console.error('[SYNC-USER-TO-TEACHER-ERROR]:', err);
+      }
+    }
+
     // Ghi Audit Log
     await repo.addAuditLog({
       action: 'UPDATE',
@@ -125,6 +150,40 @@ export async function POST(request: Request) {
       targetId: id,
       details: `Tạo tài khoản mới [${id}] - ${name} (Vai trò: ${role})`,
     });
+
+    // Chiều 2 - Đồng bộ tự động: Nếu tạo tài khoản vai trò TEACHER, tự sinh hồ sơ giảng viên nếu chưa tồn tại
+    if (role === 'TEACHER') {
+      try {
+        const existingTeacher = await repo.getTeacherById(id);
+        if (!existingTeacher) {
+          const newTeacher = {
+            id,
+            name: newUser.name,
+            email: newUser.email,
+            phone: body.phone || '0901234567',
+            specialty: body.specialty || 'Bộ môn chung',
+            hourlyRate: 300000,
+            ratePerSession: 250000,
+            status: 'Đang dạy' as const,
+            assignedClassIds: [],
+            createdAt: new Date().toISOString(),
+          };
+          await repo.createTeacher(newTeacher);
+
+          await repo.addAuditLog({
+            action: 'CREATE',
+            userId: actorId,
+            userName: 'Quản trị viên',
+            userRole: 'ADMIN',
+            targetResource: 'TEACHER',
+            targetId: id,
+            details: `Tự động đồng bộ hồ sơ giảng viên [${id}] từ tài khoản người dùng`,
+          });
+        }
+      } catch (syncTeacherErr: any) {
+        console.error(`[SYNC-TEACHER-ERROR] Không thể tự động tạo hồ sơ giảng viên cho [${id}]:`, syncTeacherErr);
+      }
+    }
 
     // Chiều 2 - Đồng bộ tự động: Nếu tạo tài khoản vai trò STUDENT, tự sinh bản ghi học sinh nếu chưa tồn tại
     if (role === 'STUDENT') {

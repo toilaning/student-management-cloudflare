@@ -74,6 +74,19 @@ export async function PATCH(
 
     if (needUpdate) {
       await repo.updateStudent(student);
+
+      // Đồng bộ ngược lại bảng Users nếu có thay đổi tên/email
+      try {
+        const u = await repo.getUserById(studentId);
+        if (u) {
+          let uChanged = false;
+          if (name && u.name !== name.trim()) { u.name = name.trim(); uChanged = true; }
+          if (email && u.email !== email.trim()) { u.email = email.trim(); uChanged = true; }
+          if (uChanged) await repo.updateUser(u);
+        }
+      } catch (err) {
+        console.error('[SYNC-STUDENT-TO-USER-ERROR]:', err);
+      }
     }
 
     const updatedStudent = await repo.getStudentById(studentId);

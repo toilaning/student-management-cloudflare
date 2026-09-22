@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Header } from '@/components/common/Header';
 import { PaginationControls } from '@/components/common/PaginationControls';
 import { User } from '@/types/auth';
-import { KeyRound, Search, Plus, ShieldCheck, UserCheck, Users, Check, X, Lock, RefreshCw, AlertCircle, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
+import { KeyRound, Edit, Search, Plus, ShieldCheck, UserCheck, Users, Check, X, Lock, RefreshCw, AlertCircle, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
 export default function AdminAccountsPage() {
@@ -20,6 +20,9 @@ export default function AdminAccountsPage() {
 
   // Modal đổi mật khẩu
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editingProfileUser, setEditingProfileUser] = useState<User | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [modalError, setModalError] = useState<string | null>(null);
@@ -58,6 +61,35 @@ export default function AdminAccountsPage() {
   useEffect(() => {
     loadUsers();
   }, []);
+
+  
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setModalError(null);
+    if (!editingProfileUser) return;
+
+    try {
+      const res = await fetch('/api/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: editingProfileUser.id,
+          newName: editName.trim(),
+          newEmail: editEmail.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setActionMessage(`Đã cập nhật thông tin tài khoản ${editName} (${editingProfileUser.id}) và tự động đồng bộ sang hồ sơ thành công!`);
+        setEditingProfileUser(null);
+        await loadUsers();
+      } else {
+        setModalError(data.error || 'Cập nhật tài khoản thất bại');
+      }
+    } catch (err: any) {
+      setModalError(err.message || 'Lỗi mạng');
+    }
+  };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -292,6 +324,18 @@ export default function AdminAccountsPage() {
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => {
+                            setEditingProfileUser(u);
+                            setEditName(u.name || '');
+                            setEditEmail(u.email || '');
+                            setModalError(null);
+                          }}
+                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-[11px] transition inline-flex items-center gap-1 border border-slate-200"
+                          title="Sửa họ tên, email (Tự động đồng bộ sang Hồ sơ Giáo viên/Học sinh)"
+                        >
+                          <Edit size={12} /> Sửa tên
+                        </button>
+                        <button
+                          onClick={() => {
                             setEditingUser(u);
                             setNewPassword('');
                             setConfirmPassword('');
@@ -343,6 +387,82 @@ export default function AdminAccountsPage() {
           />
         </div>
       </main>
+
+      
+      {/* Modal Sửa Tên & Thông Tin Tài Khoản */}
+      {editingProfileUser && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600">
+                  <Edit size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800 text-base">Cập Nhật Thông Tin Tài Khoản</h3>
+                  <p className="text-xs text-slate-500">Mã ID: <strong className="text-slate-800">{editingProfileUser.id}</strong> ({editingProfileUser.role})</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setEditingProfileUser(null)}
+                className="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateProfile} className="p-5 space-y-4">
+              {modalError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                  <AlertCircle size={15} className="shrink-0" />
+                  <span>{modalError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Họ và tên *</label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-indigo-600 font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Địa chỉ Email</label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={e => setEditEmail(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-indigo-600"
+                />
+              </div>
+
+              <div className="p-3 bg-indigo-50/70 border border-indigo-100 text-indigo-900 rounded-xl text-[11px] leading-relaxed">
+                🔄 <strong>Tự động đồng bộ 2 chiều:</strong> Khi bạn sửa họ tên hoặc email tại đây, hệ thống sẽ tự động cập nhật ngay lập tức vào hồ sơ tại mục <strong>Quản lý học sinh</strong> (nếu là Học sinh) hoặc <strong>Quản lý giáo viên</strong> (nếu là Giảng viên).
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingProfileUser(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-xs cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-xs transition cursor-pointer"
+                >
+                  Lưu Thông Tin
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal Đổi Mật Khẩu */}
       {editingUser && (

@@ -122,6 +122,19 @@ export async function PUT(request: Request) {
     };
     const updated = await repo.updateTeacher(updatedTeacher);
 
+    // Đồng bộ ngược lại bảng Users nếu có thay đổi tên/email
+    try {
+      const u = await repo.getUserById(id);
+      if (u) {
+        let uChanged = false;
+        if (name && u.name !== name) { u.name = name; uChanged = true; }
+        if (email && u.email !== email) { u.email = email; uChanged = true; }
+        if (uChanged) await repo.updateUser(u);
+      }
+    } catch (err) {
+      console.error('[SYNC-TEACHER-TO-USER-ERROR]:', err);
+    }
+
     await repo.addAuditLog({
       action: "UPDATE",
       userId: "ADMIN001",
