@@ -1,6 +1,9 @@
 import { IRepository } from '@/repositories/IRepository';
+import { repo } from '@/repositories';
 import { Student } from '@/types/student';
 import { AuthService } from './AuthService';
+
+import { MonthlyPackageService } from './MonthlyPackageService';
 
 export class StudentService {
   constructor(private repo: IRepository) {}
@@ -141,5 +144,55 @@ export class StudentService {
     });
 
     return updated;
+  }
+
+  public static async updateStudentStatus(
+    studentId: string,
+    status: 'Đang học' | 'Tạm dừng' | 'Đã nghỉ học',
+    reason?: string
+  ): Promise<{ student: any; dropoutAudit?: any }> {
+    const student = await repo.getStudentById(studentId);
+    if (!student) throw new Error('Không tìm thấy học sinh ' + studentId);
+
+    const oldStatus = student.status;
+    student.status = status;
+    await repo.updateStudent(student);
+
+    let dropoutAudit: any = null;
+
+    if (status === 'Đã nghỉ học') {
+      const allUsers = await repo.getAllUsers();
+      const linkedUser = allUsers.find(u => u.studentId === studentId || u.username === studentId || u.username === studentId.toLowerCase());
+      if (linkedUser) {
+        linkedUser.isActive = false;
+        await repo.updateUser(linkedUser);
+      }
+
+      const currentMonth = new Date().toISOString().substring(0, 7);
+      const activePackage = await MonthlyPackageService.getStudentPackage(studentId, currentMonth);
+
+      dropoutAudit = {
+        studentId,
+        studentName: student.name,
+        action: 'DROPOUT_PROCESSED',
+        accountLocked: !!linkedUser,
+        currentMonth,
+        remainingSessions: activePackage ? activePackage.remainingSessions : 0,
+        refundEstimate: activePackage ? Math.round((activePackage.price / (activePackage.totalSessions || 1)) * activePackage.remainingSessions) : 0,
+        reason: reason || 'Nghỉ học theo yêu cầu'
+      };
+    }
+
+    await repo.addAuditLog({
+      action: 'UPDATE',
+      userId: 'ADMIN001',
+      userName: 'Quản trị viên',
+      userRole: 'ADMIN',
+      targetResource: 'STUDENT',
+      targetId: studentId,
+      details: 'Thay đổi trạng thái học sinh ' + studentId + ' (' + student.name + ') từ ' + oldStatus + ' -> ' + status + '. Lý do: ' + (reason || 'Không ghi chú'),
+    });
+
+    return { student, dropoutAudit };
   }
 }
