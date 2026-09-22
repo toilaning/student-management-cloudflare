@@ -15,6 +15,30 @@ export async function GET(request: Request) {
 
   if (slotId) {
     records = await repo.getAttendanceBySlotId(slotId);
+    // Tự động hợp nhất danh sách học sinh của lớp vào sổ điểm danh nếu chưa có bản ghi
+    const slot = await repo.getScheduleSlotById(slotId);
+    if (slot && slot.classId) {
+      const cls = await repo.getClassById(slot.classId);
+      if (cls && Array.isArray(cls.studentIds) && cls.studentIds.length > 0) {
+        const recordedIds = new Set(records.map(r => r.studentId));
+        for (const stId of cls.studentIds) {
+          if (!recordedIds.has(stId)) {
+            records.push({
+              id: `ATT_ROSTER_${slotId}_${stId}`,
+              scheduleSlotId: slotId,
+              studentId: stId,
+              classId: slot.classId,
+              date: slot.date,
+              status: 'Chưa điểm danh' as any,
+              note: 'Học viên trong danh sách lớp',
+              method: 'MANUAL',
+              updatedBy: 'SYSTEM',
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        }
+      }
+    }
   } else if (classId) {
     records = await repo.getAttendanceByClassId(classId);
   } else if (studentId) {

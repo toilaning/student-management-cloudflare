@@ -1,10 +1,19 @@
 /**
- * Trả về chuỗi ngày hiện tại định dạng YYYY-MM-DD theo giờ địa phương (local timezone / GMT+7)
+ * Trả về chuỗi ngày hiện tại định dạng YYYY-MM-DD theo múi giờ Việt Nam (Asia/Saigon / GMT+7)
+ * Đảm bảo đồng nhất tuyệt đối dù server chạy ở Cloudflare Workers (UTC), Local hay Docker.
  */
 export function getTodayDateStr(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Saigon' }).format(new Date());
+}
+
+/**
+ * Trả về chuỗi giờ hiện tại định dạng HH:mm theo múi giờ Việt Nam (Asia/Saigon / GMT+7)
+ */
+export function getNowTimeStr(): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Saigon',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(new Date());
 }
