@@ -10,6 +10,8 @@ export interface BulkGenerateParams {
   startDate: string; // YYYY-MM-DD
   endDate: string; // YYYY-MM-DD
   shiftId?: number;
+  startTime?: string;
+  endTime?: string;
   scheduleDays?: number[];
   overwriteExisting?: boolean;
   actorId?: string;
@@ -43,6 +45,8 @@ export class BulkScheduleService {
       startDate,
       endDate,
       shiftId: overrideShiftId,
+      startTime: overrideStartTime,
+      endTime: overrideEndTime,
       scheduleDays: overrideScheduleDays,
       overwriteExisting = false,
       actorId = 'ADMIN001',
@@ -122,8 +126,7 @@ export class BulkScheduleService {
           ? overrideScheduleDays
           : cls.scheduleDays || [];
 
-        // Kiểm tra xem thứ của ngày hiện tại có nằm trong lịch học của lớp không
-        // Chú ý: scheduleDays của hệ thống thường là [2, 3, 4, 5, 6, 7] và có thể có 8 cho CN
+        // Kiểm tra xem thứ của ngày hiện tại có nằm trong lịch học của lớp không (2..8)
         if (!classDays.includes(dayOfWeek)) {
           continue;
         }
@@ -134,11 +137,14 @@ export class BulkScheduleService {
           ? Number(overrideShiftId)
           : cls.shiftId || 1;
 
-        const shiftInfo = shiftMap.get(currentShiftId) || shifts[0] || {
+        const defaultShift = shiftMap.get(currentShiftId) || shifts[0] || {
           id: currentShiftId,
-          startTime: '08:00',
-          endTime: '10:00',
+          startTime: '18:30',
+          endTime: '20:30',
         };
+
+        const slotStartTime = overrideStartTime || cls.startTime || defaultShift.startTime || '18:30';
+        const slotEndTime = overrideEndTime || cls.endTime || defaultShift.endTime || '20:30';
 
         // Lấy tất cả slot hiện có để kiểm tra lớp đã có ca ngày đó chưa
         const currentSlots = await this.repo.getAllScheduleSlots();
@@ -154,8 +160,8 @@ export class BulkScheduleService {
               teacherId: cls.teacherId,
               roomId: cls.roomId,
               shiftId: currentShiftId,
-              startTime: shiftInfo.startTime,
-              endTime: shiftInfo.endTime,
+              startTime: slotStartTime,
+              endTime: slotEndTime,
               subject: cls.subject || existingSlot.subject,
               meetingLink: cls.meetingLink || existingSlot.meetingLink,
               status: 'Đã lên lịch',
@@ -190,8 +196,8 @@ export class BulkScheduleService {
           roomId: cls.roomId,
           date: dateStr,
           shiftId: currentShiftId,
-          startTime: shiftInfo.startTime,
-          endTime: shiftInfo.endTime,
+          startTime: slotStartTime,
+          endTime: slotEndTime,
           subject: cls.subject || cls.name,
           topic: `Buổi học định kỳ - ${cls.name}`,
           meetingLink: cls.meetingLink || '',

@@ -175,7 +175,7 @@ export default function TeacherClassesPage() {
             {displayedClasses.map(cls => {
               const isMine = cls.teacherId === currentUser?.id;
               const isOpen = !cls.teacherId || cls.teacherId === 'CHUA_PHAN_CONG' || cls.teacherId === '';
-              const shiftInfo = shiftMap.get(cls.shiftId);
+              const shiftInfo = shiftMap.get(cls.shiftId ?? 1);
               const shiftTimeLabel = shiftInfo ? `${shiftInfo.startTime} - ${shiftInfo.endTime}` : 'Theo lịch ca';
               const shiftName = shiftInfo?.name || `Ca ${cls.shiftId}`;
 

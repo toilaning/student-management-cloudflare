@@ -68,7 +68,7 @@ export async function GET(request: Request) {
 
     const formattedClasses = studentClasses.map(cls => {
       const teacher = teacherMap.get(cls.teacherId);
-      const shift = shiftMap.get(cls.shiftId);
+      const shift = shiftMap.get(cls.shiftId ?? 1);
       const shiftTimeStr = shift ? `${shift.startTime} - ${shift.endTime}` : `Ca ${cls.shiftId}`;
       const scheduleDaysStr = cls.scheduleDays && cls.scheduleDays.length > 0
         ? cls.scheduleDays.map(d => dayNameMap[d] || `Thứ ${d}`).join(', ')
@@ -184,7 +184,7 @@ export async function POST(request: Request) {
 
     const formattedClasses = studentClasses.map(cls => {
       const teacher = teacherMap.get(cls.teacherId);
-      const shift = shiftMap.get(cls.shiftId);
+      const shift = shiftMap.get(cls.shiftId ?? 1);
       const shiftTimeStr = shift ? `${shift.startTime} - ${shift.endTime}` : `Ca ${cls.shiftId}`;
       const scheduleDaysStr = cls.scheduleDays && cls.scheduleDays.length > 0
         ? cls.scheduleDays.map(d => dayNameMap[d] || `Thứ ${d}`).join(', ')

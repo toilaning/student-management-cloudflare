@@ -182,7 +182,7 @@ export default function StudentClassesPage() {
               const isFull = currentStudents >= maxCapacity;
 
               // Lấy cấu hình khung giờ động của Admin
-              const shiftInfo = shiftMap.get(cls.shiftId);
+              const shiftInfo = shiftMap.get(cls.shiftId ?? 1);
               const shiftName = shiftInfo?.name || `Ca ${cls.shiftId}`;
               const shiftTime = shiftInfo ? `${shiftInfo.startTime} - ${shiftInfo.endTime}` : '08:00 - 10:00';
 

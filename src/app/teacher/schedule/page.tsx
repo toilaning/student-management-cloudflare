@@ -220,7 +220,7 @@ export default function TeacherSchedulePage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {openClasses.map(cls => {
-                  const shift = shiftMap.get(cls.shiftId);
+                  const shift = shiftMap.get(cls.shiftId ?? 1);
                   const startTime = shift?.startTime || '08:00';
                   const endTime = shift?.endTime || '10:00';
 

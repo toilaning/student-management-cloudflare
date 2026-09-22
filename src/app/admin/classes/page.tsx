@@ -17,11 +17,14 @@ export default function AdminClassesPage() {
     teacherId: '',
     roomId: 'P.101',
     shiftId: 1,
+    startTime: '18:30',
+    endTime: '20:30',
     scheduleDays: [2, 4, 6] as number[],
+    isRecurring: true,
     tuitionFee: 1500000,
     meetingLink: '',
-    autoGenerateSchedule: false,
-    generateMonths: 1,
+    autoGenerateSchedule: true,
+    generateMonths: 3,
   });
 
   // Modal Sinh lịch nhanh cho riêng 1 lớp
@@ -29,14 +32,16 @@ export default function AdminClassesPage() {
   const [quickScheduleStartDate, setQuickScheduleStartDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [quickScheduleEndDate, setQuickScheduleEndDate] = useState(() => {
     const d = new Date();
-    d.setMonth(d.getMonth() + 1);
+    d.setMonth(d.getMonth() + 3);
     return d.toISOString().split('T')[0];
   });
+  const [quickScheduleStartTime, setQuickScheduleStartTime] = useState('18:30');
+  const [quickScheduleEndTime, setQuickScheduleEndTime] = useState('20:30');
+  const [quickScheduleDays, setQuickScheduleDays] = useState<number[]>([2, 4, 6]);
   const [quickScheduleOverwrite, setQuickScheduleOverwrite] = useState(false);
   const [quickScheduleSubmitting, setQuickScheduleSubmitting] = useState(false);
   const [classes, setClasses] = useState<ClassEntity[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [shifts, setShifts] = useState<{ id: number; name: string; startTime: string; endTime: string }[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -56,7 +61,12 @@ export default function AdminClassesPage() {
   const [editingMeetClass, setEditingMeetClass] = useState<ClassEntity | null>(null);
   const [meetLinkInput, setMeetLinkInput] = useState('');
 
-  
+  const formatScheduleDays = (days?: number[]) => {
+    if (!days || days.length === 0) return 'Chưa xếp thứ';
+    const sorted = [...days].sort((a, b) => a - b);
+    return sorted.map(d => (d === 8 ? 'CN' : `T${d}`)).join(', ');
+  };
+
   const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newClassFormData.name || !newClassFormData.code || !newClassFormData.subject || !newClassFormData.teacherId) {
@@ -81,11 +91,14 @@ export default function AdminClassesPage() {
           teacherId: teachers[0]?.id || '',
           roomId: 'P.101',
           shiftId: 1,
+          startTime: '18:30',
+          endTime: '20:30',
           scheduleDays: [2, 4, 6],
+          isRecurring: true,
           tuitionFee: 1500000,
           meetingLink: '',
-          autoGenerateSchedule: false,
-          generateMonths: 1,
+          autoGenerateSchedule: true,
+          generateMonths: 3,
         });
         await loadData();
       } else {
@@ -109,8 +122,10 @@ export default function AdminClassesPage() {
           classIds: [quickScheduleClass.id],
           startDate: quickScheduleStartDate,
           endDate: quickScheduleEndDate,
-          shiftId: quickScheduleClass.shiftId,
-          scheduleDays: quickScheduleClass.scheduleDays,
+          startTime: quickScheduleStartTime,
+          endTime: quickScheduleEndTime,
+          shiftId: quickScheduleClass.shiftId || 1,
+          scheduleDays: quickScheduleDays,
           overwriteExisting: quickScheduleOverwrite,
           actorId: 'ADMIN001',
         }),
@@ -156,14 +171,11 @@ export default function AdminClassesPage() {
       const [clsRes, tcRes] = await Promise.all([
         fetch('/api/classes'),
         fetch('/api/teachers'),
-        fetch('/api/shifts'),
       ]);
       const clsData = await clsRes.json();
       const tcData = await tcRes.json();
       setClasses(clsData.classes || []);
       setTeachers(tcData.teachers || []);
-      const shiftData = await (await fetch('/api/shifts')).json();
-      if (shiftData.shifts) setShifts(shiftData.shifts);
     } catch (e) {
       console.error(e);
     } finally {
@@ -318,8 +330,8 @@ export default function AdminClassesPage() {
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
       <Header 
-        title="Quản lý Lớp học & Phân công" 
-        subtitle="Danh sách 30 lớp học đào tạo đang triển khai kỳ Tháng 09/2026" 
+        title="Quản lý Lớp học & Lịch đào tạo" 
+        subtitle="Quản lý thời khóa biểu custom, thứ học và tùy chọn chạy xuyên suốt" 
       />
 
       <main className="p-6 max-w-7xl mx-auto w-full space-y-6">
@@ -366,129 +378,151 @@ export default function AdminClassesPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {paginatedClasses.map(cls => (
-            <div key={cls.id} className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 hover:border-indigo-300 transition space-y-4 flex flex-col justify-between">
-              <div className="space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
-                      {cls.code} • {cls.id}
-                    </span>
-                    <h3 className="font-bold text-slate-800 text-base mt-1.5 line-clamp-1">{cls.name}</h3>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
-                      {cls.status}
-                    </span>
-                    <button
-                      onClick={() => handleDeleteClass(cls)}
-                      title="Xóa lớp học"
-                      className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                </div>
+          {paginatedClasses.map(cls => {
+            const classStartTime = cls.startTime || '18:30';
+            const classEndTime = cls.endTime || '20:30';
+            const isRecurringClass = cls.isRecurring !== false;
 
-                <div className="space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400 flex items-center gap-1.5"><UserCheck size={14} /> Giảng viên:</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-slate-800 truncate max-w-[140px]">{teacherMap[cls.teacherId] || cls.teacherId}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">({cls.teacherId})</span>
+            return (
+              <div key={cls.id} className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 hover:border-indigo-300 transition space-y-4 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
+                          {cls.code} • {cls.id}
+                        </span>
+                        {isRecurringClass && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-0.5">
+                            <RefreshCw size={10} className="shrink-0" /> Chạy xuyên suốt
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-bold text-slate-800 text-base mt-1.5 line-clamp-1">{cls.name}</h3>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
+                        {cls.status}
+                      </span>
                       <button
-                        onClick={() => {
-                          setChangingTeacherClass(cls);
-                          setNewTeacherId(cls.teacherId);
-                        }}
-                        title="Đổi giáo viên phụ trách"
-                        className="p-1 text-indigo-600 hover:bg-indigo-50 rounded transition ml-1"
+                        onClick={() => handleDeleteClass(cls)}
+                        title="Xóa lớp học"
+                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
                       >
-                        <Edit3 size={13} />
+                        <Trash2 size={15} />
                       </button>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400 flex items-center gap-1.5"><Users size={14} /> Sĩ số hiện tại:</span>
-                    <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{(cls.studentIds || []).length} học viên</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400 flex items-center gap-1.5"><Video size={14} className="text-emerald-600" /> Lớp học Online:</span>
-                    <div className="flex items-center gap-1">
-                      {cls.meetingLink ? (
-                        <a 
-                          href={cls.meetingLink} 
-                          target="_blank" 
-                          rel="noreferrer"
-                          className="font-bold text-emerald-600 hover:text-emerald-700 underline text-xs inline-flex items-center gap-1 whitespace-nowrap truncate max-w-[150px]"
+
+                  <div className="space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-3">
+                    {/* Khung giờ & Thứ học trực quan */}
+                    <div className="flex items-center justify-between bg-amber-50/60 p-2 rounded-lg border border-amber-100">
+                      <span className="text-amber-900 font-bold flex items-center gap-1">
+                        <Clock size={13} className="text-amber-600" /> {classStartTime} - {classEndTime}
+                      </span>
+                      <span className="text-amber-800 font-semibold bg-white/80 px-2 py-0.5 rounded text-[11px] border border-amber-200">
+                        Thứ {formatScheduleDays(cls.scheduleDays)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 flex items-center gap-1.5"><UserCheck size={14} /> Giảng viên:</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-slate-800 truncate max-w-[140px]">{teacherMap[cls.teacherId] || cls.teacherId}</span>
+                        <span className="text-[10px] text-slate-400 font-mono">({cls.teacherId})</span>
+                        <button
+                          onClick={() => {
+                            setChangingTeacherClass(cls);
+                            setNewTeacherId(cls.teacherId);
+                          }}
+                          title="Đổi giáo viên phụ trách"
+                          className="p-1 text-indigo-600 hover:bg-indigo-50 rounded transition ml-1"
                         >
-                          Phòng học Discord <ExternalLink size={11} className="shrink-0" />
-                        </a>
-                      ) : (
-                        <span className="text-slate-400 italic text-[11px]">Chưa gắn link</span>
-                      )}
-                      <button
-                        onClick={() => {
-                          setEditingMeetClass(cls);
-                          setMeetLinkInput(cls.meetingLink || `https://meet.google.com/edu-${cls.id.toLowerCase()}`);
-                        }}
-                        title="Đổi link Phòng học Discord"
-                        className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded ml-1"
-                      >
-                        <Edit3 size={12} />
-                      </button>
+                          <Edit3 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 flex items-center gap-1.5"><Users size={14} /> Sĩ số hiện tại:</span>
+                      <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{(cls.studentIds || []).length} học viên</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 flex items-center gap-1.5"><Video size={14} className="text-emerald-600" /> Lớp học Online:</span>
+                      <div className="flex items-center gap-1">
+                        {cls.meetingLink ? (
+                          <a 
+                            href={cls.meetingLink} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="font-bold text-emerald-600 hover:text-emerald-700 underline text-xs inline-flex items-center gap-1 whitespace-nowrap truncate max-w-[150px]"
+                          >
+                            Phòng học Discord <ExternalLink size={11} className="shrink-0" />
+                          </a>
+                        ) : (
+                          <span className="text-slate-400 italic text-[11px]">Chưa gắn link</span>
+                        )}
+                        <button
+                          onClick={() => {
+                            setEditingMeetClass(cls);
+                            setMeetLinkInput(cls.meetingLink || `https://discord.com/channels/edu-center/room-${cls.id.toLowerCase()}`);
+                          }}
+                          title="Đổi link Phòng học Discord"
+                          className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded ml-1"
+                        >
+                          <Edit3 size={12} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Phòng phụ:</span>
+                      <span className="font-semibold text-slate-800">{cls.roomId}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Học phí khóa:</span>
+                      <span className="font-bold text-emerald-600 whitespace-nowrap">{cls.tuitionFee.toLocaleString('vi-VN')} đ</span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Phòng phụ & Ca:</span>
-                    <span className="font-semibold text-slate-800">{cls.roomId} • Ca {cls.shiftId}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Lịch trong tuần:</span>
-                    <span className="font-semibold text-indigo-600">Thứ {cls.scheduleDays.join(', ')}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Học phí khóa:</span>
-                    <span className="font-bold text-emerald-600 whitespace-nowrap">{cls.tuitionFee.toLocaleString('vi-VN')} đ</span>
-                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
+                  <button
+                    onClick={() => openClassStudentsModal(cls)}
+                    className="flex-1 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap truncate min-w-0"
+                  >
+                    <Users size={14} className="shrink-0" /> <span className="truncate">Quản lý học viên ({(cls.studentIds || []).length})</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setQuickScheduleClass(cls);
+                      const now = new Date();
+                      setQuickScheduleStartDate(now.toISOString().split('T')[0]);
+                      const later = new Date(now);
+                      later.setMonth(later.getMonth() + 3);
+                      setQuickScheduleEndDate(later.toISOString().split('T')[0]);
+                      setQuickScheduleStartTime(cls.startTime || '18:30');
+                      setQuickScheduleEndTime(cls.endTime || '20:30');
+                      setQuickScheduleDays(cls.scheduleDays && cls.scheduleDays.length > 0 ? cls.scheduleDays : [2, 4, 6]);
+                      setQuickScheduleOverwrite(false);
+                    }}
+                    className="px-2.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer"
+                    title="Lên lịch học nhanh cho lớp này"
+                  >
+                    <Calendar size={14} className="text-emerald-600" /> Lên lịch
+                  </button>
+                  <button
+                    onClick={() => {
+                      setChangingTeacherClass(cls);
+                      setNewTeacherId(cls.teacherId);
+                    }}
+                    className="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center gap-1 whitespace-nowrap shrink-0"
+                    title="Đổi giáo viên phụ trách"
+                  >
+                    <Edit3 size={14} /> Đổi GV
+                  </button>
                 </div>
               </div>
-
-              <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
-                <button
-                  onClick={() => openClassStudentsModal(cls)}
-                  className="flex-1 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap truncate min-w-0"
-                >
-                  <Users size={14} className="shrink-0" /> <span className="truncate">Quản lý học viên ({(cls.studentIds || []).length})</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setQuickScheduleClass(cls);
-                    const now = new Date();
-                    setQuickScheduleStartDate(now.toISOString().split('T')[0]);
-                    const later = new Date(now);
-                    later.setMonth(later.getMonth() + 1);
-                    setQuickScheduleEndDate(later.toISOString().split('T')[0]);
-                    setQuickScheduleOverwrite(false);
-                  }}
-                  className="px-2.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer"
-                  title="Lên lịch học nhanh cho lớp này"
-                >
-                  <Calendar size={14} className="text-emerald-600" /> Lên lịch
-                </button>
-                <button
-                  onClick={() => {
-                    setChangingTeacherClass(cls);
-                    setNewTeacherId(cls.teacherId);
-                  }}
-                  className="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center gap-1 whitespace-nowrap shrink-0"
-                  title="Đổi giáo viên phụ trách"
-                >
-                  <Edit3 size={14} /> Đổi GV
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Thanh điều khiển phân trang */}
@@ -509,7 +543,6 @@ export default function AdminClassesPage() {
         </div>
       </main>
 
-            
       {/* Modal Thêm Lớp Học Mới */}
       {showAddClassModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
@@ -521,12 +554,12 @@ export default function AdminClassesPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-800 text-base">Thêm Lớp Học Mới</h3>
-                  <p className="text-xs text-slate-400">Khởi tạo lớp học mới và phân công giảng viên</p>
+                  <p className="text-xs text-slate-400">Khởi tạo lớp học với khung giờ và thứ học tùy chọn linh hoạt</p>
                 </div>
               </div>
               <button 
                 onClick={() => setShowAddClassModal(false)}
-                className="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
+                className="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -539,7 +572,7 @@ export default function AdminClassesPage() {
                   <input
                     type="text"
                     required
-                    placeholder="Ví dụ: Toán Tư Duy Khóa 1"
+                    placeholder="Ví dụ: Lập trình Python & Web Fullstack"
                     value={newClassFormData.name}
                     onChange={e => setNewClassFormData({ ...newClassFormData, name: e.target.value })}
                     className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs font-semibold"
@@ -550,7 +583,7 @@ export default function AdminClassesPage() {
                   <input
                     type="text"
                     required
-                    placeholder="MTH101, IELTS70..."
+                    placeholder="MTH101, PROG201..."
                     value={newClassFormData.code}
                     onChange={e => setNewClassFormData({ ...newClassFormData, code: e.target.value })}
                     className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs font-mono uppercase"
@@ -560,11 +593,11 @@ export default function AdminClassesPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Bộ môn / Chuyên môn (Điền tự do) *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Bộ môn / Chuyên môn *</label>
                   <input
                     type="text"
                     required
-                    placeholder="Toán, IELTS, Vẽ Manga, Lập trình..."
+                    placeholder="Toán, Tiếng Anh, Vẽ Manga, Lập trình..."
                     value={newClassFormData.subject}
                     onChange={e => setNewClassFormData({ ...newClassFormData, subject: e.target.value })}
                     className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs"
@@ -587,9 +620,38 @@ export default function AdminClassesPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* BỘ CHỌN THỜI GIAN CUSTOM (BỎ HOÀN TOÀN DROPDOWN CA 1, 2, 3...) */}
+              <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-3">
+                <span className="font-bold text-amber-900 text-xs flex items-center gap-1.5">
+                  <Clock size={15} className="text-amber-700" /> Cấu hình khung giờ học của lớp:
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Giờ bắt đầu: *</label>
+                    <input
+                      type="time"
+                      required
+                      value={newClassFormData.startTime}
+                      onChange={e => setNewClassFormData({ ...newClassFormData, startTime: e.target.value })}
+                      className="w-full p-2 border border-amber-200 rounded-lg bg-white font-mono font-bold text-xs text-slate-800 focus:outline-indigo-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Giờ kết thúc: *</label>
+                    <input
+                      type="time"
+                      required
+                      value={newClassFormData.endTime}
+                      onChange={e => setNewClassFormData({ ...newClassFormData, endTime: e.target.value })}
+                      className="w-full p-2 border border-amber-200 rounded-lg bg-white font-mono font-bold text-xs text-slate-800 focus:outline-indigo-600"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Phòng học *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Phòng học (phụ) *</label>
                   <input
                     type="text"
                     required
@@ -598,20 +660,6 @@ export default function AdminClassesPage() {
                     onChange={e => setNewClassFormData({ ...newClassFormData, roomId: e.target.value })}
                     className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs font-semibold"
                   />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Ca học mặc định *</label>
-                  <select
-                    value={newClassFormData.shiftId}
-                    onChange={e => setNewClassFormData({ ...newClassFormData, shiftId: Number(e.target.value) })}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs bg-white"
-                  >
-                    {shifts.map(s => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.startTime} - {s.endTime})
-                      </option>
-                    ))}
-                  </select>
                 </div>
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Học phí khóa (VNĐ)</label>
@@ -625,12 +673,13 @@ export default function AdminClassesPage() {
                 </div>
               </div>
 
-              {/* Lịch học trong tuần */}
+              {/* Lịch học trong tuần: Thứ 2 đến Chủ Nhật */}
               <div>
                 <label className="block font-bold text-slate-700 mb-1.5">Lịch học trong tuần:</label>
                 <div className="flex flex-wrap gap-2">
-                  {[2, 3, 4, 5, 6, 7].map(day => {
+                  {[2, 3, 4, 5, 6, 7, 8].map(day => {
                     const isSelected = newClassFormData.scheduleDays.includes(day);
+                    const label = day === 8 ? 'Chủ Nhật' : `Thứ ${day}`;
                     return (
                       <button
                         type="button"
@@ -638,10 +687,12 @@ export default function AdminClassesPage() {
                         onClick={() => {
                           let updated = [...newClassFormData.scheduleDays];
                           if (isSelected) {
-                            updated = updated.filter(d => d !== day);
+                            if (updated.length > 1) {
+                              updated = updated.filter(d => d !== day);
+                            }
                           } else {
                             updated.push(day);
-                            updated.sort();
+                            updated.sort((a, b) => a - b);
                           }
                           setNewClassFormData({ ...newClassFormData, scheduleDays: updated });
                         }}
@@ -651,7 +702,7 @@ export default function AdminClassesPage() {
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
-                        Thứ {day}
+                        {label}
                       </button>
                     );
                   })}
@@ -669,34 +720,43 @@ export default function AdminClassesPage() {
                 />
               </div>
 
-              {/* Tùy chọn Tự động sinh lịch học lặp lại */}
-              <div className="p-3.5 bg-gradient-to-r from-indigo-50/60 to-purple-50/60 border border-indigo-200 rounded-xl space-y-3">
+              {/* Tùy chọn Chạy xuyên suốt liên tục qua các ngày/tuần về sau */}
+              <div className="p-3.5 bg-gradient-to-r from-purple-50/70 to-indigo-50/70 border border-purple-200 rounded-xl space-y-3">
                 <label className="flex items-center gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={newClassFormData.autoGenerateSchedule}
-                    onChange={e => setNewClassFormData({ ...newClassFormData, autoGenerateSchedule: e.target.checked })}
-                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                    checked={newClassFormData.isRecurring}
+                    onChange={e => {
+                      const val = e.target.checked;
+                      setNewClassFormData({
+                        ...newClassFormData,
+                        isRecurring: val,
+                        autoGenerateSchedule: val ? true : newClassFormData.autoGenerateSchedule,
+                      });
+                    }}
+                    className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
                   />
-                  <span className="font-bold text-indigo-900 text-xs flex items-center gap-1.5">
-                    <RefreshCw size={14} className="text-indigo-600" /> Tự động sinh lịch học lặp lại cho các ngày về sau
+                  <span className="font-bold text-purple-900 text-xs flex items-center gap-1.5">
+                    <RefreshCw size={14} className="text-purple-600" /> ☑️ Chạy xuyên suốt liên tục qua các ngày/tuần về sau
                   </span>
                 </label>
 
-                {newClassFormData.autoGenerateSchedule && (
+                {newClassFormData.isRecurring && (
                   <div className="pl-6.5 space-y-2 animate-in fade-in">
-                    <label className="block font-semibold text-slate-700 text-xs">Khoảng thời gian sinh lịch trước:</label>
-                    <select
-                      value={newClassFormData.generateMonths}
-                      onChange={e => setNewClassFormData({ ...newClassFormData, generateMonths: Number(e.target.value) })}
-                      className="w-full sm:w-64 p-2 border border-indigo-200 rounded-lg bg-white font-semibold text-xs text-indigo-900 focus:outline-indigo-600"
-                    >
-                      <option value={1}>🗓️ 1 tháng tới (Mặc định)</option>
-                      <option value={2}>🗓️ 2 tháng tới</option>
-                      <option value={3}>🗓️ 3 tháng tới</option>
-                    </select>
+                    <div className="flex items-center gap-3">
+                      <label className="font-semibold text-slate-700 text-xs">Khoảng thời gian sinh lịch sẵn:</label>
+                      <select
+                        value={newClassFormData.generateMonths}
+                        onChange={e => setNewClassFormData({ ...newClassFormData, generateMonths: Number(e.target.value) })}
+                        className="p-1.5 border border-purple-200 rounded-lg bg-white font-semibold text-xs text-purple-900 focus:outline-indigo-600"
+                      >
+                        <option value={1}>🗓️ 1 tháng tới</option>
+                        <option value={2}>🗓️ 2 tháng tới</option>
+                        <option value={3}>🗓️ 3 tháng tới (Khuyến nghị)</option>
+                      </select>
+                    </div>
                     <p className="text-[11px] text-slate-500">
-                      Hệ thống sẽ tự động quét các ngày khớp với thứ học đã chọn và tạo các ca học theo ca tương ứng.
+                      Hệ thống tự động sinh lịch học định kỳ theo đúng khung giờ <strong className="text-slate-700">{newClassFormData.startTime} - {newClassFormData.endTime}</strong> cho tất cả các ngày khớp với thứ đã chọn.
                     </p>
                   </div>
                 )}
@@ -706,7 +766,7 @@ export default function AdminClassesPage() {
                 <button
                   type="button"
                   onClick={() => setShowAddClassModal(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold cursor-pointer"
                 >
                   Hủy
                 </button>
@@ -738,7 +798,7 @@ export default function AdminClassesPage() {
               </div>
               <button 
                 onClick={() => setEditingMeetClass(null)}
-                className="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
+                className="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -765,13 +825,13 @@ export default function AdminClassesPage() {
                 <button
                   type="button"
                   onClick={() => setEditingMeetClass(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold cursor-pointer"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-xs"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-xs cursor-pointer"
                 >
                   Cập nhật Link Phòng Discord
                 </button>
@@ -789,7 +849,7 @@ export default function AdminClassesPage() {
               <h3 className="font-bold text-slate-800 text-base">Đổi Giáo Viên Quản Lý Lớp</h3>
               <button 
                 onClick={() => setChangingTeacherClass(null)}
-                className="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
+                className="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -829,13 +889,13 @@ export default function AdminClassesPage() {
                 <button
                   type="button"
                   onClick={() => setChangingTeacherClass(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold cursor-pointer"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-xs"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-xs cursor-pointer"
                 >
                   Lưu thay đổi
                 </button>
@@ -859,12 +919,12 @@ export default function AdminClassesPage() {
                   <h3 className="font-bold text-slate-800 text-lg">{selectedClass.name}</h3>
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  Giảng viên: <strong className="text-slate-700">{teacherMap[selectedClass.teacherId] || selectedClass.teacherId}</strong> • Phòng: <strong className="text-slate-700">{selectedClass.roomId}</strong> • Sĩ số: <strong className="text-indigo-600">{(selectedClass.studentIds || []).length}</strong>
+                  Giảng viên: <strong className="text-slate-700">{teacherMap[selectedClass.teacherId] || selectedClass.teacherId}</strong> • Khung giờ: <strong className="text-slate-700">{selectedClass.startTime || '18:30'} - {selectedClass.endTime || '20:30'}</strong> • Sĩ số: <strong className="text-indigo-600">{(selectedClass.studentIds || []).length}</strong>
                 </p>
               </div>
               <button 
                 onClick={() => setSelectedClass(null)}
-                className="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
+                className="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -886,7 +946,7 @@ export default function AdminClassesPage() {
                       </div>
                       <button
                         onClick={() => handleEnrollAction(st.id, 'UNENROLL')}
-                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer"
                         title="Xoá học viên khỏi lớp"
                       >
                         <Trash2 size={15} />
@@ -924,7 +984,7 @@ export default function AdminClassesPage() {
                       </div>
                       <button
                         onClick={() => handleEnrollAction(st.id, 'ENROLL')}
-                        className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-[11px] font-bold flex items-center gap-1 transition shadow-xs"
+                        className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-[11px] font-bold flex items-center gap-1 transition shadow-xs cursor-pointer"
                       >
                         <Plus size={13} /> Thêm vào lớp
                       </button>
@@ -944,7 +1004,7 @@ export default function AdminClassesPage() {
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
               <button
                 onClick={() => setSelectedClass(null)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold transition"
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold transition cursor-pointer"
               >
                 Đóng
               </button>
@@ -952,6 +1012,7 @@ export default function AdminClassesPage() {
           </div>
         </div>
       )}
+
       {/* Modal Lên lịch học nhanh cho lớp */}
       {quickScheduleClass && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
@@ -968,7 +1029,7 @@ export default function AdminClassesPage() {
               </div>
               <button 
                 onClick={() => setQuickScheduleClass(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-white"
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-white cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -977,16 +1038,39 @@ export default function AdminClassesPage() {
             <form onSubmit={handleQuickSchedule} className="p-5 space-y-4 text-xs">
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
                 <div className="flex justify-between text-slate-600">
-                  <span>Lịch học tuần:</span>
-                  <strong className="text-indigo-600">Thứ {quickScheduleClass.scheduleDays.join(', ')}</strong>
+                  <span>Khung giờ lớp:</span>
+                  <strong className="text-amber-800 font-mono">{quickScheduleStartTime} - {quickScheduleEndTime}</strong>
                 </div>
                 <div className="flex justify-between text-slate-600">
-                  <span>Ca học & Giờ:</span>
-                  <strong className="text-slate-800">Ca {quickScheduleClass.shiftId}</strong>
+                  <span>Thứ học:</span>
+                  <strong className="text-indigo-600">Thứ {formatScheduleDays(quickScheduleDays)}</strong>
                 </div>
                 <div className="flex justify-between text-slate-600">
                   <span>Phòng học:</span>
                   <strong className="text-slate-800">{quickScheduleClass.roomId}</strong>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Giờ bắt đầu</label>
+                  <input
+                    type="time"
+                    required
+                    value={quickScheduleStartTime}
+                    onChange={e => setQuickScheduleStartTime(e.target.value)}
+                    className="w-full p-2 border border-slate-200 rounded-lg text-xs font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Giờ kết thúc</label>
+                  <input
+                    type="time"
+                    required
+                    value={quickScheduleEndTime}
+                    onChange={e => setQuickScheduleEndTime(e.target.value)}
+                    className="w-full p-2 border border-slate-200 rounded-lg text-xs font-mono font-bold"
+                  />
                 </div>
               </div>
 
@@ -1022,7 +1106,7 @@ export default function AdminClassesPage() {
                     base.setMonth(base.getMonth() + 1);
                     setQuickScheduleEndDate(base.toISOString().split('T')[0]);
                   }}
-                  className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded text-xs font-bold border border-emerald-200"
+                  className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded text-xs font-bold border border-emerald-200 cursor-pointer"
                 >
                   +1 Tháng
                 </button>
@@ -1033,7 +1117,7 @@ export default function AdminClassesPage() {
                     base.setMonth(base.getMonth() + 3);
                     setQuickScheduleEndDate(base.toISOString().split('T')[0]);
                   }}
-                  className="px-2 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded text-xs font-bold border border-teal-200"
+                  className="px-2 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded text-xs font-bold border border-teal-200 cursor-pointer"
                 >
                   +3 Tháng
                 </button>
@@ -1053,14 +1137,14 @@ export default function AdminClassesPage() {
                 <button
                   type="button"
                   onClick={() => setQuickScheduleClass(null)}
-                  className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 text-xs font-medium"
+                  className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 text-xs font-medium cursor-pointer"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={quickScheduleSubmitting}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer"
                 >
                   {quickScheduleSubmitting ? 'Đang tạo...' : <><Sparkles size={14} /> Sinh Lịch Ngay</>}
                 </button>

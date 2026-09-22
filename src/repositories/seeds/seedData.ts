@@ -237,7 +237,7 @@ export function generateSeedData() {
           teacherId: cls.teacherId,
           roomId: cls.roomId,
           date: dateStr,
-          shiftId: cls.shiftId,
+          shiftId: cls.shiftId ?? 1,
           startTime: shift.startTime,
           endTime: shift.endTime,
           subject: cls.subject,

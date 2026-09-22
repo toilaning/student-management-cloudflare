@@ -32,9 +32,17 @@ export async function PUT(request: Request) {
     const body = await request.json();
     const {
       classId,
+      name,
+      code,
+      subject,
       teacherId,
       roomId,
       shiftId,
+      startTime,
+      endTime,
+      scheduleDays,
+      isRecurring,
+      tuitionFee,
       meetingLink,
       actorId = 'ADMIN001'
     } = body;
@@ -51,6 +59,11 @@ export async function PUT(request: Request) {
     let oldTeacherId = cls.teacherId;
     let newTeacher = null;
 
+    if (name !== undefined) cls.name = name.trim();
+    if (code !== undefined) cls.code = code.trim().toUpperCase();
+    if (subject !== undefined) cls.subject = subject.trim();
+    if (tuitionFee !== undefined) cls.tuitionFee = Number(tuitionFee);
+
     if (teacherId && teacherId !== oldTeacherId) {
       newTeacher = await repo.getTeacherById(teacherId);
       if (!newTeacher) {
@@ -65,6 +78,22 @@ export async function PUT(request: Request) {
 
     if (shiftId !== undefined) {
       cls.shiftId = Number(shiftId);
+    }
+
+    if (startTime !== undefined) {
+      cls.startTime = startTime;
+    }
+
+    if (endTime !== undefined) {
+      cls.endTime = endTime;
+    }
+
+    if (scheduleDays !== undefined && Array.isArray(scheduleDays)) {
+      cls.scheduleDays = scheduleDays.map(Number);
+    }
+
+    if (isRecurring !== undefined) {
+      cls.isRecurring = Boolean(isRecurring);
     }
 
     if (meetingLink !== undefined) {
@@ -90,12 +119,12 @@ export async function PUT(request: Request) {
       }
     }
 
-    // 3. Đồng bộ 2 chiều: Khi Admin đổi teacherId, roomId, shiftId, hoặc meetingLink:
+    // 3. Đồng bộ 2 chiều: Khi Admin đổi teacherId, roomId, startTime, endTime, scheduleDays, shiftId, hoặc meetingLink:
     // Quét tất cả ScheduleSlot của lớp đó có date >= today, cập nhật các thuộc tính mới
     const today = new Date().toISOString().split('T')[0];
     const allSlots = await repo.getAllScheduleSlots();
     
-    // Tìm thông tin shift nếu shiftId thay đổi
+    // Tìm thông tin shift nếu shiftId thay đổi mà không có startTime/endTime custom
     let shiftInfo = undefined;
     if (shiftId !== undefined) {
       const shifts = await ShiftService.getAllShifts();
@@ -117,16 +146,33 @@ export async function PUT(request: Request) {
           changed = true;
         }
 
+        if (startTime !== undefined && slot.startTime !== startTime) {
+          slot.startTime = startTime;
+          changed = true;
+        }
+
+        if (endTime !== undefined && slot.endTime !== endTime) {
+          slot.endTime = endTime;
+          changed = true;
+        }
+
         if (shiftId !== undefined) {
           const sNum = Number(shiftId);
           if (slot.shiftId !== sNum) {
             slot.shiftId = sNum;
-            if (shiftInfo) {
+            if (!startTime && !cls.startTime && shiftInfo) {
               slot.startTime = shiftInfo.startTime;
+            }
+            if (!endTime && !cls.endTime && shiftInfo) {
               slot.endTime = shiftInfo.endTime;
             }
             changed = true;
           }
+        }
+
+        if (cls.subject && slot.subject !== cls.subject) {
+          slot.subject = cls.subject;
+          changed = true;
         }
 
         if (meetingLink !== undefined && slot.meetingLink !== meetingLink) {
@@ -173,17 +219,24 @@ export async function POST(request: Request) {
       teacherId,
       roomId,
       shiftId = 1,
+      startTime = '18:30',
+      endTime = '20:30',
       scheduleDays = [2, 4, 6],
+      isRecurring = true,
       tuitionFee = 1500000,
       meetingLink = '',
-      autoGenerateSchedule = false,
-      generateMonths = 1,
+      autoGenerateSchedule = true,
+      generateMonths = 3,
       actorId = 'ADMIN001',
     } = body;
 
     if (!name || !code || !subject || !teacherId || !roomId) {
       return NextResponse.json({ error: 'Vui lòng điền đủ Tên lớp, Mã môn, Môn học, Giảng viên và Phòng học' }, { status: 400 });
     }
+
+    const parsedStartTime = (startTime || '18:30').trim();
+    const parsedEndTime = (endTime || '20:30').trim();
+    const parsedIsRecurring = isRecurring !== undefined ? Boolean(isRecurring) : true;
 
     const allClasses = await repo.getAllClasses();
     const maxNum = allClasses.reduce((max, c) => {
@@ -201,7 +254,10 @@ export async function POST(request: Request) {
       teacherId,
       roomId,
       shiftId: Number(shiftId) || 1,
+      startTime: parsedStartTime,
+      endTime: parsedEndTime,
       scheduleDays: Array.isArray(scheduleDays) ? scheduleDays.map(Number) : [2, 4, 6],
+      isRecurring: parsedIsRecurring,
       tuitionFee: Number(tuitionFee) || 0,
       meetingLink: meetingLink?.trim() || '',
       studentIds: [],
@@ -232,14 +288,14 @@ export async function POST(request: Request) {
     });
 
     let bulkScheduleResult = null;
-    // Nếu autoGenerateSchedule = true: sinh lịch tự động từ ngày hôm nay/ngày mai đến hết generateMonths tháng tới
-    if (autoGenerateSchedule) {
+    // Nếu isRecurring = true hoặc autoGenerateSchedule = true: sinh lịch tự động từ ngày hôm nay đến hết generateMonths tháng tới (mặc định 3 tháng)
+    const shouldGenerate = parsedIsRecurring || autoGenerateSchedule;
+    if (shouldGenerate) {
       const bulkService = new BulkScheduleService(repo);
       const now = new Date();
-      // Bắt đầu từ hôm nay
       const startDate = now.toISOString().split('T')[0];
       const endDateObj = new Date(now);
-      const monthsToAdd = Math.max(1, Number(generateMonths) || 1);
+      const monthsToAdd = Math.max(1, Number(generateMonths) || (parsedIsRecurring ? 3 : 1));
       endDateObj.setMonth(endDateObj.getMonth() + monthsToAdd);
       const endDate = endDateObj.toISOString().split('T')[0];
 
@@ -248,6 +304,8 @@ export async function POST(request: Request) {
         startDate,
         endDate,
         shiftId: newClass.shiftId,
+        startTime: newClass.startTime,
+        endTime: newClass.endTime,
         scheduleDays: newClass.scheduleDays,
         overwriteExisting: false,
         actorId,
@@ -259,7 +317,7 @@ export async function POST(request: Request) {
       class: newClass,
       bulkScheduleResult,
       message: `Tạo lớp ${newClass.name} (${newId}) thành công!${
-        bulkScheduleResult ? ` Đã sinh tự động ${bulkScheduleResult.summary.createdCount} ca học.` : ''
+        bulkScheduleResult ? ` Đã tự động sinh ${bulkScheduleResult.summary.createdCount} ca học (${newClass.startTime} - ${newClass.endTime}) cho các ngày tới.` : ''
       }`,
     });
   } catch (error: any) {
