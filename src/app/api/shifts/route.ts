@@ -60,3 +60,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Thiếu mã ca học cần xóa' }, { status: 400 });
+    }
+
+    const ok = await ShiftService.deleteShift(Number(id));
+    if (!ok) {
+      return NextResponse.json({ success: false, error: 'Không tìm thấy ca học cần xóa' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, message: 'Đã xóa ca học thành công' });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
+}

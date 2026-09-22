@@ -15,6 +15,8 @@ export default function AdminCalendarPage() {
   const [rooms, setRooms] = useState<Classroom[]>([]);
   const [shifts, setShifts] = useState<typeof TIME_SHIFTS>(TIME_SHIFTS);
   const [showShiftModal, setShowShiftModal] = useState(false);
+  const [showCreateShiftForm, setShowCreateShiftForm] = useState(false);
+  const [newShiftInput, setNewShiftInput] = useState({ name: '', startTime: '07:00', endTime: '09:00' });
   const [editingShift, setEditingShift] = useState<{ id: number; name: string; startTime: string; endTime: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -98,6 +100,54 @@ export default function AdminCalendarPage() {
   };
 
   
+  
+  const handleCreateShift = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newShiftInput.startTime || !newShiftInput.endTime) {
+      alert('Vui lòng điền đủ giờ bắt đầu và kết thúc');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/shifts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newShiftInput),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActionMessage('Đã thêm ca học mới: ' + data.shift.name);
+        setShifts(prev => [...prev, data.shift]);
+        setShowCreateShiftForm(false);
+        setNewShiftInput({ name: '', startTime: '07:00', endTime: '09:00' });
+        setTimeout(() => setActionMessage(null), 3000);
+      } else {
+        alert(data.error || 'Thêm ca học thất bại');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Lỗi kết nối');
+    }
+  };
+
+  const handleDeleteShift = async (shiftId: number, shiftName: string) => {
+    if (!confirm('Bạn có chắc chắn muốn xóa "' + shiftName + '" không?')) return;
+
+    try {
+      const res = await fetch('/api/shifts?id=' + shiftId, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setActionMessage('Đã xóa ' + shiftName + ' thành công');
+        setShifts(prev => prev.filter(s => s.id !== shiftId));
+        if (editingShift?.id === shiftId) setEditingShift(null);
+        setTimeout(() => setActionMessage(null), 3000);
+      } else {
+        alert(data.error || 'Xóa ca học thất bại');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Lỗi mạng');
+    }
+  };
+
   const handleUpdateShift = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingShift) return;

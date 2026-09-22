@@ -89,6 +89,26 @@ export class ShiftService {
     return newShift;
   }
 
+public static async deleteShift(id: number): Promise<boolean> {
+    const idx = this.shifts.findIndex(s => s.id === id);
+    if (idx === -1) return false;
+
+    const oldShift = this.shifts[idx];
+    this.shifts.splice(idx, 1);
+
+    await repo.addAuditLog({
+      action: 'DELETE',
+      userId: 'ADMIN001',
+      userName: 'Quản trị viên',
+      userRole: 'ADMIN',
+      targetResource: 'SCHEDULE',
+      targetId: 'SHIFT_' + id,
+      details: 'Xóa ca học ' + oldShift.name,
+    });
+
+    return true;
+  }
+
   private static calcDuration(start: string, end: string): number {
     try {
       const [sh, sm] = start.split(':').map(Number);

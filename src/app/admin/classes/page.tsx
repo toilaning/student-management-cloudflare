@@ -23,6 +23,7 @@ export default function AdminClassesPage() {
   });
   const [classes, setClasses] = useState<ClassEntity[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [shifts, setShifts] = useState<{ id: number; name: string; startTime: string; endTime: string }[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -107,11 +108,14 @@ export default function AdminClassesPage() {
       const [clsRes, tcRes] = await Promise.all([
         fetch('/api/classes'),
         fetch('/api/teachers'),
+        fetch('/api/shifts'),
       ]);
       const clsData = await clsRes.json();
       const tcData = await tcRes.json();
       setClasses(clsData.classes || []);
       setTeachers(tcData.teachers || []);
+      const shiftData = await (await fetch('/api/shifts')).json();
+      if (shiftData.shifts) setShifts(shiftData.shifts);
     } catch (e) {
       console.error(e);
     } finally {
@@ -539,11 +543,11 @@ export default function AdminClassesPage() {
                     onChange={e => setNewClassFormData({ ...newClassFormData, shiftId: Number(e.target.value) })}
                     className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs bg-white"
                   >
-                    <option value={1}>Ca 1 (08:00 - 10:00)</option>
-                    <option value={2}>Ca 2 (10:15 - 12:15)</option>
-                    <option value={3}>Ca 3 (13:30 - 15:30)</option>
-                    <option value={4}>Ca 4 (15:45 - 17:45)</option>
-                    <option value={5}>Ca 5 (18:30 - 20:30)</option>
+                    {shifts.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.startTime} - {s.endTime})
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
