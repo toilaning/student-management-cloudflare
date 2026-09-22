@@ -1,9 +1,10 @@
 export interface TimeShift {
-  id: number; // 1..5
-  name: string; // Ca 1..Ca 5
-  startTime: string; // "08:00"
-  endTime: string;   // "10:00"
-  durationHours: number; // 2.0
+  id: number;
+  name: string;
+  startTime: string;
+  endTime: string;
+  durationHours?: number;
+  isActive?: boolean;
 }
 
 export const TIME_SHIFTS: TimeShift[] = [

@@ -5,7 +5,7 @@ import { Header } from '@/components/common/Header';
 import { ScheduleSlot, TIME_SHIFTS } from '@/types/schedule';
 import { Teacher } from '@/types/teacher';
 import { Classroom, ClassEntity } from '@/types/classroom';
-import { Calendar, ChevronLeft, ChevronRight, AlertCircle, Plus, UserCheck, Edit3, Trash2, X, Check, Video, ExternalLink, Headphones } from 'lucide-react';
+import { Calendar, Clock, ChevronLeft, ChevronRight, AlertCircle, Plus, UserCheck, Edit3, Trash2, X, Check, Video, ExternalLink, Headphones } from 'lucide-react';
 
 export default function AdminCalendarPage() {
   const [selectedDate, setSelectedDate] = useState('2026-09-02');
@@ -260,16 +260,24 @@ export default function AdminCalendarPage() {
             </div>
           </div>
 
-          <button
-            onClick={() => {
-              setNewSlotData(prev => ({ ...prev, date: selectedDate }));
-              setConflictError(null);
-              setShowAddModal(true);
-            }}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowShiftModal(true)}
+              className="flex items-center justify-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold text-sm rounded-lg shadow-xs transition whitespace-nowrap w-full sm:w-auto shrink-0"
+            >
+              <Clock size={16} className="text-amber-400" /> Cấu hình Khung giờ Ca học
+            </button>
+            <button
+              onClick={() => {
+                setNewSlotData(prev => ({ ...prev, date: selectedDate }));
+                setConflictError(null);
+                setShowAddModal(true);
+              }}
             className="flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg shadow-xs transition whitespace-nowrap w-full sm:w-auto shrink-0"
           >
             <Plus size={16} /> Thêm ca học mới
           </button>
+          </div>
         </div>
 
         {/* Schedule Grid by Time Shifts */}
@@ -674,6 +682,116 @@ export default function AdminCalendarPage() {
             </div>
           </div>
         )}
+
+        {/* Modal Cấu hình Khung giờ Ca học */}
+        {showShiftModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-2">
+                  <Clock className="text-indigo-600" size={20} />
+                  <h3 className="font-bold text-slate-800 text-base">Cấu hình Khung giờ Ca học Động</h3>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowShiftModal(false);
+                    setEditingShift(null);
+                  }}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                <p className="text-xs text-slate-500">
+                  Admin có thể trực tiếp sửa giờ bắt đầu & kết thúc của từng ca học (Ví dụ: Ca 1 từ 08:00 thành 08:30). Hệ thống sẽ cập nhật tức thì trên toàn bộ lịch giảng dạy và đăng ký học viên.
+                </p>
+
+                <div className="space-y-3">
+                  {shifts.map(s => {
+                    const isEditing = editingShift?.id === s.id;
+                    return (
+                      <div key={s.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-slate-800">{s.name}</span>
+                            <span className="text-[11px] px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100">
+                              {s.startTime} - {s.endTime}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-slate-400">Thời lượng: {s.durationHours || 2.0} giờ</span>
+                        </div>
+
+                        {isEditing ? (
+                          <form onSubmit={handleUpdateShift} className="flex items-center gap-2 flex-wrap">
+                            <input
+                              type="text"
+                              value={editingShift.name}
+                              onChange={e => setEditingShift({ ...editingShift, name: e.target.value })}
+                              placeholder="Tên ca"
+                              className="w-24 px-2 py-1 border border-slate-300 rounded text-xs"
+                              required
+                            />
+                            <input
+                              type="time"
+                              value={editingShift.startTime}
+                              onChange={e => setEditingShift({ ...editingShift, startTime: e.target.value })}
+                              className="px-2 py-1 border border-slate-300 rounded text-xs"
+                              required
+                            />
+                            <span className="text-xs text-slate-400">-</span>
+                            <input
+                              type="time"
+                              value={editingShift.endTime}
+                              onChange={e => setEditingShift({ ...editingShift, endTime: e.target.value })}
+                              className="px-2 py-1 border border-slate-300 rounded text-xs"
+                              required
+                            />
+                            <button
+                              type="submit"
+                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold shadow-xs"
+                            >
+                              Lưu
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingShift(null)}
+                              className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-xs font-semibold"
+                            >
+                              Hủy
+                            </button>
+                          </form>
+                        ) : (
+                          <button
+                            onClick={() => setEditingShift({ id: s.id, name: s.name, startTime: s.startTime, endTime: s.endTime })}
+                            className="px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-400 text-indigo-600 rounded-lg text-xs font-semibold transition flex items-center gap-1 shadow-2xs self-start sm:self-auto"
+                          >
+                            <Edit3 size={13} /> Sửa khung giờ
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowShiftModal(false);
+                    setEditingShift(null);
+                  }}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold transition"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
     </div>
   );
