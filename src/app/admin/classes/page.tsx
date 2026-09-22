@@ -473,14 +473,7 @@ export default function AdminClassesPage() {
                         </button>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Phòng phụ:</span>
-                      <span className="font-semibold text-slate-800">{cls.roomId}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Học phí khóa:</span>
-                      <span className="font-bold text-emerald-600 whitespace-nowrap">{cls.tuitionFee.toLocaleString('vi-VN')} đ</span>
-                    </div>
+
                   </div>
                 </div>
 
@@ -649,29 +642,7 @@ export default function AdminClassesPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Phòng học (phụ) *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="P.101, P.201..."
-                    value={newClassFormData.roomId}
-                    onChange={e => setNewClassFormData({ ...newClassFormData, roomId: e.target.value })}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs font-semibold"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Học phí khóa (VNĐ)</label>
-                  <input
-                    type="number"
-                    step={100000}
-                    value={newClassFormData.tuitionFee}
-                    onChange={e => setNewClassFormData({ ...newClassFormData, tuitionFee: Number(e.target.value) })}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs font-bold text-emerald-600"
-                  />
-                </div>
-              </div>
+
 
               {/* Lịch học trong tuần: Thứ 2 đến Chủ Nhật */}
               <div>
@@ -1045,10 +1016,7 @@ export default function AdminClassesPage() {
                   <span>Thứ học:</span>
                   <strong className="text-indigo-600">Thứ {formatScheduleDays(quickScheduleDays)}</strong>
                 </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>Phòng học:</span>
-                  <strong className="text-slate-800">{quickScheduleClass.roomId}</strong>
-                </div>
+
               </div>
 
               <div className="grid grid-cols-2 gap-3">

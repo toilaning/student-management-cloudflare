@@ -36,7 +36,7 @@ export async function PUT(request: Request) {
       code,
       subject,
       teacherId,
-      roomId,
+      roomId = "ONLINE",
       shiftId,
       startTime,
       endTime,
@@ -119,7 +119,7 @@ export async function PUT(request: Request) {
       }
     }
 
-    // 3. Đồng bộ 2 chiều: Khi Admin đổi teacherId, roomId, startTime, endTime, scheduleDays, shiftId, hoặc meetingLink:
+    // 3. Đồng bộ 2 chiều: Khi Admin đổi teacherId, roomId: roomId || "ONLINE", startTime, endTime, scheduleDays, shiftId, hoặc meetingLink:
     // Quét tất cả ScheduleSlot của lớp đó có date >= today, cập nhật các thuộc tính mới
     const today = new Date().toISOString().split('T')[0];
     const allSlots = await repo.getAllScheduleSlots();
@@ -230,8 +230,8 @@ export async function POST(request: Request) {
       actorId = 'ADMIN001',
     } = body;
 
-    if (!name || !code || !subject || !teacherId || !roomId) {
-      return NextResponse.json({ error: 'Vui lòng điền đủ Tên lớp, Mã môn, Môn học, Giảng viên và Phòng học' }, { status: 400 });
+    if (!name || !code || !subject || !teacherId) {
+      return NextResponse.json({ error: 'Vui lòng điền đủ Tên lớp, Mã môn, Môn học và Giảng viên phụ trách' }, { status: 400 });
     }
 
     const parsedStartTime = (startTime || '18:30').trim();
