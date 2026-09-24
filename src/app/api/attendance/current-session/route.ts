@@ -43,23 +43,23 @@ export async function GET(request: Request) {
 
     // Nếu không tìm thấy slot trong ngày này (do dữ liệu seed trong tháng 09/2026),
     // fallback tìm slot mẫu đại diện gần nhất trong tháng 9/2026 để hiển thị live stats
-    let activeSlot: ScheduleSlot | null = null;
+        let activeSlot: ScheduleSlot | null = null;
 
-    if (daySlots.length > 0) {
-      // Tìm slot đang diễn ra: startTime <= nowTime <= endTime
-      activeSlot = daySlots.find(s => s.startTime <= nowTime && s.endTime >= nowTime) || null;
-      if (!activeSlot) {
-        // Nếu không có ca nào đúng giờ hiện tại, lấy ca sắp tới hoặc ca đầu tiên trong ngày
-        activeSlot = daySlots[0];
+    if (dateParam) {
+      // Trường hợp truyền dateParam (preview hoặc automated test):
+      if (daySlots.length > 0) {
+        activeSlot = daySlots.find(s => s.status !== "Đã hủy") || null;
+      } else {
+        // Fallback cho test date nếu ngày được chọn rơi vào ngày nghỉ: lấy slot hợp lệ đầu tiên trong tháng
+        activeSlot = slots.find(s => s.status !== "Đã hủy") || null;
       }
     } else {
-      // Fallback: Lấy 1 ca có sẵn trong seed (ví dụ ngày 2026-09-20 hoặc slot đầu tiên)
-      const today = getTodayDateStr();
-      const sampleDateSlots = slots.filter(s => s.date === today);
-      if (teacherId) {
-        activeSlot = sampleDateSlots.find(s => s.teacherId === teacherId) || slots.find(s => s.teacherId === teacherId) || null;
+      // Trường hợp chạy thời gian thực trên giao diện Live:
+      // CHUẨN XÁC TUYỆT ĐỐI: Chỉ bật "Đang Diễn Ra" khi thời gian hiện tại nằm ĐÚNG trong khung giờ học
+      if (daySlots.length > 0) {
+        activeSlot = daySlots.find(s => s.startTime <= nowTime && s.endTime >= nowTime && s.status !== "Đã hủy") || null;
       } else {
-        activeSlot = sampleDateSlots[0] || slots[0] || null;
+        activeSlot = null;
       }
     }
 
