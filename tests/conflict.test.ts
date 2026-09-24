@@ -31,23 +31,22 @@ test('ConflictEngine Suite: Phát hiện xung đột lịch học', async (t) =>
     assert.equal(teacherConflict, undefined, 'Giáo viên được phép dạy nhiều lớp cùng lúc');
   });
 
-  await t.test('2. Phát hiện trùng phòng học khi 2 lớp dùng chung phòng cùng 1 ca', async () => {
-    const conflictingSlot: Omit<ScheduleSlot, 'id'> = {
+  await t.test('2. Trung tâm 100% Online: Nhiều lớp có thể dùng chung link Discord/Phòng Online', async () => {
+    const onlineSlot: Omit<ScheduleSlot, 'id'> = {
       classId: 'CLS_OTHER',
-      teacherId: 'GV_OTHER',         // Giáo viên khác
-      roomId: baseSlot.roomId,       // Cùng phòng học
-      date: baseSlot.date,           // Cùng ngày
-      shiftId: baseSlot.shiftId,     // Cùng ca
+      teacherId: 'GV_OTHER',
+      roomId: 'ONLINE',
+      date: baseSlot.date,
+      shiftId: baseSlot.shiftId,
       startTime: baseSlot.startTime,
       endTime: baseSlot.endTime,
       subject: 'Môn Khác',
       status: 'Đã lên lịch',
     };
 
-    const result = await conflictEngine.checkScheduleConflict(conflictingSlot);
-    assert.equal(result.hasConflict, true, 'Phải báo có xung đột phòng học');
+    const result = await conflictEngine.checkScheduleConflict(onlineSlot);
     const roomConflict = result.conflicts.find(c => c.type === 'ROOM_CONFLICT');
-    assert.ok(roomConflict, 'Phải có lỗi ROOM_CONFLICT');
+    assert.equal(roomConflict, undefined, 'Mô hình 100% Online không báo lỗi trùng phòng vật lý');
   });
 
   await t.test('3. Phát hiện trùng lớp khi 1 lớp bị xếp 2 môn trong cùng 1 ca', async () => {

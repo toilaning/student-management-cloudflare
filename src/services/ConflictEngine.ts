@@ -61,18 +61,8 @@ export class ConflictEngine {
         // 1. Giáo viên có thể dạy nhiều lớp cùng lúc (Đặc thù trung tâm luyện thi: 1 giáo viên kèm song song nhiều nhóm/lớp)
         // Không coi trùng giáo viên là xung đột chặn lịch học nữa.
 
-        // 2. Trùng phòng học (Bỏ qua nếu là phòng 'ONLINE' hoặc rỗng)
-        const isOnlineRoom = !slot.roomId || !newSlot.roomId || 
-          slot.roomId.toUpperCase() === 'ONLINE' || 
-          newSlot.roomId.toUpperCase() === 'ONLINE';
-
-        if (!isOnlineRoom && slot.roomId === newSlot.roomId) {
-          conflicts.push({
-            type: 'ROOM_CONFLICT',
-            message: `Phòng học [${newSlot.roomId}] đã được sử dụng bởi lớp [${slot.classId}] vào ngày ${slot.date} (${slot.startTime} - ${slot.endTime})!`,
-            conflictingSlot: slot,
-          });
-        }
+        // 2. Trung tâm vận hành 100% Online (Discord / Google Meet)
+        // Không có phòng học vật lý -> Bỏ hoàn toàn ràng buộc ROOM_CONFLICT
 
         // 3. Trùng lớp học
         if (slot.classId && newSlot.classId && slot.classId === newSlot.classId) {
