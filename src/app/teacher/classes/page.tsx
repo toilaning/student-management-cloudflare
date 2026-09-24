@@ -12,6 +12,9 @@ import Link from 'next/link';
 export default function TeacherClassesPage() {
   const { currentUser, isReady } = useApp();
   const [allClasses, setAllClasses] = useState<ClassEntity[]>([]);
+  const [selectedClassForView, setSelectedClassForView] = useState<ClassEntity | null>(null);
+  const [classStudents, setClassStudents] = useState<any[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
   const [shifts, setShifts] = useState<TimeShift[]>(TIME_SHIFTS);
   const [loading, setLoading] = useState(true);
   const [claimingClassId, setClaimingClassId] = useState<string | null>(null);
@@ -41,6 +44,23 @@ export default function TeacherClassesPage() {
   useEffect(() => {
     loadData();
   }, [currentUser, isReady]);
+
+  
+  const handleOpenClassStudents = async (cls: ClassEntity) => {
+    setSelectedClassForView(cls);
+    setLoadingStudents(true);
+    try {
+      const res = await fetch('/api/students?limit=1000');
+      const data = await res.json();
+      const allSt = data.students || [];
+      const enrolled = allSt.filter((s: any) => (cls.studentIds || []).includes(s.id));
+      setClassStudents(enrolled);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingStudents(false);
+    }
+  };
 
   const handleClaimShift = async (cls: ClassEntity) => {
     if (!currentUser?.id) return;
@@ -238,9 +258,17 @@ export default function TeacherClassesPage() {
                         <span className="text-slate-500">Lịch trong tuần:</span>
                         <span className="font-semibold text-emerald-700">Thứ {cls.scheduleDays.join(', ')}</span>
                       </div>
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                        <span className="text-slate-500 flex items-center gap-1.5"><Users size={13} className="text-blue-500" /> Sĩ số đăng ký:</span>
-                        <span className="font-bold text-slate-800">{cls.studentIds.length} học viên</span>
+                      <div 
+                        onClick={() => handleOpenClassStudents(cls)}
+                        className="flex items-center justify-between pt-1 border-t border-slate-100 hover:bg-slate-50 p-1 rounded-lg cursor-pointer transition"
+                        title="Bấm để xem danh sách học sinh của lớp"
+                      >
+                        <span className="text-slate-600 font-medium flex items-center gap-1.5">
+                          <Users size={13} className="text-blue-600" /> Sĩ số đăng ký:
+                        </span>
+                        <span className="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded text-xs hover:underline flex items-center gap-1">
+                          {cls.studentIds.length} học viên <ChevronRight size={12} />
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -274,6 +302,113 @@ export default function TeacherClassesPage() {
           </div>
         </main>
       </div>
+    
+      {/* Modal Giáo viên xem chi tiết Lớp học & Danh sách học sinh */}
+      {selectedClassForView && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 font-mono">
+                    {selectedClassForView.code} • {selectedClassForView.id}
+                  </span>
+                  <h3 className="font-bold text-slate-900 text-base">{selectedClassForView.name}</h3>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Môn học: <strong className="text-slate-800">{selectedClassForView.subject}</strong> • Khung giờ: <strong className="text-slate-800">{selectedClassForView.startTime || '18:30'} - {selectedClassForView.endTime || '20:30'}</strong> • Thứ: <strong className="text-slate-800">{selectedClassForView.scheduleDays?.join(', ')}</strong>
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedClassForView(null)}
+                className="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 flex-1 overflow-y-auto space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Danh sách học sinh đang học ({classStudents.length} học viên)
+                </span>
+                {selectedClassForView.meetingLink && (
+                  <a
+                    href={selectedClassForView.meetingLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1"
+                  >
+                    Vào phòng học Discord ↗
+                  </a>
+                )}
+              </div>
+
+              {loadingStudents ? (
+                <div className="p-8 text-center text-xs text-slate-400">Đang tải danh sách học sinh...</div>
+              ) : classStudents.length === 0 ? (
+                <div className="p-8 bg-slate-50 border border-slate-100 rounded-xl text-center text-xs text-slate-400">
+                  Lớp học này hiện chưa có học sinh nào đăng ký.
+                </div>
+              ) : (
+                <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 text-xs">
+                  {classStudents.map((st, idx) => (
+                    <div key={st.id} className="p-3 hover:bg-slate-50 flex items-center justify-between gap-3 transition">
+                      <div className="flex items-center gap-3">
+                        <span className="text-slate-400 font-mono text-[11px] w-5 text-center">{idx + 1}</span>
+                        <div>
+                          <div className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                            <span>{st.name}</span>
+                            <span className="font-mono text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                              {st.id}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5 flex-wrap">
+                            <span>Mục tiêu: <strong>{st.targetUniversity === 'KHAC' ? (st.customUniversity || 'Trường khác') : (st.targetUniversity || 'HAU')}</strong></span>
+                            <span>• Khối: <strong className="text-indigo-700">{st.examBlock === 'KHOI_H' ? 'Khối H' : 'Khối V'}</strong></span>
+                            <span>• {st.gradeLevel || 'Lớp 12'}</span>
+                            {st.homeTown && <span>• Quê: {st.homeTown}</span>}
+                          </div>
+                          {st.otherNotes && (
+                            <div className="text-[10px] text-amber-800 italic mt-0.5 bg-amber-50/60 px-1.5 py-0.5 rounded inline-block">
+                              Ghi chú: {st.otherNotes}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                          Còn {st.remainingSessions ?? 12} buổi
+                        </div>
+                        {st.phone && (
+                          <div className="text-[11px] text-slate-400 mt-1 font-mono">
+                            {st.phone}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+              <span className="text-xs text-slate-500">
+                Thầy/Cô có thể điểm danh và đánh giá buổi học trong mục <strong>Sổ điểm danh</strong>.
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedClassForView(null)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </RoleGuard>
   );
 }
