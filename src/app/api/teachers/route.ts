@@ -112,8 +112,40 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Không tìm thấy giảng viên' }, { status: 404 });
     }
 
+    // 1. Gỡ liên kết giảng viên khỏi tất cả các lớp đang phụ trách
+    try {
+      const allClasses = await repo.getAllClasses();
+      const assignedClasses = allClasses.filter(c => c.teacherId === id);
+      for (const cls of assignedClasses) {
+        cls.teacherId = '';
+        await repo.updateClass(cls);
+      }
+    } catch (e) {
+      console.warn('[DELETE-TEACHER] Gỡ liên kết lớp học:', e);
+    }
+
+    // 2. Gỡ liên kết trong các ca học schedule_slots
+    try {
+      const allSlots = await repo.getScheduleSlotsByTeacherId(id);
+      for (const slot of allSlots) {
+        slot.teacherId = '';
+        await repo.updateScheduleSlot(slot);
+      }
+    } catch (e) {
+      console.warn('[DELETE-TEACHER] Gỡ liên kết ca học:', e);
+    }
+
+    // 3. Xóa giáo viên trong repository
     await repo.deleteTeacher(id);
 
+    // 4. Xóa luôn tài khoản User tương ứng để tránh bị hàm auto-heal phục hồi lại
+    try {
+      await repo.deleteUser(id);
+    } catch (e) {
+      console.warn('[DELETE-TEACHER] Xóa tài khoản user:', e);
+    }
+
+    // 5. Ghi Audit Log
     await repo.addAuditLog({
       action: 'DELETE',
       userId: 'ADMIN001',
@@ -121,10 +153,10 @@ export async function DELETE(request: Request) {
       userRole: 'ADMIN',
       targetResource: 'TEACHER',
       targetId: id,
-      details: `Xoá giảng viên ${id} - ${teacher.name}`,
+      details: `Xoá giảng viên ${id} - ${teacher.name} (Đã tháo gỡ phân công các lớp và xoá tài khoản)`,
     });
 
-    return NextResponse.json({ success: true, message: `Đã xoá giảng viên ${id} (${teacher.name})` });
+    return NextResponse.json({ success: true, message: `Đã xoá giảng viên ${id} (${teacher.name}) thành công!` });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Lỗi khi xoá giảng viên' }, { status: 500 });
   }

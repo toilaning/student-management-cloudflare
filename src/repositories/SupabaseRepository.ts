@@ -877,11 +877,19 @@ export class SupabaseRepository implements IRepository {
     if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local"); // deleteTeacher(id);
 
     try {
+      // 1. Tháo gỡ ràng buộc trong classes và schedule_slots trước khi xóa
+      await client.from('classes').update({ teacher_id: null }).eq('teacher_id', id);
+      await client.from('schedule_slots').update({ teacher_id: null }).eq('teacher_id', id);
+
+      // 2. Xóa trong bảng teachers
       const { error } = await client.from('teachers').delete().eq('id', id);
       if (error) {
         if (this.fallbackToLocalOnFailure) return localRepo.deleteTeacher(id);
         throw new Error(error.message);
       }
+
+      // 3. Xóa user tương ứng
+      await client.from('users').delete().eq('id', id);
       return true;
     } catch (err) {
       if (this.fallbackToLocalOnFailure) return localRepo.deleteTeacher(id);

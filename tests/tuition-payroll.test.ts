@@ -74,7 +74,8 @@ test('Tuition & Payroll Suite: Tính toán tài chính, học phí và lương g
     assert.equal(payroll.teacherId, teacher.id);
     assert.equal(payroll.month, '2026-09');
     assert.equal(payroll.totalHours, payroll.totalSlots * 2, 'Tổng giờ = Tổng ca * 2');
-    assert.equal(payroll.grossSalary, payroll.totalHours * teacher.hourlyRate, 'Lương gộp = Giờ * Đơn giá');
+    const sessionRate = teacher.ratePerSession || teacher.hourlyRate || 250000;
+    assert.equal(payroll.grossSalary, payroll.totalSlots * sessionRate, 'Lương gộp = Tổng ca * Đơn giá mỗi ca');
     assert.equal(payroll.netSalary, payroll.grossSalary + payroll.bonus - payroll.deduction, 'Thực nhận = Gộp + Thưởng - Khấu trừ');
 
     // Test chốt lương

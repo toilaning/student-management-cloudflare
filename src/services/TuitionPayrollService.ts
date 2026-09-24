@@ -149,8 +149,10 @@ export class TuitionPayrollService {
     );
 
     const totalSlots = completedSlotsInMonth.length;
-    const totalHours = totalSlots * 2; // Mỗi ca 2 tiếng
-    const grossSalary = totalHours * teacher.hourlyRate;
+    const totalHours = totalSlots * 2;
+    // Chuẩn thực tế Mr. Thuyết: Lương giảng viên tính cố định theo ca dạy (ratePerSession)
+    const sessionRate = teacher.ratePerSession || teacher.hourlyRate || 250000;
+    const grossSalary = totalSlots * sessionRate;
     const bonus = totalSlots >= 12 ? 1000000 : 500000;
     const deduction = 0;
     const netSalary = grossSalary + bonus - deduction;
