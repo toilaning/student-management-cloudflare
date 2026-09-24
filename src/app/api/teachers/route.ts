@@ -165,7 +165,7 @@ export async function DELETE(request: Request) {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const { id, name, specialty, phone, email, bio, status } = body;
+    const { id, name, specialty, phone, email, bio, status, ratePerSession, hourlyRate } = body;
 
     if (!id || !name || !specialty) {
       return NextResponse.json({ error: "Vui lòng cung cấp ID, họ tên và chuyên môn" }, { status: 400 });
@@ -184,6 +184,8 @@ export async function PUT(request: Request) {
       email: email || existing.email,
       bio: bio !== undefined ? bio : existing.bio,
       status: status || existing.status,
+      ratePerSession: ratePerSession !== undefined ? Number(ratePerSession) : existing.ratePerSession,
+      hourlyRate: hourlyRate !== undefined ? Number(hourlyRate) : (ratePerSession !== undefined ? Number(ratePerSession) : existing.hourlyRate),
     };
     const updated = await repo.updateTeacher(updatedTeacher);
 
