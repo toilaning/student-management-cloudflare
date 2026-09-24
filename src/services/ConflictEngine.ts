@@ -58,14 +58,8 @@ export class ConflictEngine {
         : (slot.shiftId === newSlot.shiftId);
 
       if (hasTimeCollision) {
-        // 1. Trùng giáo viên
-        if (slot.teacherId && newSlot.teacherId && slot.teacherId === newSlot.teacherId) {
-          conflicts.push({
-            type: 'TEACHER_CONFLICT',
-            message: `Giáo viên mã [${newSlot.teacherId}] đã có lịch dạy lớp [${slot.classId}] vào ngày ${slot.date} (${slot.startTime} - ${slot.endTime})!`,
-            conflictingSlot: slot,
-          });
-        }
+        // 1. Giáo viên có thể dạy nhiều lớp cùng lúc (Đặc thù trung tâm luyện thi: 1 giáo viên kèm song song nhiều nhóm/lớp)
+        // Không coi trùng giáo viên là xung đột chặn lịch học nữa.
 
         // 2. Trùng phòng học (Bỏ qua nếu là phòng 'ONLINE' hoặc rỗng)
         const isOnlineRoom = !slot.roomId || !newSlot.roomId || 

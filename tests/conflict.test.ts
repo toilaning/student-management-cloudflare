@@ -13,10 +13,10 @@ test('ConflictEngine Suite: Phát hiện xung đột lịch học', async (t) =>
   assert.ok(existingSlots.length > 0, 'Phải có slots lịch học');
   const baseSlot = existingSlots[0];
 
-  await t.test('1. Phát hiện trùng giáo viên khi dạy 2 nơi cùng 1 ca', async () => {
-    const conflictingSlot: Omit<ScheduleSlot, 'id'> = {
+  await t.test('1. Cho phép giáo viên dạy nhiều lớp cùng lúc (không báo TEACHER_CONFLICT)', async () => {
+    const multiClassSlot: Omit<ScheduleSlot, 'id'> = {
       classId: 'CLS_OTHER',
-      teacherId: baseSlot.teacherId, // Cùng giáo viên
+      teacherId: baseSlot.teacherId, // Cùng giáo viên dạy song song lớp khác
       roomId: 'P.ROOM_DIFF',          // Phòng khác
       date: baseSlot.date,           // Cùng ngày
       shiftId: baseSlot.shiftId,     // Cùng ca
@@ -26,10 +26,9 @@ test('ConflictEngine Suite: Phát hiện xung đột lịch học', async (t) =>
       status: 'Đã lên lịch',
     };
 
-    const result = await conflictEngine.checkScheduleConflict(conflictingSlot);
-    assert.equal(result.hasConflict, true, 'Phải báo có xung đột');
+    const result = await conflictEngine.checkScheduleConflict(multiClassSlot);
     const teacherConflict = result.conflicts.find(c => c.type === 'TEACHER_CONFLICT');
-    assert.ok(teacherConflict, 'Phải có lỗi TEACHER_CONFLICT');
+    assert.equal(teacherConflict, undefined, 'Giáo viên được phép dạy nhiều lớp cùng lúc');
   });
 
   await t.test('2. Phát hiện trùng phòng học khi 2 lớp dùng chung phòng cùng 1 ca', async () => {

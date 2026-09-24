@@ -6,11 +6,11 @@ import { getTodayDateStr, getNowTimeStr } from '../src/utils/date';
 import { GET as getAttendanceRoute } from '../src/app/api/attendance/route';
 
 describe('System Logic Refinement Suite: Time Overlap, Asia/Saigon Timezone & Attendance Roster', () => {
-  it('1. ConflictEngine: Phát hiện trùng lịch khi 2 ca giao nhau về giờ thực tế (18:00 - 20:00 và 19:00 - 21:00)', async () => {
+  it('1. ConflictEngine: Phát hiện trùng phòng khi 2 ca giao nhau về giờ thực tế (18:00 - 20:00 và 19:00 - 21:00)', async () => {
     const engine = new ConflictEngine(repo);
     const testDate = '2026-11-25';
 
-    // Tạo slot 1: 18:00 - 20:00 cho GV001 tại phòng P.101
+    // Tạo slot 1: 18:00 - 20:00 tại phòng P.101
     await repo.createScheduleSlot({
       id: 'SCH_OVERLAP_1',
       classId: 'CLS01',
@@ -24,21 +24,21 @@ describe('System Logic Refinement Suite: Time Overlap, Asia/Saigon Timezone & At
       status: 'Đã lên lịch'
     });
 
-    // Thử xếp slot 2: 19:00 - 21:00 (giao nhau từ 19:00 đến 20:00) cho GV001
+    // Thử xếp slot 2: 19:00 - 21:00 (giao nhau từ 19:00 đến 20:00) cùng phòng P.101
     const conflictResult = await engine.checkScheduleConflict({
       classId: 'CLS02',
-      teacherId: 'GV001',
-      roomId: 'P.202', // khác phòng
+      teacherId: 'GV002',
+      roomId: 'P.101', // Cùng phòng vật lý
       date: testDate,
-      shiftId: 2,      // khác shiftId
+      shiftId: 2,
       startTime: '19:00',
       endTime: '21:00',
       subject: 'Lý',
       status: 'Đã lên lịch'
     });
 
-    assert.equal(conflictResult.hasConflict, true, 'Phải phát hiện xung đột trùng giáo viên khi giờ bị giao nhau');
-    assert.equal(conflictResult.conflicts[0].type, 'TEACHER_CONFLICT');
+    assert.equal(conflictResult.hasConflict, true, 'Phải phát hiện xung đột trùng phòng khi giờ bị giao nhau');
+    assert.equal(conflictResult.conflicts[0].type, 'ROOM_CONFLICT');
   });
 
   it('2. ConflictEngine: Phòng ONLINE không bị coi là trùng phòng', async () => {
