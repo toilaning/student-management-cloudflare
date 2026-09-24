@@ -26,7 +26,8 @@ import {
   Search, 
   X,
   AlertTriangle,
-  Info
+  Info,
+  Edit3
 } from 'lucide-react';
 
 interface ExtendedAttendanceRecord extends AttendanceRecord {
@@ -35,6 +36,10 @@ interface ExtendedAttendanceRecord extends AttendanceRecord {
 }
 
 function AdminAttendanceContent() {
+  const [editingAttendanceStudent, setEditingAttendanceStudent] = useState<any>(null);
+  const [editRemainingInput, setEditRemainingInput] = useState<number>(12);
+  const [studentDetailMap, setStudentDetailMap] = useState<Record<string, any>>({});
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
   // Bộ lọc
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateStr());
   const [classes, setClasses] = useState<ClassEntity[]>([]);
@@ -217,6 +222,35 @@ function AdminAttendanceContent() {
   }, [records]);
 
   // Handler đổi trạng thái cho từng học viên
+  
+  const handleUpdateStudentSessionsFromAttendance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAttendanceStudent) return;
+    try {
+      const res = await fetch(`/api/students/${editingAttendanceStudent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ remainingSessions: editRemainingInput })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Đã cập nhật số buổi của ${editingAttendanceStudent.name} thành ${editRemainingInput} buổi!`);
+        setStudentDetailMap(prev => ({
+          ...prev,
+          [editingAttendanceStudent.id]: {
+            ...prev[editingAttendanceStudent.id],
+            remainingSessions: editRemainingInput
+          }
+        }));
+        setEditingAttendanceStudent(null);
+      } else {
+        alert(data.error || 'Cập nhật thất bại');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Lỗi mạng');
+    }
+  };
+
   const handleStatusChange = (index: number, newStatus: AttendanceStatus) => {
     const updated = [...records];
     const rec = updated[index];
@@ -667,107 +701,110 @@ function AdminAttendanceContent() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-500 uppercase font-bold border-b border-slate-200">
+                <thead className="bg-slate-50 text-slate-600 uppercase font-bold border-b border-slate-200 text-[11px]">
                   <tr>
-                    <th className="px-4 py-3.5 w-12 text-center">STT</th>
-                    <th className="px-4 py-3.5 w-44">Mã HV & Họ Tên</th>
-                    <th className="px-4 py-3.5 w-28">Số điện thoại</th>
-                    <th className="px-4 py-3.5">Trạng thái điểm danh (5 tùy chọn)</th>
-                    <th className="px-4 py-3.5 w-40">Giờ vào lớp (Check-in)</th>
-                    <th className="px-4 py-3.5 w-56">Thông tin bù / Ghi chú</th>
+                    <th className="px-3 py-3 w-12 text-center">STT</th>
+                    <th className="px-4 py-3 w-48">Mã HV & Họ Tên</th>
+                    <th className="px-3 py-3 w-28">Lớp mấy</th>
+                    <th className="px-3 py-3 w-32">Khối thi</th>
+                    <th className="px-4 py-3 w-44">Trường ĐH mục tiêu</th>
+                    <th className="px-3 py-3 w-28 text-center text-rose-600">Nghỉ (Cần bù)</th>
+                    <th className="px-3 py-3 w-32 text-center text-indigo-700">Số buổi còn</th>
+                    <th className="px-4 py-3">Trạng thái buổi học (1-Click)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {records.map((rec, idx) => {
+                    const stDetail = studentDetailMap[rec.studentId];
+                    const remaining = stDetail?.remainingSessions ?? 12;
+                    const absentCount = stDetail?.absentSessionsInMonth ?? 0;
                     return (
-                      <tr key={rec.id || idx} className="hover:bg-slate-50/70 transition">
-                        <td className="px-4 py-3.5 text-slate-400 font-semibold text-center">{idx + 1}</td>
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs ring-1 ring-slate-200 flex-shrink-0">
-                              {rec.studentName ? rec.studentName.charAt(0) : 'U'}
-                            </div>
-                            <div>
-                              <div className="font-bold text-slate-800 text-[13px]">{rec.studentName}</div>
-                              <div className="font-mono text-[11px] font-semibold text-indigo-600">{rec.studentId}</div>
-                            </div>
-                          </div>
+                      <tr key={rec.id || idx} className="hover:bg-slate-50/80 transition">
+                        <td className="px-3 py-3 text-slate-400 font-semibold text-center">{idx + 1}</td>
+                        <td className="px-4 py-3">
+                          <div className="font-bold text-slate-800 text-xs sm:text-[13px]">{rec.studentName}</div>
+                          <div className="font-mono text-[11px] font-semibold text-indigo-600">{rec.studentId}</div>
                         </td>
-                        <td className="px-4 py-3.5 text-slate-600 font-medium">{rec.studentPhone}</td>
-                        <td className="px-4 py-3.5">
-                          {/* 5 Nút Trực Quan */}
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {(['Có mặt', 'Đi muộn', 'Vắng có phép', 'Vắng không phép', 'Điểm danh bù'] as AttendanceStatus[]).map((statusOpt) => {
-                              const isCurrent = rec.status === statusOpt;
-                              let activeClass = '';
-                              if (isCurrent) {
-                                switch (statusOpt) {
-                                  case 'Có mặt':
-                                    activeClass = 'bg-emerald-600 text-white shadow-xs font-bold';
-                                    break;
-                                  case 'Đi muộn':
-                                    activeClass = 'bg-amber-500 text-white shadow-xs font-bold';
-                                    break;
-                                  case 'Vắng có phép':
-                                    activeClass = 'bg-blue-600 text-white shadow-xs font-bold';
-                                    break;
-                                  case 'Vắng không phép':
-                                    activeClass = 'bg-rose-600 text-white shadow-xs font-bold';
-                                    break;
-                                  case 'Điểm danh bù':
-                                    activeClass = 'bg-purple-600 text-white shadow-xs font-bold';
-                                    break;
-                                }
-                              } else {
-                                activeClass = 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium';
+                        <td className="px-3 py-3 font-semibold text-slate-700">
+                          {stDetail?.gradeLevel || 'Lớp 12'}
+                        </td>
+                        <td className="px-3 py-3">
+                          <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            {stDetail?.examBlock === 'KHOI_H' ? 'Khối H' : 'Khối V'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="font-bold text-slate-800 text-xs">
+                            {stDetail?.targetUniversity === 'KHAC' ? (stDetail?.customUniversity || 'Trường khác') : (stDetail?.targetUniversity || 'HAU')}
+                          </div>
+                          {stDetail?.homeTown && <div className="text-[10px] text-slate-400">{stDetail.homeTown}</div>}
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <span className={`font-bold px-2 py-0.5 rounded ${
+                            absentCount > 0 ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200' : 'text-slate-400'
+                          }`}>
+                            {absentCount} buổi
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (stDetail) {
+                                setEditingAttendanceStudent(stDetail);
+                                setEditRemainingInput(stDetail.remainingSessions ?? 12);
                               }
-
-                              return (
-                                <button
-                                  key={statusOpt}
-                                  type="button"
-                                  onClick={() => handleStatusChange(idx, statusOpt)}
-                                  className={`px-2.5 py-1.5 rounded-lg text-xs transition ${activeClass}`}
-                                >
-                                  {statusOpt}
-                                </button>
-                              );
-                            })}
-                          </div>
+                            }}
+                            className={`px-2.5 py-1 rounded-lg font-bold text-xs border inline-flex items-center gap-1 cursor-pointer transition hover:opacity-80 ${
+                              remaining >= 3
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : remaining > 0
+                                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                : 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
+                            }`}
+                            title="Bấm để tùy chỉnh thủ công số buổi còn lại"
+                          >
+                            <span>{remaining} buổi</span>
+                            <Edit3 size={11} className="opacity-60" />
+                          </button>
                         </td>
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="text"
-                              value={rec.checkinTime || ''}
-                              onChange={e => handleCheckinTimeChange(idx, e.target.value)}
-                              placeholder="HH:mm:ss"
-                              className="w-24 bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-mono text-slate-700 focus:outline-indigo-600"
-                            />
+                        <td className="px-4 py-3">
+                          {/* 3 Nút Trạng Thái Chuẩn Mr. Thuyết */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <button
                               type="button"
-                              onClick={() => handleSetCurrentTime(idx)}
-                              title="Lấy giờ hiện tại"
-                              className="p-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 rounded-lg transition"
+                              onClick={() => handleStatusChange(idx, 'Có mặt')}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer border ${
+                                rec.status === 'Có mặt'
+                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                  : 'bg-emerald-50/60 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                              }`}
                             >
-                              <Clock size={14} />
+                              🟢 Có mặt
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleStatusChange(idx, 'Vắng không phép')}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer border ${
+                                rec.status === 'Vắng không phép'
+                                  ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                                  : 'bg-rose-50/60 hover:bg-rose-100 text-rose-800 border-rose-200'
+                              }`}
+                            >
+                              🔴 Vắng
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleStatusChange(idx, 'Vắng có phép')}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer border ${
+                                rec.status === 'Vắng có phép' || rec.status === 'Điểm danh bù'
+                                  ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
+                                  : 'bg-amber-50/60 hover:bg-amber-100 text-amber-900 border-amber-200'
+                              }`}
+                            >
+                              🟡 Nghỉ phép / Bù
                             </button>
                           </div>
-                        </td>
-                        <td className="px-4 py-3.5 space-y-1">
-                          {rec.status === 'Điểm danh bù' && (
-                            <div className="flex items-center gap-1 text-[11px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100 font-semibold">
-                              <Info size={12} /> Ca gốc: {rec.originalSlotId || 'Chưa gán'}
-                              {rec.makeupReason && ` - ${rec.makeupReason}`}
-                            </div>
-                          )}
-                          <input
-                            type="text"
-                            value={rec.note || ''}
-                            onChange={e => handleNoteChange(idx, e.target.value)}
-                            placeholder="Ghi chú thêm..."
-                            className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-700 focus:outline-indigo-500"
-                          />
                         </td>
                       </tr>
                     );
@@ -898,6 +935,9 @@ function AdminAttendanceContent() {
 }
 
 export default function AdminAttendancePage() {
+  const [editingAttendanceStudent, setEditingAttendanceStudent] = useState<any>(null);
+  const [editRemainingInput, setEditRemainingInput] = useState<number>(12);
+  const [studentDetailMap, setStudentDetailMap] = useState<Record<string, any>>({});
   return (
     <RoleGuard allowedRoles={['ADMIN']}>
       <Suspense fallback={<div className="p-8 text-center text-sm text-slate-500">Đang tải trang Sổ Điểm danh Toàn trường...</div>}>

@@ -34,7 +34,12 @@ export async function PATCH(
   try {
     const studentId = params.id;
     const body = await request.json();
-    const { discordId, discordUsername, actorId, actorRole, phone, email, address, name } = body;
+    const {
+      discordId, discordUsername, actorId, actorRole, phone, email, address, name,
+      status, homeTown, gradeLevel, targetUniversity, customUniversity, examBlock,
+      studyGoal, facebookUrl, otherNotes, registeredDate, parentPhone,
+      remainingSessions, totalSessionsInMonth, attendedSessionsInMonth, absentSessionsInMonth
+    } = body;
 
     const student = await repo.getStudentById(studentId);
     if (!student) {
@@ -71,6 +76,24 @@ export async function PATCH(
       student.name = name.trim();
       needUpdate = true;
     }
+    if (status !== undefined) {
+      student.status = status;
+      needUpdate = true;
+    }
+    if (homeTown !== undefined) { student.homeTown = homeTown.trim(); needUpdate = true; }
+    if (gradeLevel !== undefined) { student.gradeLevel = gradeLevel; needUpdate = true; }
+    if (targetUniversity !== undefined) { student.targetUniversity = targetUniversity; needUpdate = true; }
+    if (customUniversity !== undefined) { student.customUniversity = customUniversity.trim(); needUpdate = true; }
+    if (examBlock !== undefined) { student.examBlock = examBlock; needUpdate = true; }
+    if (studyGoal !== undefined) { student.studyGoal = studyGoal.trim(); needUpdate = true; }
+    if (facebookUrl !== undefined) { student.facebookUrl = facebookUrl.trim(); needUpdate = true; }
+    if (otherNotes !== undefined) { student.otherNotes = otherNotes.trim(); needUpdate = true; }
+    if (parentPhone !== undefined) { student.parentPhone = parentPhone.trim(); needUpdate = true; }
+    if (registeredDate !== undefined) { student.registeredDate = registeredDate; needUpdate = true; }
+    if (remainingSessions !== undefined) { student.remainingSessions = Number(remainingSessions); needUpdate = true; }
+    if (totalSessionsInMonth !== undefined) { student.totalSessionsInMonth = Number(totalSessionsInMonth); needUpdate = true; }
+    if (attendedSessionsInMonth !== undefined) { student.attendedSessionsInMonth = Number(attendedSessionsInMonth); needUpdate = true; }
+    if (absentSessionsInMonth !== undefined) { student.absentSessionsInMonth = Number(absentSessionsInMonth); needUpdate = true; }
 
     if (needUpdate) {
       await repo.updateStudent(student);

@@ -661,8 +661,13 @@ export class SupabaseRepository implements IRepository {
     if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local"); // updateStudent(student);
 
     try {
-      const row = mapStudentToDb(student);
-      const { error: updateErr } = await client.from('students').update(row).eq('id', student.id);
+      let row = mapStudentToDb(student);
+      let { error: updateErr } = await client.from('students').update(row).eq('id', student.id);
+      if (updateErr && updateErr.code === 'PGRST204') {
+        const { home_town, grade_level, target_university, custom_university, exam_block, study_goal, facebook_url, other_notes, registered_date, total_sessions_in_month, attended_sessions_in_month, absent_sessions_in_month, remaining_sessions, ...legacyRow } = row;
+        const retry = await client.from('students').update(legacyRow).eq('id', student.id);
+        updateErr = retry.error;
+      }
       if (updateErr) {
         if (this.fallbackToLocalOnFailure) return localRepo.updateStudent(student);
         throw new Error(updateErr.message);
@@ -689,8 +694,13 @@ export class SupabaseRepository implements IRepository {
     if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local"); // createStudent(student);
 
     try {
-      const row = mapStudentToDb(student);
-      const { error: insertErr } = await client.from('students').insert(row);
+      let row = mapStudentToDb(student);
+      let { error: insertErr } = await client.from('students').insert(row);
+      if (insertErr && insertErr.code === 'PGRST204') {
+        const { home_town, grade_level, target_university, custom_university, exam_block, study_goal, facebook_url, other_notes, registered_date, total_sessions_in_month, attended_sessions_in_month, absent_sessions_in_month, remaining_sessions, ...legacyRow } = row;
+        const retry = await client.from('students').insert(legacyRow);
+        insertErr = retry.error;
+      }
       if (insertErr) {
         if (this.fallbackToLocalOnFailure) return localRepo.createStudent(student);
         throw new Error(insertErr.message);

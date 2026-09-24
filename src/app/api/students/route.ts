@@ -104,6 +104,17 @@ export async function POST(request: Request) {
       fastOnboarding = false,
       actorId = 'ADMIN001',
       actorName = 'Quản trị viên',
+      homeTown,
+      gradeLevel = 'Lớp 12',
+      targetUniversity = 'HAU',
+      customUniversity,
+      examBlock = 'KHOI_V',
+      studyGoal,
+      parentPhone,
+      facebookUrl,
+      otherNotes,
+      totalSessionsInMonth = 12,
+      remainingSessions = 12,
     } = body;
 
     if (!name || !name.trim()) {
@@ -142,6 +153,21 @@ export async function POST(request: Request) {
       student.email = email.trim();
       updatedDetails = true;
     }
+
+    if (homeTown) { student.homeTown = homeTown.trim(); updatedDetails = true; }
+    if (gradeLevel) { student.gradeLevel = gradeLevel; updatedDetails = true; }
+    if (targetUniversity) { student.targetUniversity = targetUniversity; updatedDetails = true; }
+    if (customUniversity) { student.customUniversity = customUniversity.trim(); updatedDetails = true; }
+    if (examBlock) { student.examBlock = examBlock; updatedDetails = true; }
+    if (studyGoal) { student.studyGoal = studyGoal.trim(); updatedDetails = true; }
+    if (parentPhone) { student.parentPhone = parentPhone.trim(); updatedDetails = true; }
+    if (facebookUrl) { student.facebookUrl = facebookUrl.trim(); updatedDetails = true; }
+    if (otherNotes) { student.otherNotes = otherNotes.trim(); updatedDetails = true; }
+    student.totalSessionsInMonth = Number(totalSessionsInMonth) || 12;
+    student.remainingSessions = Number(remainingSessions) || 12;
+    student.attendedSessionsInMonth = 0;
+    student.absentSessionsInMonth = 0;
+    updatedDetails = true;
 
     if (updatedDetails) {
       await repo.updateStudent(student);

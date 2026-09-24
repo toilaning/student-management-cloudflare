@@ -23,6 +23,12 @@ import {
 
 export default function AdminStudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
+  const [statusTab, setStatusTab] = useState<'ALL' | 'Đang học' | 'Tạm dừng' | 'Đã nghỉ học'>('Đang học');
+  const [targetUniFilter, setTargetUniFilter] = useState<string>('ALL');
+  const [quickActionId, setQuickActionId] = useState<string>('');
+  const [editingSessionStudent, setEditingSessionStudent] = useState<Student | null>(null);
+  const [editSessionInput, setEditSessionInput] = useState<number>(12);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
   const [classes, setClasses] = useState<ClassEntity[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
@@ -74,10 +80,21 @@ export default function AdminStudentsPage() {
     email: '',
     gender: 'Nam' as 'Nam' | 'Nữ',
     dateOfBirth: '2008-01-01',
-    address: 'TP. Hồ Chí Minh',
+    address: 'TP. Hà Nội',
     discordId: '',
     discordUsername: '',
     selectedClassIds: [] as string[],
+    parentPhone: '',
+    homeTown: '',
+    gradeLevel: 'Lớp 12',
+    targetUniversity: 'HAU',
+    customUniversity: '',
+    examBlock: 'KHOI_V' as 'KHOI_V' | 'KHOI_H',
+    studyGoal: 'Thi Đại Học',
+    facebookUrl: '',
+    otherNotes: '',
+    totalSessionsInMonth: 12,
+    remainingSessions: 12,
   });
 
   const loadStudents = async (p = 1, limit = 20, search = '') => {
@@ -103,6 +120,57 @@ export default function AdminStudentsPage() {
   useEffect(() => {
     loadStudents(page, pageSize, searchTerm);
   }, [page, pageSize, searchTerm]);
+
+  
+  const handleQuickStatusChange = async (targetStatus: 'Tạm dừng' | 'Đã nghỉ học') => {
+    if (!quickActionId.trim()) {
+      alert('Vui lòng nhập Mã học viên cần thao tác');
+      return;
+    }
+    const cleanId = quickActionId.trim();
+    setIsUpdatingStatus(true);
+    try {
+      const res = await fetch(`/api/students/${cleanId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: targetStatus })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setActionMessage(`Đã chuyển học viên [${cleanId}] sang trạng thái "${targetStatus}" thành công!`);
+        setQuickActionId('');
+        await loadStudents(page, pageSize, searchTerm);
+      } else {
+        alert(data.error || 'Thao tác thất bại');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Lỗi mạng');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleUpdateRemainingSessions = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSessionStudent) return;
+    try {
+      const res = await fetch(`/api/students/${editingSessionStudent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ remainingSessions: editSessionInput })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setActionMessage(`Đã cập nhật số buổi còn lại của học viên ${editingSessionStudent.name} thành ${editSessionInput} buổi!`);
+        setEditingSessionStudent(null);
+        await loadStudents(page, pageSize, searchTerm);
+      } else {
+        alert(data.error || 'Cập nhật thất bại');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Lỗi mạng');
+    }
+  };
 
   const handleSearchChange = (val: string) => {
     setSearchTerm(val);
@@ -175,6 +243,17 @@ export default function AdminStudentsPage() {
           discordId: newStudentData.discordId.trim() || undefined,
           discordUsername: newStudentData.discordUsername.trim() || undefined,
           enrolledClassIds: newStudentData.selectedClassIds,
+          parentPhone: newStudentData.parentPhone,
+          homeTown: newStudentData.homeTown,
+          gradeLevel: newStudentData.gradeLevel,
+          targetUniversity: newStudentData.targetUniversity,
+          customUniversity: newStudentData.customUniversity,
+          examBlock: newStudentData.examBlock,
+          studyGoal: newStudentData.studyGoal,
+          facebookUrl: newStudentData.facebookUrl,
+          otherNotes: newStudentData.otherNotes,
+          totalSessionsInMonth: newStudentData.totalSessionsInMonth,
+          remainingSessions: newStudentData.remainingSessions,
         }),
       });
       const data = await res.json();
@@ -194,10 +273,21 @@ export default function AdminStudentsPage() {
           email: '',
           gender: 'Nam',
           dateOfBirth: '2008-01-01',
-          address: 'TP. Hồ Chí Minh',
+          address: 'TP. Hà Nội',
           discordId: '',
           discordUsername: '',
           selectedClassIds: [],
+          parentPhone: '',
+          homeTown: '',
+          gradeLevel: 'Lớp 12',
+          targetUniversity: 'HAU',
+          customUniversity: '',
+          examBlock: 'KHOI_V',
+          studyGoal: 'Thi Đại Học',
+          facebookUrl: '',
+          otherNotes: '',
+          totalSessionsInMonth: 12,
+          remainingSessions: 12,
         });
         await loadStudents(page, pageSize, searchTerm);
       } else {
@@ -306,6 +396,30 @@ Lưu ý: Học viên vui lòng đăng nhập, đổi mật khẩu và liên kế
     setTimeout(() => setCopiedHandover(false), 2500);
   };
 
+  
+  const filteredStudents = students.filter(st => {
+    // 1. Lọc theo Tab trạng thái
+    if (statusTab !== 'ALL' && st.status !== statusTab) {
+      return false;
+    }
+    // 2. Lọc theo trường & khối thi
+    if (targetUniFilter !== 'ALL') {
+      if (targetUniFilter === 'HAU_V') return st.targetUniversity === 'HAU' && st.examBlock === 'KHOI_V';
+      if (targetUniFilter === 'HAU_H') return st.targetUniversity === 'HAU' && st.examBlock === 'KHOI_H';
+      if (targetUniFilter === 'HUCE_V') return st.targetUniversity === 'HUCE' && st.examBlock === 'KHOI_V';
+      if (targetUniFilter === 'HUCE_H') return st.targetUniversity === 'HUCE' && st.examBlock === 'KHOI_H';
+      if (targetUniFilter === 'MTCN_V') return st.targetUniversity === 'MTCN' && st.examBlock === 'KHOI_V';
+      if (targetUniFilter === 'MTCN_H') return st.targetUniversity === 'MTCN' && st.examBlock === 'KHOI_H';
+      if (targetUniFilter === 'NUAE') return st.targetUniversity === 'NUAE';
+      if (targetUniFilter === 'HNUE') return st.targetUniversity === 'HNUE';
+      if (targetUniFilter === 'VNUFA') return st.targetUniversity === 'VNUFA';
+      if (targetUniFilter === 'HOU') return st.targetUniversity === 'HOU';
+      if (targetUniFilter === 'VNU-SIS') return st.targetUniversity === 'VNU-SIS';
+      if (targetUniFilter === 'KHAC') return st.targetUniversity === 'KHAC' || !!st.customUniversity;
+    }
+    return true;
+  });
+
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
       <Header
@@ -325,6 +439,125 @@ Lưu ý: Học viên vui lòng đăng nhập, đổi mật khẩu và liên kế
             </button>
           </div>
         )}
+
+        
+        {/* THANH THAO TÁC NHANH ĐẦU TRANG (CHUẨN MR. THUYẾT) */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <span className="text-xs font-bold text-slate-700 whitespace-nowrap">Chuyển trạng thái nhanh:</span>
+            <input
+              type="text"
+              placeholder="Nhập Mã học viên (VD: 26001, ST001)..."
+              value={quickActionId}
+              onChange={e => setQuickActionId(e.target.value)}
+              className="p-2 border border-slate-200 rounded-xl text-xs font-mono font-bold w-full sm:w-64 focus:outline-indigo-600"
+            />
+          </div>
+
+          <div className="flex items-center gap-2.5 w-full md:w-auto justify-end">
+            <button
+              type="button"
+              disabled={isUpdatingStatus}
+              onClick={() => handleQuickStatusChange('Tạm dừng')}
+              className="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-xl font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            >
+              ⏸️ Tạm nghỉ
+            </button>
+            <button
+              type="button"
+              disabled={isUpdatingStatus}
+              onClick={() => handleQuickStatusChange('Đã nghỉ học')}
+              className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 rounded-xl font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            >
+              ⛔ Dừng học
+            </button>
+          </div>
+        </div>
+
+        {/* 3 TAB TRẠNG THÁI HỌC TẬP */}
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setStatusTab('Đang học')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+              statusTab === 'Đang học'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            🟢 Đang học
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusTab('Tạm dừng')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+              statusTab === 'Tạm dừng'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            🟡 Tạm nghỉ
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusTab('Đã nghỉ học')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+              statusTab === 'Đã nghỉ học'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            🔴 Đã nghỉ
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusTab('ALL')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+              statusTab === 'ALL'
+                ? 'bg-slate-800 text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            📋 Tất cả trạng thái
+          </button>
+        </div>
+
+        {/* BỘ LỌC 1-CLICK THEO TRƯỜNG ĐẠI HỌC & KHỐI THI (TẤT CẢ ĐỀU CÓ KHỐI V VÀ H) */}
+        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            🏛️ Thư mục lọc theo Trường ĐH & Khối thi (Khối V / Khối H):
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap text-xs">
+            {[
+              { id: 'ALL', label: 'Tất cả trường' },
+              { id: 'HAU_V', label: 'HAU - Khối V' },
+              { id: 'HAU_H', label: 'HAU - Khối H' },
+              { id: 'HUCE_V', label: 'HUCE - Khối V' },
+              { id: 'HUCE_H', label: 'HUCE - Khối H' },
+              { id: 'MTCN_V', label: 'MTCN - Khối V' },
+              { id: 'MTCN_H', label: 'MTCN - Khối H' },
+              { id: 'NUAE', label: 'NUAE (Nghệ Thuật TW)' },
+              { id: 'HNUE', label: 'HNUE (Sư Phạm HN)' },
+              { id: 'VNUFA', label: 'VNUFA (Mỹ Thuật VN)' },
+              { id: 'HOU', label: 'HOU (Viện ĐH Mở)' },
+              { id: 'VNU-SIS', label: 'VNU-SIS (Khoa học liên ngành)' },
+              { id: 'KHAC', label: 'Trường khác' },
+            ].map(f => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setTargetUniFilter(f.id)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer border ${
+                  targetUniFilter === f.id
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Toolbar Header */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
@@ -373,13 +606,15 @@ Lưu ý: Học viên vui lòng đăng nhập, đổi mật khẩu và liên kế
                   <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold">Họ và tên</th>
                   <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold">Discord Snowflake ID</th>
                   <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold">Liên hệ / Email</th>
+                  <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold">Mục tiêu & Khối</th>
                   <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold">Lớp đang theo học</th>
+                  <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold text-center">Số buổi còn lại</th>
                   <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold">Trạng thái</th>
                   <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold text-right">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {students.map(st => (
+                {filteredStudents.map(st => (
                   <tr key={st.id} className="hover:bg-slate-50/80 transition">
                     <td className="px-3 sm:px-4 py-2.5 sm:py-3 font-mono font-bold text-indigo-700 whitespace-nowrap">
                       {st.id}
@@ -909,11 +1144,140 @@ Lưu ý: Học viên vui lòng đăng nhập, đổi mật khẩu và liên kế
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Địa chỉ</label>
+                <label className="block font-bold text-slate-700 mb-1">Địa chỉ thường trú / Chỗ ở hiện tại</label>
                 <input
                   type="text"
                   value={newStudentData.address}
                   onChange={e => setNewStudentData({ ...newStudentData, address: e.target.value })}
+                  className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Quê quán / Tỉnh thành</label>
+                  <input
+                    type="text"
+                    placeholder="Ví dụ: Nam Định, Hải Dương, Hà Nội..."
+                    value={newStudentData.homeTown}
+                    onChange={e => setNewStudentData({ ...newStudentData, homeTown: e.target.value })}
+                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">SĐT / Zalo Phụ huynh</label>
+                  <input
+                    type="tel"
+                    placeholder="0987..."
+                    value={newStudentData.parentPhone}
+                    onChange={e => setNewStudentData({ ...newStudentData, parentPhone: e.target.value })}
+                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Lớp mấy hiện tại *</label>
+                  <select
+                    value={newStudentData.gradeLevel}
+                    onChange={e => setNewStudentData({ ...newStudentData, gradeLevel: e.target.value })}
+                    className="w-full p-2.5 border border-slate-200 rounded-lg text-xs bg-white focus:outline-indigo-600 font-semibold"
+                  >
+                    <option value="Lớp 10">Lớp 10</option>
+                    <option value="Lớp 11">Lớp 11</option>
+                    <option value="Lớp 12">Lớp 12 (Thi năm nay)</option>
+                    <option value="Thí sinh tự do">Thí sinh tự do</option>
+                    <option value="Học năng khiếu">Học năng khiếu / Đi làm</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Khối thi đại học *</label>
+                  <select
+                    value={newStudentData.examBlock}
+                    onChange={e => setNewStudentData({ ...newStudentData, examBlock: e.target.value as any })}
+                    className="w-full p-2.5 border border-slate-200 rounded-lg text-xs bg-white focus:outline-indigo-600 font-bold text-indigo-700"
+                  >
+                    <option value="KHOI_V">Khối V (Vẽ Mỹ thuật / Tượng)</option>
+                    <option value="KHOI_H">Khối H (Vẽ Bố cục màu / Người)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Trường ĐH mục tiêu *</label>
+                  <select
+                    value={newStudentData.targetUniversity}
+                    onChange={e => setNewStudentData({ ...newStudentData, targetUniversity: e.target.value })}
+                    className="w-full p-2.5 border border-slate-200 rounded-lg text-xs bg-white focus:outline-indigo-600 font-semibold"
+                  >
+                    <option value="HAU">ĐH Kiến Trúc Hà Nội (HAU)</option>
+                    <option value="HUCE">ĐH Xây Dựng (HUCE)</option>
+                    <option value="MTCN">ĐH Mỹ Thuật Công Nghiệp (MTCN)</option>
+                    <option value="NUAE">ĐH Sư Phạm Nghệ Thuật TW (NUAE)</option>
+                    <option value="HNUE">ĐH Sư Phạm Hà Nội (HNUE)</option>
+                    <option value="VNUFA">ĐH Mỹ Thuật Việt Nam (VNUFA)</option>
+                    <option value="HOU">Viện ĐH Mở Hà Nội (HOU)</option>
+                    <option value="VNU-SIS">ĐHQGHN (VNU-SIS)</option>
+                    <option value="KHAC">-- Trường khác --</option>
+                  </select>
+                </div>
+              </div>
+
+              {newStudentData.targetUniversity === 'KHAC' && (
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Nhập tên Trường Đại học mục tiêu khác *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ví dụ: ĐH Bách Khoa, ĐH Tôn Đức Thắng, Du học..."
+                    value={newStudentData.customUniversity}
+                    onChange={e => setNewStudentData({ ...newStudentData, customUniversity: e.target.value })}
+                    className="w-full p-2.5 border border-indigo-300 bg-indigo-50/40 rounded-lg text-xs font-bold text-indigo-900 focus:outline-indigo-600"
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Mục đích học</label>
+                  <input
+                    type="text"
+                    placeholder="Ví dụ: Thi Đại học, Rèn luyện kỹ năng..."
+                    value={newStudentData.studyGoal}
+                    onChange={e => setNewStudentData({ ...newStudentData, studyGoal: e.target.value })}
+                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Số buổi đăng ký ban đầu</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={newStudentData.remainingSessions}
+                    onChange={e => setNewStudentData({ ...newStudentData, remainingSessions: Number(e.target.value), totalSessionsInMonth: Number(e.target.value) })}
+                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs font-bold text-emerald-700"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Link Facebook cá nhân</label>
+                <input
+                  type="url"
+                  placeholder="https://facebook.com/..."
+                  value={newStudentData.facebookUrl}
+                  onChange={e => setNewStudentData({ ...newStudentData, facebookUrl: e.target.value })}
+                  className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Trường thông tin khác (Ghi chú tự do của học viên)</label>
+                <textarea
+                  rows={2}
+                  placeholder="Ghi chú thêm về năng khiếu, mục tiêu thi cử, nguyện vọng đặc biệt..."
+                  value={newStudentData.otherNotes}
+                  onChange={e => setNewStudentData({ ...newStudentData, otherNotes: e.target.value })}
                   className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs"
                 />
               </div>
