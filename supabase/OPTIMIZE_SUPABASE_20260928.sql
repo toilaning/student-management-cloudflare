@@ -40,11 +40,11 @@ CREATE TABLE IF NOT EXISTS public.time_shifts (
 
 -- Seed 5 ca (id cố định 1..5 khớp TIME_SHIFTS trong src/types/schedule.ts)
 INSERT INTO public.time_shifts (id, name, start_time, end_time, duration_hours, is_active, sort_order) VALUES
-    (1, 'Ca 1', '08:00', '10:00', 2.0, true, 1),
-    (2, 'Ca 2', '10:15', '12:15', 2.0, true, 2),
-    (3, 'Ca 3', '13:30', '15:30', 2.0, true, 3),
-    (4, 'Ca 4', '15:45', '17:45', 2.0, true, 4),
-    (5, 'Ca 5', '18:30', '20:30', 2.0, true, 5)
+    (1, 'Ca 1 (08:00 - 10:00)', '08:00', '10:00', 2.0, true, 1),
+    (2, 'Ca 2 (10:15 - 12:15)', '10:15', '12:15', 2.0, true, 2),
+    (3, 'Ca 3 (13:30 - 15:30)', '13:30', '15:30', 2.0, true, 3),
+    (4, 'Ca 4 (15:45 - 17:45)', '15:45', '17:45', 2.0, true, 4),
+    (5, 'Ca 5 (18:30 - 20:30)', '18:30', '20:30', 2.0, true, 5)
 ON CONFLICT (id) DO UPDATE SET
     name = EXCLUDED.name,
     start_time = EXCLUDED.start_time,
@@ -80,9 +80,23 @@ ALTER TABLE public.tuition_invoices
     ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
 -- ============================================================================
--- 3. TEACHER_PAYROLL_PERIODS — thêm cột khớp code (mapper mapPayrollRecordToDb)
+-- 3b. SỬA DRIFT KIỂU CỘT attendance_records.checkin_time
+-- ----------------------------------------------------------------------------
+-- Drift giữa schema.sql (VARCHAR) và clean_master_schema.sql (TIMESTAMPTZ).
+-- Code ứng dụng ghi checkin_time dạng chuỗi giờ "HH:mm:ss" (VD: "08:00:05"),
+-- nên cột PHẢI là VARCHAR, không phải TIMESTAMPTZ (nếu không điểm danh sẽ lỗi).
 -- ============================================================================
-ALTER TABLE public.teacher_payroll_periods
+ALTER TABLE public.attendance_records
+    ALTER COLUMN checkin_time TYPE VARCHAR(20)
+    USING CASE
+        WHEN checkin_time IS NULL THEN NULL
+        WHEN checkin_time::text ~ '^[0-9]{2}:[0-9]{2}' THEN checkin_time::text
+        ELSE to_char(checkin_time, 'HH24:MI:SS')
+    END;
+
+-- ============================================================================
+-- 3. TEACHER_PAYROLL_PERIODS — thêm cột khớp code (mapper mapPayrollRecordToDb)
+-- ============================================================================ALTER TABLE public.teacher_payroll_periods
     ADD COLUMN IF NOT EXISTS total_hours NUMERIC(6, 1) DEFAULT 0;   -- Tổng giờ dạy
 ALTER TABLE public.teacher_payroll_periods
     ADD COLUMN IF NOT EXISTS hourly_rate NUMERIC(15, 2) DEFAULT 0;  -- Đơn giá/giờ
@@ -181,6 +195,9 @@ ALTER TABLE public.classes DROP CONSTRAINT IF EXISTS classes_shift_id_check;
 ALTER TABLE public.classes DROP CONSTRAINT IF EXISTS classes_status_check;
 ALTER TABLE public.students DROP CONSTRAINT IF EXISTS students_status_check;
 ALTER TABLE public.students DROP CONSTRAINT IF EXISTS students_exam_block_check;
+-- class_requests: constraint cũ chặn trạng thái/loại tiếng Việt mà code gửi
+ALTER TABLE public.class_requests DROP CONSTRAINT IF EXISTS class_requests_status_check;
+ALTER TABLE public.class_requests DROP CONSTRAINT IF EXISTS class_requests_type_check;
 
 -- ============================================================================
 -- 6. INDEX TỐI ƯU HÓA TRUY VẤN (đảm bảo không thiếu)
