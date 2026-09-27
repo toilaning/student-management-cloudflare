@@ -208,7 +208,7 @@ CREATE INDEX IF NOT EXISTS idx_slots_class_id ON public.schedule_slots(class_id)
 CREATE INDEX IF NOT EXISTS idx_slots_teacher_id ON public.schedule_slots(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_att_date ON public.attendance_records(date);
 CREATE INDEX IF NOT EXISTS idx_att_slot ON public.attendance_records(schedule_slot_id);
-CREATE INDEX IF NOT EXISTS idx_invoices_month ON public.tuition_invoices(month);
+CREATE INDEX IF NOT EXISTS idx_invoices_due_date ON public.tuition_invoices(due_date);
 CREATE INDEX IF NOT EXISTS idx_invoices_student ON public.tuition_invoices(student_id);
 CREATE INDEX IF NOT EXISTS idx_payroll_teacher ON public.teacher_payroll_periods(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON public.manual_expenses(expense_date);
