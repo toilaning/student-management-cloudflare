@@ -96,7 +96,8 @@ ALTER TABLE public.attendance_records
 
 -- ============================================================================
 -- 3. TEACHER_PAYROLL_PERIODS — thêm cột khớp code (mapper mapPayrollRecordToDb)
--- ============================================================================ALTER TABLE public.teacher_payroll_periods
+-- ============================================================================
+ALTER TABLE public.teacher_payroll_periods
     ADD COLUMN IF NOT EXISTS total_hours NUMERIC(6, 1) DEFAULT 0;   -- Tổng giờ dạy
 ALTER TABLE public.teacher_payroll_periods
     ADD COLUMN IF NOT EXISTS hourly_rate NUMERIC(15, 2) DEFAULT 0;  -- Đơn giá/giờ
