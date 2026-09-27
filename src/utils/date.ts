@@ -27,3 +27,21 @@ export function timeToMinutes(timeStr: string): number {
   return (parts[0] || 0) * 60 + (parts[1] || 0);
 }
 
+/**
+ * Đổi số phút từ đầu ngày thành chuỗi giờ HH:mm (hỗ trợ > 24h, ví dụ 25:30).
+ */
+export function minutesTo24h(totalMinutes: number): string {
+  const m = Math.max(0, Math.round(totalMinutes));
+  const hh = Math.floor(m / 60);
+  const mm = m % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
+/**
+ * Trả về chuỗi YYYY-MM-DD cho một Date cụ thể, theo múi giờ Việt Nam (Asia/Saigon).
+ * Dùng để cộng/trừ ngày an toàn không bị lệch múi giờ UTC.
+ */
+export function getTodayDateStrByDate(d: Date): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Saigon' }).format(d);
+}
+

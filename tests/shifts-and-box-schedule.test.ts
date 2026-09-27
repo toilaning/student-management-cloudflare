@@ -79,6 +79,20 @@ describe('Dynamic Shifts & Schedule Box Suite', () => {
     const testClassId = 'CLS02';
     const testStudentId = 'ST002';
 
+    // 6.0 Dữ liệu seed: ST002 đang học CLS01 (Toán, Thứ 2-4-6, Ca 1) trùng giờ với CLS02.
+    // Trước khi đăng ký ca mới, hủy lớp trùng giờ hiện tại để giải phóng lịch.
+    const reqUnenrollConflicting = new Request('http://localhost/api/classes/enroll', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        classId: 'CLS01',
+        studentId: testStudentId,
+        action: 'UNENROLL',
+        actorId: testStudentId,
+      }),
+    });
+    await enrollClass(reqUnenrollConflicting);
+
     // 6.1 Ghi danh / Chọn ca này
     const reqEnroll = new Request('http://localhost/api/classes/enroll', {
       method: 'POST',
@@ -92,7 +106,7 @@ describe('Dynamic Shifts & Schedule Box Suite', () => {
     });
     const resEnroll = await enrollClass(reqEnroll);
     const dataEnroll = await resEnroll.json();
-    assert.ok(dataEnroll.success, 'Đăng ký ca học phải thành công');
+    assert.ok(dataEnroll.success, 'Đăng ký ca học phải thành công khi không trùng giờ');
 
     const updatedCls = await repo.getClassById(testClassId);
     assert.ok(updatedCls?.studentIds.includes(testStudentId), 'Học viên phải có trong danh sách studentIds của lớp');
@@ -114,6 +128,28 @@ describe('Dynamic Shifts & Schedule Box Suite', () => {
 
     const clsAfterUnenroll = await repo.getClassById(testClassId);
     assert.ok(!clsAfterUnenroll?.studentIds.includes(testStudentId), 'Học viên phải được xoá khỏi lớp');
+  });
+
+  it('6b. Từ chối đăng ký ca học TRÙNG GIỜ với lớp đã enrolled', async () => {
+    const testStudentId = 'ST003';
+    // ST003 theo seed học CLS01 (Toán, Thứ 2-4-6, Ca 1). CLS02 (Tiếng Anh) trùng ngày + trùng giờ.
+    const reqEnroll = new Request('http://localhost/api/classes/enroll', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        classId: 'CLS02',
+        studentId: testStudentId,
+        action: 'ENROLL',
+        actorId: testStudentId,
+      }),
+    });
+    const resEnroll = await enrollClass(reqEnroll);
+    const dataEnroll = await resEnroll.json();
+    assert.equal(resEnroll.status, 409, 'Phải trả về 409 khi trùng giờ');
+    assert.ok(dataEnroll.error && dataEnroll.error.includes('trùng giờ'), 'Message lỗi phải nói rõ trùng giờ');
+
+    const cls = await repo.getClassById('CLS02');
+    assert.ok(!cls?.studentIds.includes(testStudentId), 'Học viên KHÔNG được thêm vào lớp khi trùng giờ');
   });
 
   it('7. Luồng giáo viên nhận ca dạy (Claim Shift)', async () => {
