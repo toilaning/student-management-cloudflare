@@ -120,6 +120,74 @@ export default function StudentClassesPage() {
   const shiftMap = new Map<number, TimeShift>();
   shifts.forEach(s => shiftMap.set(s.id, s));
 
+  // --- Hỗ trợ chặn ca trùng giờ phía client (mirror logic backend enroll/route.ts) ---
+  const timeToMin = (t?: string): number => {
+    if (!t) return 0;
+    const [h, m] = t.trim().split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+  };
+
+  // Khoảng giờ thực của 1 lớp: ưu tiên startTime/endTime riêng, fallback theo shiftId -> TIME_SHIFTS.
+  const classTimeRange = (cls: ClassEntity): { start: number; end: number } | null => {
+    let startTime = cls.startTime;
+    let endTime = cls.endTime;
+    if (!startTime || !endTime) {
+      const sh = shiftMap.get(cls.shiftId ?? 0) || TIME_SHIFTS.find(s => s.id === cls.shiftId);
+      if (!sh) return null;
+      startTime = sh.startTime;
+      endTime = sh.endTime;
+    }
+    return { start: timeToMin(startTime), end: timeToMin(endTime) };
+  };
+
+  // 2 khoảng giờ có trùng nhau không (xử lý ca qua đêm).
+  const rangesOverlap = (aStart: number, aEnd: number, bStart: number, bEnd: number): boolean => {
+    let aE = aEnd, bE = bEnd;
+    if (aStart > aE) aE += 1440;
+    if (bStart > bE) bE += 1440;
+    return Math.max(aStart, bStart) < Math.min(aE, bE);
+  };
+
+  // Ca mục tiêu (shiftId) có trùng giờ với lớp khác mà học sinh đã đăng ký (trên ít nhất 1 ngày chung) không.
+  const shiftConflictsWithEnrolled = (fromClass: ClassEntity, targetShiftId: number): boolean => {
+    const targetShift = shiftMap.get(targetShiftId) || TIME_SHIFTS.find(s => s.id === targetShiftId);
+    if (!targetShift) return false;
+
+    // Giờ của ca mục tiêu trên LỚP ĐỘC LẬP (cùng subject) sẽ thừa hưởng giờ ca đó.
+    const targetStart = timeToMin(targetShift.startTime);
+    const targetEnd = timeToMin(targetShift.endTime);
+    const targetDays = new Set((fromClass.scheduleDays || []));
+
+    const enrolledIds = (student?.enrolledClassIds || []);
+    for (const otherId of enrolledIds) {
+      const other = classes.find(c => c.id === otherId);
+      if (!other || other.id === fromClass.id) continue;
+
+      // Phải có ít nhất 1 ngày học chung
+      const otherDays = new Set(other.scheduleDays || []);
+      const hasCommonDay = [...targetDays].some(d => otherDays.has(d));
+      if (!hasCommonDay) continue;
+
+      const otherRange = classTimeRange(other);
+      if (!otherRange) continue;
+
+      if (rangesOverlap(targetStart, targetEnd, otherRange.start, otherRange.end)) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Ca mục tiêu có lớp cùng môn đang chạy không (điều kiện để đổi ca backend tìm thấy lớp đích).
+  const hasTargetClassForShift = (fromClass: ClassEntity, targetShiftId: number): boolean => {
+    const subject = (fromClass.subject || '').trim().toLowerCase();
+    return classes.some(c =>
+      c.id !== fromClass.id &&
+      (c.subject || '').trim().toLowerCase() === subject &&
+      Number(c.shiftId) === targetShiftId
+    );
+  };
+
   const filtered = classes.filter(c =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -336,11 +404,20 @@ export default function StudentClassesPage() {
                             <option value="">Đổi sang ca nào...</option>
                             {shifts
                               .filter(s => s.id !== (cls.shiftId ?? 1))
-                              .map(s => (
-                                <option key={s.id} value={s.id}>
-                                  {s.name} ({s.startTime} - {s.endTime})
-                                </option>
-                              ))}
+                              .map(s => {
+                                const conflicts = shiftConflictsWithEnrolled(cls, s.id);
+                                const hasTarget = hasTargetClassForShift(cls, s.id);
+                                const disabledReason = !hasTarget
+                                  ? 'Ca này không có lớp cùng môn đang mở'
+                                  : conflicts
+                                  ? 'Trùng giờ với lớp khác bạn đang học'
+                                  : '';
+                                return (
+                                  <option key={s.id} value={s.id} disabled={!!disabledReason} title={disabledReason || undefined}>
+                                    {s.name} ({s.startTime} - {s.endTime}){disabledReason ? ` — ⛔ ${disabledReason}` : ''}
+                                  </option>
+                                );
+                              })}
                           </select>
                           <button
                             onClick={() => handleChangeShift(cls.id, cls.name, cls.shiftId ?? 1)}
