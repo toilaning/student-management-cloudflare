@@ -18,13 +18,19 @@ const DAY_LABELS: Record<number, string> = {
   7: 'Thứ 7',
   8: 'Chủ Nhật',
 };
-const DAY_ORDER = [2, 3, 4, 5, 6, 7, 8];
 
-/** Từ chuỗi date YYYY-MM-DD -> số thứ trong tuần (2=T2 ... 8=CN) */
+/** Từ chuỗi date YYYY-MM-DD -> số thứ trong tuần (2=T2 ... 3=T3 ... 8=CN) */
 function dayOfWeekNumber(dateStr: string): number {
   const d = new Date(dateStr + 'T00:00:00+07:00');
   const g = d.getDay(); // 0=CN, 1=T2 .. 6=T7
   return g === 0 ? 8 : g + 1;
+}
+
+/** Format hiển thị ngày: `Thứ N - DD/MM` */
+function formatDayLabel(dateStr: string): string {
+  const day = dayOfWeekNumber(dateStr);
+  const [, m, dd] = dateStr.split('-');
+  return `${DAY_LABELS[day]} (${dd}/${m})`;
 }
 
 export default function TeacherSchedulePage() {
@@ -93,16 +99,18 @@ export default function TeacherSchedulePage() {
 
   const classMap = new Map(allClasses.map(c => [c.id, c]));
   const shiftMap = new Map(shifts.map(s => [s.id, s]));
-  const sortedShifts = [...shifts].sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
 
-  // Group slot theo (thứ, ca) để render lưới
-  const grid = new Map<string, ScheduleSlot[]>();
+  // Group slot theo NGÀY (sort ASC), trong mỗi ngày sort theo giờ bắt đầu thực tế
+  const groupedByDate = new Map<string, ScheduleSlot[]>();
   slots.forEach(slot => {
-    const day = dayOfWeekNumber(slot.date);
-    const key = `${day}-${slot.shiftId}`;
-    if (!grid.has(key)) grid.set(key, []);
-    grid.get(key)!.push(slot);
+    const key = slot.date;
+    if (!groupedByDate.has(key)) groupedByDate.set(key, []);
+    groupedByDate.get(key)!.push(slot);
   });
+  const sortedDays = [...groupedByDate.keys()].sort((a, b) => a.localeCompare(b));
+  sortedDays.forEach(day =>
+    groupedByDate.get(day)!.sort((a, b) => (a.startTime || '00:00').localeCompare(b.startTime || '00:00'))
+  );
 
   // Ca mở chưa có GV phân công
   const openClasses = allClasses.filter(c => !c.teacherId || c.teacherId === 'CHUA_PHAN_CONG' || c.teacherId === '');
@@ -163,111 +171,96 @@ export default function TeacherSchedulePage() {
                 Thầy/Cô hiện chưa có lịch dạy buổi nào trong tháng này. Vui lòng nhận các ca mở bên dưới!
               </div>
             ) : (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-x-auto">
-                <table className="w-full border-collapse min-w-[900px]">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200">
-                      <th className="p-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider border-r border-slate-200 w-36 sticky left-0 bg-slate-50">
-                        Ca học / Giờ
-                      </th>
-                      {DAY_ORDER.map(day => (
-                        <th key={day} className="p-3 text-center text-xs font-bold text-slate-700 border-r border-slate-200">
-                          <div className="text-slate-700">{DAY_LABELS[day]}</div>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedShifts.map(shift => (
-                      <tr key={shift.id} className="border-b border-slate-100">
-                        <td className="p-3 align-top bg-slate-50/60 border-r border-slate-200 sticky left-0 bg-slate-50">
-                          <div className="font-bold text-indigo-700 text-xs">Ca {shift.id}</div>
-                          <div className="text-[11px] font-mono text-slate-500 mt-0.5">
-                            {shift.startTime} - {shift.endTime}
-                          </div>
-                        </td>
-                        {DAY_ORDER.map(day => {
-                          const cellSlots = grid.get(`${day}-${shift.id}`) || [];
-                          return (
-                            <td
-                              key={day}
-                              className={`p-2 align-top border-r border-slate-100 min-h-[96px] ${
-                                cellSlots.length > 0 ? 'bg-blue-50/30' : 'bg-white'
-                              }`}
-                            >
-                              {cellSlots.length > 0 ? (
-                                <div className="space-y-2">
-                                  {cellSlots.map(slot => {
-                                    const cls = classMap.get(slot.classId);
-                                    const studentCount = cls?.studentIds?.length || 0;
-                                    const meetingLink = slot.meetingLink || cls?.meetingLink;
+              <div className="space-y-6">
+                {sortedDays.map(day => {
+                  const daySlots = groupedByDate.get(day) || [];
+                  return (
+                    <div key={day} className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-blue-600"></span>
+                        <h3 className="text-base font-bold text-slate-800">{formatDayLabel(day)}</h3>
+                        <span className="text-xs text-slate-500 font-medium">{daySlots.length} buổi</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {daySlots.map(slot => {
+                          const cls = classMap.get(slot.classId);
+                          const studentCount = cls?.studentIds?.length || 0;
+                          const meetingLink = slot.meetingLink || cls?.meetingLink;
 
-                                    return (
-                                      <div
-                                        key={slot.id}
-                                        className="bg-white rounded-lg border border-blue-200 shadow-2xs p-2.5 space-y-1.5"
-                                      >
-                                        <div className="flex items-center justify-between gap-1">
-                                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
-                                            {slot.classId}
-                                          </span>
-                                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${
-                                            slot.status === 'Đã hoàn thành'
-                                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                              : 'bg-blue-600 text-white'
-                                          }`}>
-                                            {slot.status}
-                                          </span>
-                                        </div>
-                                        <h4 className="font-bold text-slate-800 text-xs leading-snug">{slot.subject}</h4>
-                                        <div className="text-[11px] text-slate-500 space-y-0.5">
-                                          <div className="flex items-center gap-1">
-                                            <Calendar size={11} className="text-blue-500 shrink-0" />
-                                            <span>{slot.date}</span>
-                                          </div>
-                                          <div className="flex items-center gap-1">
-                                            <MapPin size={11} className="text-slate-400 shrink-0" />
-                                            <span>{slot.roomId}</span>
-                                          </div>
-                                          <div className="flex items-center gap-1">
-                                            <Users size={11} className="text-emerald-500 shrink-0" />
-                                            <span className="font-bold text-emerald-700">{studentCount} học viên</span>
-                                          </div>
-                                        </div>
-                                        {meetingLink ? (
-                                          <a
-                                            href={meetingLink}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-700 font-bold"
-                                          >
-                                            <Video size={12} /> Vào Phòng học online <ExternalLink size={10} />
-                                          </a>
-                                        ) : (
-                                          <div className="text-[10px] text-slate-400 italic">Chưa có link phòng học online</div>
-                                        )}
-                                        <div className="pt-1">
-                                          <Link
-                                            href={`/teacher/attendance?classId=${slot.classId}&slotId=${slot.id}`}
-                                            className="inline-flex items-center gap-1 py-1 px-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[11px] font-bold transition shadow-xs"
-                                          >
-                                            <CheckCircle2 size={11} /> Điểm danh
-                                          </Link>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
+                          return (
+                            <div
+                              key={slot.id}
+                              className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 space-y-2.5 hover:border-blue-200 hover:shadow-md transition"
+                            >
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                                  {slot.classId}
+                                </span>
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${
+                                  slot.status === 'Đã hoàn thành'
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                    : 'bg-blue-600 text-white'
+                                }`}>
+                                  {slot.status}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-1 w-fit">
+                                <Clock size={12} className="shrink-0" />
+                                {slot.startTime} - {slot.endTime}
+                              </div>
+
+                              <h4 className="font-bold text-slate-800 text-sm leading-snug">{slot.subject}</h4>
+
+                              <div className="text-xs text-slate-500 space-y-1">
+                                <div className="flex items-center gap-1.5">
+                                  <Calendar size={12} className="text-blue-500 shrink-0" />
+                                  <span>{slot.date}</span>
                                 </div>
+                                <div className="flex items-center gap-1.5">
+                                  <MapPin size={12} className="text-slate-400 shrink-0" />
+                                  <span>{slot.roomId}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <Users size={12} className="text-emerald-500 shrink-0" />
+                                  <span className="font-bold text-emerald-700">{studentCount} học viên</span>
+                                </div>
+                              </div>
+
+                              {meetingLink ? (
+                                <a
+                                  href={meetingLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-700 font-bold"
+                                >
+                                  <Video size={12} /> Vào Phòng học online <ExternalLink size={10} />
+                                </a>
                               ) : (
-                                <div className="text-slate-200 text-center text-[11px]">—</div>
+                                <div className="text-[10px] text-slate-400 italic">Chưa có link phòng học online</div>
                               )}
-                            </td>
+
+                              <div className="pt-1 flex items-center gap-2">
+                                <Link
+                                  href={`/teacher/attendance?classId=${slot.classId}&slotId=${slot.id}`}
+                                  className="inline-flex items-center gap-1 py-1 px-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[11px] font-bold transition shadow-xs"
+                                >
+                                  <CheckCircle2 size={11} /> Điểm danh
+                                </Link>
+                                <a
+                                  href={`/teacher/classes`}
+                                  className="inline-flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-700 font-bold"
+                                >
+                                  <BookOpen size={11} /> Xem lớp
+                                </a>
+                              </div>
+                            </div>
                           );
                         })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

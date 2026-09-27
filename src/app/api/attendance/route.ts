@@ -174,6 +174,27 @@ export async function POST(request: Request) {
 
       const saved = await repo.saveAttendanceRecord(newRecord);
 
+      // Tự động trừ 1 buổi (usedSessions) khỏi gói hoá đơn đang hoạt động của học sinh.
+      // Bọc riêng trong try/catch để không bao giờ làm fail điểm danh nếu lỗi xảy ra.
+      try {
+        const invoices = await repo.getTuitionInvoicesByStudentId(studentId);
+        const availableInvoice = (invoices || []).find(
+          (inv) =>
+            inv &&
+            typeof inv.sessionCount === 'number' &&
+            inv.sessionCount > 0 &&
+            (inv.usedSessions || 0) < inv.sessionCount
+        );
+        if (availableInvoice) {
+          availableInvoice.usedSessions = (availableInvoice.usedSessions || 0) + 1;
+          await repo.updateTuitionInvoice(availableInvoice);
+        }
+      } catch (sessionErr: any) {
+        console.warn(
+          `[attendance] Không thể trừ buổi cho học sinh ${studentId}: ${sessionErr?.message || sessionErr}`
+        );
+      }
+
       const studentObj = await repo.getStudentById(studentId);
       await repo.addAuditLog({
         userId: studentId,

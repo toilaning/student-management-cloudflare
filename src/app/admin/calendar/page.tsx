@@ -164,124 +164,88 @@ export default function AdminCalendarPage() {
           </div>
         </div>
 
-        {/* Lưới ma trận: trục ngang = Ca giờ (5 ca), trục dọc = lớp/ca dạy trong ngày */}
+        {/* Danh sách lớp học trong ngày: mỗi slot = 1 card với giờ thực tế */}
         {loading ? (
           <div className="p-12 text-center text-slate-400 text-sm">Đang tải danh sách lớp học ngày {selectedDate}...</div>
         ) : activeSlots.length > 0 ? (
           <div className="space-y-4">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-x-auto">
-              <table className="w-full border-collapse min-w-[900px]">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="p-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider border-r border-slate-200 w-48 sticky left-0 bg-slate-50">
-                      Lớp / Ca dạy
-                    </th>
-                    {sortedShifts.map(shift => (
-                      <th key={shift.id} className="p-3 text-center text-xs font-bold text-slate-700 border-r border-slate-200">
-                        <div className="font-bold text-indigo-700 text-xs">Ca {shift.id}</div>
-                        <div className="text-[11px] font-mono text-slate-500 mt-0.5 font-normal">
-                          {shift.startTime} - {shift.endTime}
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeSlots.map(slot => {
-                    const cls = classMap[slot.classId];
-                    const studentCount = (cls?.studentIds || []).length;
-                    const runtimeStatus = getSlotRuntimeStatus(slot);
-                    const teacherName = teacherMap[slot.teacherId] || slot.teacherId;
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {activeSlots.map(slot => {
+                const cls = classMap[slot.classId];
+                const studentCount = (cls?.studentIds || []).length;
+                const runtimeStatus = getSlotRuntimeStatus(slot);
+                const teacherName = teacherMap[slot.teacherId] || slot.teacherId;
 
-                    return (
-                      <tr key={slot.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                        <td className="p-3 align-top bg-slate-50/60 border-r border-slate-200 sticky left-0 bg-slate-50">
-                          <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
-                            Mã lớp: {slot.classId}
-                          </div>
-                          <div className="font-bold text-slate-800 text-sm mt-0.5 leading-snug">
-                            {cls?.name || slot.subject}
-                          </div>
-                          <div className="text-xs text-indigo-600 font-semibold mt-0.5">
-                            {slot.subject}
-                          </div>
-                        </td>
-                        {sortedShifts.map(shift => {
-                          const active = slot.shiftId === shift.id;
-                          return (
-                            <td
-                              key={shift.id}
-                              className={`p-2 align-top border-r border-slate-100 min-h-[120px] ${active ? 'bg-blue-50/30' : 'bg-white'}`}
-                            >
-                              {active ? (
-                                <div className="space-y-2">
-                                  <div className="flex items-center justify-between gap-1">
-                                    <span className="px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded text-[10px] font-bold font-mono flex items-center gap-1">
-                                      <Clock size={11} className="text-amber-600" />
-                                      {slot.startTime} - {slot.endTime}
-                                    </span>
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold border ${runtimeStatus.color}`}>
-                                      {runtimeStatus.label}
-                                    </span>
-                                  </div>
+                return (
+                  <div
+                    key={slot.id}
+                    className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 space-y-3 hover:border-indigo-200 hover:shadow-md transition"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase tracking-wider">
+                        Mã lớp: {slot.classId}
+                      </span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold border ${runtimeStatus.color}`}>
+                        {runtimeStatus.label}
+                      </span>
+                    </div>
 
-                                  <div className="space-y-1 text-[11px] text-slate-500">
-                                    <div className="flex items-center gap-1">
-                                      <UserCheck size={11} className="text-indigo-500 shrink-0" />
-                                      <span className="truncate">{teacherName} ({slot.teacherId})</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <Users size={11} className="text-emerald-500 shrink-0" />
-                                      <span className="font-bold text-indigo-600">{studentCount} học viên</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <MapPin size={11} className="text-slate-400 shrink-0" />
-                                      <span>{slot.roomId}</span>
-                                    </div>
-                                  </div>
+                    <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 w-fit">
+                      <Clock size={12} className="text-amber-600 shrink-0" />
+                      {slot.startTime} - {slot.endTime}
+                    </div>
 
-                                  {slot.meetingLink ? (
-                                    <a
-                                      href={slot.meetingLink}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="inline-flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-700 font-bold"
-                                    >
-                                      <Video size={12} /> Vào Phòng học online <ExternalLink size={10} />
-                                    </a>
-                                  ) : (
-                                    <div className="text-[10px] text-slate-400 italic">
-                                      Chưa gắn link phòng học online
-                                    </div>
-                                  )}
+                    <div>
+                      <h4 className="font-bold text-slate-800 text-sm leading-snug">{cls?.name || slot.subject}</h4>
+                      <div className="text-xs text-indigo-600 font-semibold mt-0.5">{slot.subject}</div>
+                    </div>
 
-                                  <div className="flex items-center gap-1.5 pt-1">
-                                    <button
-                                      type="button"
-                                      onClick={() => setSelectedSlotForStudents(slot)}
-                                      className="py-1 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-[11px] font-semibold transition flex items-center gap-1 cursor-pointer"
-                                    >
-                                      <Users size={11} /> Danh sách ({studentCount})
-                                    </button>
-                                    <a
-                                      href={`/admin/attendance?classId=${slot.classId}&date=${selectedDate}`}
-                                      className="py-1 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-[11px] font-bold transition shadow-xs flex items-center gap-1"
-                                    >
-                                      Điểm danh &rarr;
-                                    </a>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="text-slate-200 text-center text-[11px]">—</div>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    <div className="text-xs text-slate-500 space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <UserCheck size={12} className="text-indigo-500 shrink-0" />
+                        <span className="truncate">{teacherName} ({slot.teacherId})</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Users size={12} className="text-emerald-500 shrink-0" />
+                        <span className="font-bold text-indigo-600">{studentCount} học viên</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <MapPin size={12} className="text-slate-400 shrink-0" />
+                        <span>{slot.roomId}</span>
+                      </div>
+                    </div>
+
+                    {slot.meetingLink ? (
+                      <a
+                        href={slot.meetingLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-700 font-bold"
+                      >
+                        <Video size={12} /> Vào Phòng học online <ExternalLink size={10} />
+                      </a>
+                    ) : (
+                      <div className="text-[10px] text-slate-400 italic">Chưa gắn link phòng học online</div>
+                    )}
+
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSlotForStudents(slot)}
+                        className="py-1 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-[11px] font-semibold transition flex items-center gap-1 cursor-pointer"
+                      >
+                        <Users size={11} /> Danh sách ({studentCount})
+                      </button>
+                      <a
+                        href={`/admin/attendance?classId=${slot.classId}&date=${selectedDate}`}
+                        className="py-1 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-[11px] font-bold transition shadow-xs flex items-center gap-1"
+                      >
+                        Điểm danh &rarr;
+                      </a>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Các lớp đã hủy trong ngày nếu có */}

@@ -9,10 +9,11 @@
 BEGIN;
 
 -- ============================================================================
--- PHẦN 1. TUITION_INVOICES: bổ sung cột session_count (Số buổi)
+-- PHẦN 1. TUITION_INVOICES: bổ sung cột session_count (Số buổi) + used_sessions
 -- ============================================================================
 ALTER TABLE IF EXISTS public.tuition_invoices
-    ADD COLUMN IF NOT EXISTS session_count INTEGER DEFAULT 0;
+    ADD COLUMN IF NOT EXISTS session_count INTEGER DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS used_sessions INTEGER DEFAULT 0;
 
 -- ============================================================================
 -- PHẦN 2. STUDENTS: xóa cột Discord (nếu còn ở DB đời cũ)
@@ -58,13 +59,13 @@ SELECT column_name FROM information_schema.columns
    AND column_name ILIKE '%discord%';
 -- (kết quả: KHÔNG có dòng nào = thành công)
 
--- 6.2 Kiểm tra session_count đã có trong tuition_invoices
+-- 6.2 Kiểm tra session_count + used_sessions đã có trong tuition_invoices
 SELECT column_name, data_type, column_default
   FROM information_schema.columns
  WHERE table_schema = 'public'
    AND table_name = 'tuition_invoices'
-   AND column_name = 'session_count';
--- (kết quả: có 1 dòng session_count = thành công)
+   AND column_name IN ('session_count', 'used_sessions');
+-- (kết quả: có 2 dòng session_count + used_sessions = thành công)
 
 -- 6.3 Kiểm tra số link discord còn sót trong dữ liệu (mong đợi = 0)
 SELECT

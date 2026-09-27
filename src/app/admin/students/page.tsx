@@ -103,6 +103,28 @@ export default function AdminStudentsPage() {
   }, [page, pageSize, searchTerm]);
 
   
+  const handleRowStatusChange = async (student: Student, newStatus: Student['status']) => {
+    if (!student || !newStatus || newStatus === student.status) return;
+    try {
+      const res = await fetch(`/api/students/${student.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setStudents(prev =>
+          prev.map(s => (s.id === student.id ? { ...s, status: newStatus } : s))
+        );
+        setActionMessage(`Đã chuyển học viên ${student.name} [${student.id}] sang trạng thái "${newStatus}"!`);
+      } else {
+        alert(data.error || 'Thao tác thất bại');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Lỗi mạng');
+    }
+  };
+
   const handleQuickStatusChange = async (targetStatus: 'Tạm dừng' | 'Đã nghỉ học') => {
     if (!quickActionId.trim()) {
       alert('Vui lòng nhập Mã học viên cần thao tác');
@@ -588,6 +610,17 @@ Lưu ý: Học viên vui lòng đăng nhập và đổi mật khẩu lần đầ
                       >
                         {st.status}
                       </span>
+                      <select
+                        value={st.status}
+                        onChange={e => handleRowStatusChange(st, e.target.value as Student['status'])}
+                        title="Chuyển trạng thái học viên"
+                        className="mt-1 block w-full max-w-[130px] p-1 border border-slate-200 rounded-md text-[11px] font-semibold text-slate-700 bg-white focus:outline-indigo-600 cursor-pointer hover:border-indigo-300 transition"
+                      >
+                        <option value="Đang học">Đang học</option>
+                        <option value="Tạm dừng">Tạm dừng</option>
+                        <option value="Đã nghỉ học">Đã nghỉ học</option>
+                        <option value="Bảo lưu">Bảo lưu</option>
+                      </select>
                     </td>
                     <td className="px-3 sm:px-4 py-2.5 sm:py-3 text-right whitespace-nowrap min-w-[120px]">
                       <div className="inline-flex items-center gap-1.5 justify-end">
