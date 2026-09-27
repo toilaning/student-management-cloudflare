@@ -584,6 +584,10 @@ Lưu ý: Học viên vui lòng đăng nhập và đổi mật khẩu lần đầ
                       <div className="text-[11px] text-slate-400">{st.email}</div>
                     </td>
                     <td className="px-3 sm:px-4 py-2.5 sm:py-3 font-medium text-indigo-600">
+                      <div className="font-bold text-slate-700 whitespace-nowrap">{st.targetUniversity || '—'}</div>
+                      <div className="text-[11px] text-slate-400 whitespace-nowrap">Khối {st.examBlock?.replace('KHOI_', '') || '—'}</div>
+                    </td>
+                    <td className="px-3 sm:px-4 py-2.5 sm:py-3">
                       <div className="flex flex-wrap gap-1">
                         {(st.enrolledClassIds || []).map(cid => (
                           <span
@@ -597,6 +601,10 @@ Lưu ý: Học viên vui lòng đăng nhập và đổi mật khẩu lần đầ
                           <span className="text-slate-400 italic whitespace-nowrap">Chưa gán lớp</span>
                         )}
                       </div>
+                    </td>
+                    <td className="px-3 sm:px-4 py-2.5 sm:py-3 text-center whitespace-nowrap">
+                      <span className="font-bold text-emerald-700 text-sm">{st.remainingSessions ?? st.totalSessionsInMonth ?? '—'}</span>
+                      <span className="text-[10px] text-slate-400"> buổi</span>
                     </td>
                     <td className="px-3 sm:px-4 py-2.5 sm:py-3">
                       <span

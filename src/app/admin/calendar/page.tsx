@@ -194,24 +194,24 @@ export default function AdminCalendarPage() {
                           className="relative h-auto"
                         >
                           <div
-                            className="relative rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-blue-50 p-2.5 shadow-xs hover:shadow-md hover:border-indigo-300 transition min-h-[72px] flex flex-col justify-center"
-                            style={{ marginLeft: `${leftPct}%`, width: `${widthPct}%` }}
+                            className="relative rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-blue-50 p-3 shadow-xs hover:shadow-md hover:border-indigo-300 transition min-h-[72px] flex flex-col justify-center"
+                            style={{ marginLeft: `${leftPct}%`, width: `min(calc(100% - ${leftPct}%), 480px)`, minWidth: '340px' }}
                           >
                             <div className="flex items-center justify-between gap-2 flex-wrap">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 border border-indigo-200 uppercase tracking-wider">
                                   {slot.classId}
                                 </span>
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold border ${runtimeStatus.color}`}>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold border whitespace-nowrap ${runtimeStatus.color}`}>
                                   {runtimeStatus.label}
                                 </span>
                                 {isOvernight && (
-                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 whitespace-nowrap">
                                     qua đêm
                                   </span>
                                 )}
                               </div>
-                              <span className="text-[11px] font-mono font-bold text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-2 py-0.5 flex items-center gap-1">
+                              <span className="text-[11px] font-mono font-bold text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-2 py-0.5 flex items-center gap-1 whitespace-nowrap shrink-0">
                                 <Clock size={11} className="text-amber-600" />
                                 {slot.startTime} - {slot.endTime}
                               </span>
@@ -219,13 +219,13 @@ export default function AdminCalendarPage() {
 
                             <div className="mt-1 flex items-center justify-between gap-2 flex-wrap">
                               <div className="min-w-0">
-                                <h4 className="font-bold text-slate-800 text-sm leading-snug truncate">{cls?.name || slot.subject}</h4>
+                                <h4 className="font-bold text-slate-800 text-sm leading-snug">{cls?.name || slot.subject}</h4>
                                 <div className="text-[11px] text-indigo-600 font-semibold">{slot.subject}</div>
                               </div>
                               <div className="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap shrink-0">
-                                <span className="flex items-center gap-1"><UserCheck size={11} className="text-indigo-500" />{teacherName}</span>
-                                <span className="flex items-center gap-1"><MapPin size={11} className="text-slate-400" />{slot.roomId}</span>
-                                <span className="flex items-center gap-1 font-bold text-indigo-600"><Users size={11} className="text-emerald-500" />{studentCount} HS</span>
+                                <span className="flex items-center gap-1 whitespace-nowrap"><UserCheck size={11} className="text-indigo-500" />{teacherName}</span>
+                                <span className="flex items-center gap-1 whitespace-nowrap"><MapPin size={11} className="text-slate-400" />{slot.roomId}</span>
+                                <span className="flex items-center gap-1 font-bold text-indigo-600 whitespace-nowrap"><Users size={11} className="text-emerald-500" />{studentCount} HS</span>
                               </div>
                             </div>
 
@@ -235,12 +235,12 @@ export default function AdminCalendarPage() {
                                   href={slot.meetingLink}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="inline-flex items-center gap-0.5 text-[11px] text-emerald-600 hover:text-emerald-700 font-bold"
+                                  className="inline-flex items-center gap-0.5 text-[11px] text-emerald-600 hover:text-emerald-700 font-bold whitespace-nowrap"
                                 >
                                   <Video size={11} /> Phòng online <ExternalLink size={9} />
                                 </a>
                               ) : (
-                                <span className="text-[10px] text-slate-400 italic">Chưa gắn link phòng online</span>
+                                <span className="text-[10px] text-slate-400 italic whitespace-nowrap">Chưa gắn link phòng online</span>
                               )}
 
                               <span className="flex-1" />
@@ -249,13 +249,13 @@ export default function AdminCalendarPage() {
                                 <button
                                   type="button"
                                   onClick={() => setSelectedSlotForStudents(slot)}
-                                  className="py-1 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-[11px] font-semibold transition flex items-center gap-1 cursor-pointer"
+                                  className="py-1 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-[11px] font-semibold transition flex items-center gap-1 cursor-pointer whitespace-nowrap"
                                 >
                                   <Users size={11} /> Danh sách HS ({studentCount})
                                 </button>
                                 <a
                                   href={`/admin/attendance?classId=${slot.classId}&date=${selectedDate}`}
-                                  className="py-1 px-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-[11px] font-bold transition shadow-xs flex items-center gap-1"
+                                  className="py-1 px-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-[11px] font-bold transition shadow-xs flex items-center gap-1 whitespace-nowrap"
                                 >
                                   Điểm danh &rarr;
                                 </a>

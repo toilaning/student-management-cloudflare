@@ -240,8 +240,8 @@ export default function TeacherSchedulePage() {
                         return (
                           <div key={slot.id} className="relative">
                             <div
-                              className="relative rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-2.5 shadow-xs hover:shadow-md hover:border-blue-300 transition min-h-[72px] flex flex-col justify-center"
-                              style={{ marginLeft: `${leftPct}%`, width: `${widthPct}%` }}
+                              className="relative rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-3 shadow-xs hover:shadow-md hover:border-blue-300 transition min-h-[72px] flex flex-col justify-center"
+                              style={{ marginLeft: `${leftPct}%`, width: `min(calc(100% - ${leftPct}%), 480px)`, minWidth: '340px' }}
                             >
                               <div className="flex items-center justify-between gap-2 flex-wrap">
                                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -256,12 +256,12 @@ export default function TeacherSchedulePage() {
                                     {slot.status}
                                   </span>
                                   {isOvernight && (
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 whitespace-nowrap">
                                       qua đêm
                                     </span>
                                   )}
                                 </div>
-                                <span className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-0.5 w-fit">
+                                <span className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-0.5 w-fit whitespace-nowrap shrink-0">
                                   <Clock size={11} className="shrink-0" />
                                   {slot.startTime} - {slot.endTime}
                                 </span>
@@ -270,8 +270,8 @@ export default function TeacherSchedulePage() {
                               <div className="mt-1 flex items-center justify-between gap-2 flex-wrap">
                                 <h4 className="font-bold text-slate-800 text-sm leading-snug">{slot.subject}</h4>
                                 <div className="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap shrink-0">
-                                  <span className="flex items-center gap-1"><MapPin size={11} className="text-slate-400" />{slot.roomId}</span>
-                                  <span className="flex items-center gap-1 font-bold text-emerald-700"><Users size={11} className="text-emerald-500" />{studentCount} học viên</span>
+                                  <span className="flex items-center gap-1 whitespace-nowrap"><MapPin size={11} className="text-slate-400" />{slot.roomId}</span>
+                                  <span className="flex items-center gap-1 font-bold text-emerald-700 whitespace-nowrap"><Users size={11} className="text-emerald-500" />{studentCount} học viên</span>
                                 </div>
                               </div>
 
