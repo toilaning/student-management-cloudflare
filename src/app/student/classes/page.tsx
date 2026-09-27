@@ -18,6 +18,8 @@ export default function StudentClassesPage() {
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  // Map classId -> ca mới mà HS muốn đổi sang (shift id)
+  const [targetShiftByClass, setTargetShiftByClass] = useState<Record<string, number>>({});
 
   const loadData = async () => {
     if (!isReady || !currentUser?.id) return;
@@ -76,9 +78,14 @@ export default function StudentClassesPage() {
     }
   };
 
-  // Đổi ca khác (Hủy ca hiện tại để chọn ca mới)
-  const handleChangeShift = async (classId: string, className: string) => {
-    if (!confirm(`Bạn có chắc muốn hủy đăng ký ca học lớp "${className}" để chọn sang ca học khác?`)) {
+  // Đổi ca TRỰC TIẾP: chuyển HS sang lớp cùng môn ở ca mới (KHÔNG tạo request chờ duyệt, KHÔNG chặn sĩ số)
+  const handleChangeShift = async (classId: string, className: string, currentShiftId: number) => {
+    const targetShiftId = targetShiftByClass[classId];
+    if (!targetShiftId) {
+      alert('Vui lòng chọn ca học mới muốn chuyển sang.');
+      return;
+    }
+    if (!confirm(`Bạn có chắc muốn đổi ca của lớp "${className}" sang ${shiftMap.get(targetShiftId)?.name || `Ca ${targetShiftId}`}?`)) {
       return;
     }
     setActionLoadingId(classId);
@@ -89,17 +96,19 @@ export default function StudentClassesPage() {
         body: JSON.stringify({
           classId,
           studentId: currentUser?.id || '',
-          action: 'UNENROLL',
+          action: 'CHANGE_SHIFT',
+          targetShiftId,
           actorId: currentUser?.id || '',
         }),
       });
       const data = await res.json();
       if (res.ok) {
-        setActionMessage(`Đã hủy ca học lớp "${className}". Bạn có thể chọn ca học mới!`);
+        setActionMessage(data.message || 'Đổi ca thành công!');
+        setTargetShiftByClass(prev => ({ ...prev, [classId]: undefined as any }));
         await loadData();
         setTimeout(() => setActionMessage(null), 3500);
       } else {
-        alert(data.error || 'Thao tác thất bại');
+        alert(data.error || 'Đổi ca thất bại');
       }
     } catch (e: any) {
       alert(e.message || 'Lỗi mạng');
@@ -238,7 +247,7 @@ export default function StudentClassesPage() {
                       {badgeStatus}
                     </div>
 
-                    {/* Chi tiết Box: Thứ/Ngày, Ca học, Khung giờ, Phòng/Discord, Giảng viên, Sĩ số */}
+                    {/* Chi tiết Box: Thứ/Ngày, Ca học, Khung giờ, Phòng, Giảng viên, Sĩ số */}
                     <div className="bg-white rounded-xl p-3.5 border border-slate-100 shadow-2xs space-y-2 text-xs">
                       {/* Thứ/Ngày */}
                       <div className="flex items-center justify-between">
@@ -258,10 +267,10 @@ export default function StudentClassesPage() {
                         </span>
                       </div>
 
-                      {/* Phòng học / Discord */}
+                      {/* Phòng học */}
                       <div className="flex items-center justify-between">
                         <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-                          <MapPin size={13} className="text-rose-400" /> Phòng / Discord:
+                          <MapPin size={13} className="text-rose-400" /> Phòng học:
                         </span>
                         <div className="flex items-center gap-1.5">
                           <span className="font-semibold text-slate-700">{cls.roomId}</span>
@@ -271,9 +280,9 @@ export default function StudentClassesPage() {
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 text-[11px] font-bold underline"
-                              title="Mở phòng Discord"
+                              title="Vào phòng học online"
                             >
-                              <Video size={12} /> Discord
+                              <Video size={12} /> Vào học
                             </a>
                           )}
                         </div>
@@ -302,22 +311,46 @@ export default function StudentClassesPage() {
                   {/* Nút hành động theo đúng quy định */}
                   <div className="pt-4 border-t border-slate-100 mt-4">
                     {isEnrolled ? (
-                      /* 🟦 Ca bạn đang học: Nút 'Đã đăng ký' / 'Đổi ca khác' */
-                      <div className="flex items-center gap-2">
-                        <button
-                          disabled
-                          className="flex-1 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold border border-blue-200 flex items-center justify-center gap-1.5 cursor-default"
-                        >
-                          <Check size={14} /> Đã đăng ký
-                        </button>
-                        <button
-                          onClick={() => handleChangeShift(cls.id, cls.name)}
-                          disabled={actionLoadingId === cls.id}
-                          className="px-3 py-2.5 bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer whitespace-nowrap"
-                          title="Hủy ca này để đăng ký ca khác"
-                        >
-                          <RefreshCw size={12} className={actionLoadingId === cls.id ? 'animate-spin' : ''} /> Đổi ca khác
-                        </button>
+                      /* 🟦 Ca bạn đang học: hiện ca hiện tại + chọn ca mới để đổi trực tiếp */
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            disabled
+                            className="flex-1 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold border border-blue-200 flex items-center justify-center gap-1.5 cursor-default"
+                          >
+                            <Check size={14} /> Ca đang chọn: {shiftName}
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={targetShiftByClass[cls.id] || ''}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setTargetShiftByClass(prev => ({
+                                ...prev,
+                                [cls.id]: val ? Number(val) : (undefined as any),
+                              }));
+                            }}
+                            className="flex-1 border border-slate-200 rounded-xl px-2.5 py-2.5 text-xs text-slate-700 bg-white focus:outline-blue-600"
+                          >
+                            <option value="">Đổi sang ca nào...</option>
+                            {shifts
+                              .filter(s => s.id !== (cls.shiftId ?? 1))
+                              .map(s => (
+                                <option key={s.id} value={s.id}>
+                                  {s.name} ({s.startTime} - {s.endTime})
+                                </option>
+                              ))}
+                          </select>
+                          <button
+                            onClick={() => handleChangeShift(cls.id, cls.name, cls.shiftId ?? 1)}
+                            disabled={actionLoadingId === cls.id || !targetShiftByClass[cls.id]}
+                            className="px-3 py-2.5 bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer whitespace-nowrap disabled:opacity-50"
+                            title="Đổi ca trực tiếp (không cần duyệt)"
+                          >
+                            <RefreshCw size={12} className={actionLoadingId === cls.id ? 'animate-spin' : ''} /> Đổi ca
+                          </button>
+                        </div>
                       </div>
                     ) : isFull ? (
                       /* ⬛ Đã đủ chỗ: Nhãn 'Hết chỗ' */

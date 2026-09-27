@@ -196,7 +196,7 @@ export function generateSeedData() {
       roomId: room.id,
       studentIds: classStudentIds,
       tuitionFee: mon.fee,
-      meetingLink: `https://discord.com/channels/edu-center/room-${classId.toLowerCase()}`,
+      meetingLink: `https://meet.google.com/room-${classId.toLowerCase()}`,
       scheduleDays: days,
       shiftId,
       status: 'Đang mở',
@@ -302,16 +302,13 @@ export function generateSeedData() {
     const cls = classes.find(c => c.id === clsId) || classes[0];
     const relatedSlot = scheduleSlots.find(s => s.classId === clsId && s.date > '2026-09-15') || scheduleSlots[0];
 
-    const isLeave = i % 2 === 0;
     classRequests.push({
       id: `REQ${i.toString().padStart(3, '0')}`,
       studentId: st.id,
       classId: clsId,
       scheduleSlotId: relatedSlot.id,
-      type: isLeave ? 'XIN_NGHI' : 'DOI_LICH',
-      reason: isLeave 
-        ? 'Em bị sốt và cần đi khám bệnh tại bệnh viện, xin phép thầy cô cho em nghỉ buổi học này.' 
-        : 'Trùng lịch thi kết thúc học phần trên trường đại học, kính mong được đổi sang ca tiếp theo.',
+      type: 'XIN_NGHI',
+      reason: 'Em bị sốt và cần đi khám bệnh tại bệnh viện, xin phép thầy cô cho em nghỉ buổi học này.',
       status: i <= 10 ? 'ĐÃ_DUYỆT' : (i <= 18 ? 'CHỜ_DUYỆT' : 'TỪ_CHỐI'),
       reviewedBy: cls.teacherId,
       reviewNote: i <= 10 ? 'Đồng ý cho nghỉ. Em nhớ xem lại bài giảng và ghi chép đầy đủ nhé.' : (i > 18 ? 'Không đủ điều kiện đổi lịch do lớp đã hết chỗ ngồi.' : undefined),

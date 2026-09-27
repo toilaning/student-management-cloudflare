@@ -143,10 +143,10 @@ export default function TeacherDashboardPage() {
                           target="_blank"
                           rel="noreferrer"
                           className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded font-medium transition text-[11px] inline-flex items-center gap-1"
-                          title="Vào phòng học Discord"
+                          title="Vào phòng học online"
                         >
                           <Headphones size={12} />
-                          <span>Vào phòng học Discord</span>
+                          <span>Vào phòng học online</span>
                         </a>
                       ) : null}
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${

@@ -10,8 +10,6 @@ export interface StudentAttendanceDetail {
   id: string;
   name: string;
   phone?: string;
-  discordId?: string;
-  discordUsername?: string;
   checkinTime?: string;
   method?: string;
   note?: string;
@@ -109,8 +107,6 @@ export async function GET(request: Request) {
         id: stId,
         name: studentName,
         phone: stObj?.phone,
-        discordId: stObj?.discordId,
-        discordUsername: stObj?.discordUsername,
         checkinTime: rec?.checkinTime,
         method: rec?.method,
         note: rec?.note,

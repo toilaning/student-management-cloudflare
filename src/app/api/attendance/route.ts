@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { repo } from '@/repositories';
-import { AttendanceRecord } from '@/types/attendance';
+import { AttendanceRecord, AttendanceStatus } from '@/types/attendance';
+import { getTodayDateStr, getNowTimeStr, timeToMinutes } from '@/utils/date';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,6 +78,116 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+
+    // 1. Action: STUDENT_CHECKIN - Điểm danh nhanh phía học sinh (Self check-in)
+    if (body.action === 'STUDENT_CHECKIN') {
+      const { studentId, scheduleSlotId } = body;
+      if (!studentId || !scheduleSlotId) {
+        return NextResponse.json(
+          { success: false, error: 'Thiếu thông tin studentId hoặc scheduleSlotId' },
+          { status: 400 }
+        );
+      }
+
+      // Slot tồn tại
+      const slot = await repo.getScheduleSlotById(scheduleSlotId);
+      if (!slot) {
+        return NextResponse.json(
+          { success: false, error: 'Ca học không tồn tại' },
+          { status: 400 }
+        );
+      }
+
+      // Kiểm tra HS có trong lớp của slot không
+      const cls = await repo.getClassById(slot.classId);
+      const isEnrolled = cls?.studentIds?.includes(studentId);
+      if (!isEnrolled) {
+        return NextResponse.json(
+          { success: false, error: 'Học sinh không thuộc danh sách lớp học của ca này' },
+          { status: 403 }
+        );
+      }
+
+      // So sánh ngày và giờ theo múi giờ Asia/Saigon
+      const todayStr = getTodayDateStr();
+      const nowTimeStr = getNowTimeStr();
+
+      if (slot.date !== todayStr) {
+        return NextResponse.json(
+          { success: false, error: `Ca học diễn ra vào ngày ${slot.date}, hôm nay là ${todayStr}` },
+          { status: 400 }
+        );
+      }
+
+      const nowMins = timeToMinutes(nowTimeStr);
+      const startMins = timeToMinutes(slot.startTime);
+      const endMins = timeToMinutes(slot.endTime);
+
+      // Ca qua nửa đêm (vd 22:00 -> 01:00): hợp lệ khi nowMins >= startMins HOẶC nowMins <= endMins.
+      const isOvernight = startMins > endMins;
+      const inShiftWindow = isOvernight
+        ? (nowMins >= startMins || nowMins <= endMins)
+        : (nowMins >= startMins && nowMins <= endMins);
+
+      if (!inShiftWindow) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Chỉ được điểm danh khi ca học đang diễn ra (${slot.startTime} - ${slot.endTime}). Hiện tại là ${nowTimeStr}`,
+          },
+          { status: 400 }
+        );
+      }
+
+      // Kiểm tra nếu đã có record cho (studentId, scheduleSlotId)
+      const existingRecords = await repo.getAttendanceBySlotId(scheduleSlotId);
+      const existing = existingRecords.find(r => r.studentId === studentId);
+      if (existing) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Bạn đã được điểm danh trong ca học này rồi, không thể tự điểm danh lại',
+            record: existing,
+          },
+          { status: 409 }
+        );
+      }
+
+      // Tính status theo mốc 30 phút:
+      // Trong 30 phút đầu ca (từ startTime đến startTime + 30') -> 'Có mặt'
+      // Sau 30 phút nhưng vẫn trong ca (đến endTime) -> 'Đi muộn'
+      const status: AttendanceStatus = (nowMins <= startMins + 30) ? 'Có mặt' : 'Đi muộn';
+
+      const newRecord: AttendanceRecord = {
+        id: `ATT_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        scheduleSlotId: slot.id,
+        classId: slot.classId,
+        studentId: studentId,
+        date: slot.date,
+        status: status,
+        checkinTime: nowTimeStr,
+        method: 'STUDENT_QUICK',
+        note: `Học sinh tự điểm danh nhanh lúc ${nowTimeStr} (${status})`,
+        updatedBy: studentId,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const saved = await repo.saveAttendanceRecord(newRecord);
+
+      const studentObj = await repo.getStudentById(studentId);
+      await repo.addAuditLog({
+        userId: studentId,
+        userName: studentObj?.name || `Học sinh ${studentId}`,
+        userRole: 'STUDENT',
+        action: 'ATTENDANCE_CHECK',
+        targetResource: 'ATTENDANCE',
+        targetId: saved.scheduleSlotId || saved.id,
+        details: `Học sinh ${studentObj?.name || studentId} tự điểm danh nhanh: ${status} lúc ${nowTimeStr}`,
+      });
+
+      return NextResponse.json({ success: true, record: saved });
+    }
+
     const updatedBy = body.updatedBy || 'ADMIN001';
     const updaterName = body.updaterName || 'Quản trị viên';
     const userRole = updatedBy.startsWith('ADMIN') ? 'ADMIN' : (body.userRole || 'ADMIN');

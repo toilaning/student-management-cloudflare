@@ -35,7 +35,7 @@ export async function PATCH(
     const studentId = params.id;
     const body = await request.json();
     const {
-      discordId, discordUsername, actorId, actorRole, phone, email, address, name,
+      actorId, actorRole, phone, email, address, name,
       status, homeTown, gradeLevel, targetUniversity, customUniversity, examBlock,
       studyGoal, facebookUrl, otherNotes, registeredDate, parentPhone,
       remainingSessions, totalSessionsInMonth, attendedSessionsInMonth, absentSessionsInMonth
@@ -47,16 +47,6 @@ export async function PATCH(
     }
 
     const studentService = new StudentService(repo);
-
-    // Cập nhật Discord ID / Discord Username
-    if (discordId !== undefined || discordUsername !== undefined) {
-      await studentService.updateDiscordInfo(studentId, {
-        discordId,
-        discordUsername,
-        actorId,
-        actorRole,
-      });
-    }
 
     // Cập nhật các trường thông tin cơ bản khác nếu có gửi kèm
     let needUpdate = false;

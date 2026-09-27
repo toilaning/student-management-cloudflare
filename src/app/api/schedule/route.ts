@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const date = searchParams.get('date');
 
   let slots = await repo.getAllScheduleSlots();
-  // Enrich normalized schedule rows with class-owned subject and Discord Room URL.
+  // Enrich normalized schedule rows with class-owned subject and meeting link.
   const allClasses = await repo.getAllClasses();
   const classMap = new Map(allClasses.map(cls => [cls.id, cls]));
   slots = slots.map(slot => {

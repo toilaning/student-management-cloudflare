@@ -160,7 +160,6 @@ export async function POST(request: Request) {
         sessionCount,
         title,
         originalAmount,
-        discountAmount = 0,
         finalAmount,
         amount,
         dueDate,
@@ -169,7 +168,7 @@ export async function POST(request: Request) {
 
       const calcAmount = finalAmount !== undefined 
         ? Number(finalAmount) 
-        : (originalAmount !== undefined ? (Number(originalAmount) - Number(discountAmount || 0)) : Number(amount));
+        : (originalAmount !== undefined ? Number(originalAmount) : Number(amount));
 
       const effectiveClassId = classId || 'CHUNG';
       const now = new Date();

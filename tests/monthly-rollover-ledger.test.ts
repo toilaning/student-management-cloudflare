@@ -60,19 +60,16 @@ describe('Phase 2 Core Logic Suite: Monthly Rollover, Dropout & Ledger', () => {
       name: 'Nguyễn Văn Nghỉ Học',
       phone: '0912334455',
       status: 'Đang học',
+      enrolledClassIds: [],
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
     });
     await repo.createUser({
       id: 'USR_DROPOUT_TEST',
       username: studentId,
       passwordHash: 'hash123',
       role: 'STUDENT',
-      studentId: studentId,
       name: 'Nguyễn Văn Nghỉ Học',
       isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
     });
     const st = { student: { id: studentId, name: 'Nguyễn Văn Nghỉ Học' } };
 
@@ -102,7 +99,7 @@ describe('Phase 2 Core Logic Suite: Monthly Rollover, Dropout & Ledger', () => {
 
     // Kiểm tra tài khoản user bị khóa
     const allUsers = await repo.getAllUsers();
-    const user = allUsers.find(u => u.studentId === st.student.id);
+    const user = allUsers.find(u => u.username === st.student.id || u.id === st.student.id);
     assert.equal(user?.isActive, false, 'User isActive phải bằng false');
   });
 

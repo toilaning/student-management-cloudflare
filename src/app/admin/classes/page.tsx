@@ -252,7 +252,7 @@ export default function AdminClassesPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setActionMessage(data.message || 'Đã cập nhật Link Phòng Discord thành công!');
+        setActionMessage(data.message || 'Đã cập nhật Link Phòng học online thành công!');
         setClasses(prev => prev.map(c => c.id === editingMeetClass.id ? { ...c, meetingLink: meetLinkInput } : c));
         setEditingMeetClass(null);
       } else {
@@ -463,7 +463,7 @@ export default function AdminClassesPage() {
                             onClick={(e) => e.stopPropagation()}
                           className="font-bold text-emerald-600 hover:text-emerald-700 underline text-xs inline-flex items-center gap-1 whitespace-nowrap truncate max-w-[150px]"
                           >
-                            Phòng học Discord <ExternalLink size={11} className="shrink-0" />
+                            Phòng học online <ExternalLink size={11} className="shrink-0" />
                           </a>
                         ) : (
                           <span className="text-slate-400 italic text-[11px]">Chưa gắn link</span>
@@ -471,9 +471,9 @@ export default function AdminClassesPage() {
                         <button
                           onClick={() => {
                             setEditingMeetClass(cls);
-                            setMeetLinkInput(cls.meetingLink || `https://discord.com/channels/edu-center/room-${cls.id.toLowerCase()}`);
+                            setMeetLinkInput(cls.meetingLink || `https://meet.google.com/${cls.id.toLowerCase()}`);
                           }}
-                          title="Đổi link Phòng học Discord"
+                          title="Đổi link Phòng học online"
                           className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded ml-1"
                         >
                           <Edit3 size={12} />
@@ -690,10 +690,10 @@ export default function AdminClassesPage() {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Link phòng Discord / Phòng Online</label>
+                <label className="block font-bold text-slate-700 mb-1">Link phòng học online / Phòng Online</label>
                 <input
                   type="url"
-                  placeholder="https://discord.com/channels/edu-center/room-..."
+                  placeholder="https://meet.google.com/..."
                   value={newClassFormData.meetingLink}
                   onChange={e => setNewClassFormData({ ...newClassFormData, meetingLink: e.target.value })}
                   className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs font-mono"
@@ -762,7 +762,7 @@ export default function AdminClassesPage() {
         </div>
       )}
 
-      {/* Modal Sửa Link Phòng học Discord / Room Link */}
+      {/* Modal Sửa Link Phòng học online / Room Link */}
       {editingMeetClass && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
@@ -772,7 +772,7 @@ export default function AdminClassesPage() {
                   <Video size={18} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-800 text-base">Cấu hình Link Phòng học Discord</h3>
+                  <h3 className="font-bold text-slate-800 text-base">Cấu hình Link Phòng học online</h3>
                   <p className="text-xs text-slate-500">Lớp: <strong className="text-slate-800">{editingMeetClass.name}</strong> ({editingMeetClass.id})</p>
                 </div>
               </div>
@@ -786,11 +786,11 @@ export default function AdminClassesPage() {
 
             <form onSubmit={handleSaveMeetLink} className="p-5 space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 mb-1.5">Link phòng học Phòng học Discord *</label>
+                <label className="block font-bold text-slate-700 mb-1.5">Link phòng học online *</label>
                 <input
                   type="url"
                   required
-                  placeholder="https://discord.com/channels/edu-center/room-..."
+                  placeholder="https://meet.google.com/..."
                   value={meetLinkInput}
                   onChange={e => setMeetLinkInput(e.target.value)}
                   className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-emerald-600 text-xs font-mono"
@@ -798,7 +798,7 @@ export default function AdminClassesPage() {
               </div>
 
               <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-[11px] leading-relaxed">
-                💡 Toàn bộ lớp học là 100% Online. Link Phòng học Discord này sẽ được cập nhật tự động đến thời khóa biểu của Giảng viên và Học viên trong lớp.
+                💡 Toàn bộ lớp học là 100% Online. Link phòng học online này sẽ được cập nhật tự động đến thời khóa biểu của Giảng viên và Học viên trong lớp.
               </div>
 
               <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
@@ -813,7 +813,7 @@ export default function AdminClassesPage() {
                   type="submit"
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-xs cursor-pointer"
                 >
-                  Cập nhật Link Phòng Discord
+                  Cập nhật Link Phòng học online
                 </button>
               </div>
             </form>

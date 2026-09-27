@@ -71,9 +71,7 @@ export async function GET(request: Request) {
       s.id.toLowerCase().includes(search) ||
       s.name.toLowerCase().includes(search) ||
       (s.phone && s.phone.includes(search)) ||
-      (s.email && s.email.toLowerCase().includes(search)) ||
-      (s.discordId && s.discordId.includes(search)) ||
-      (s.discordUsername && s.discordUsername.toLowerCase().includes(search))
+      (s.email && s.email.toLowerCase().includes(search))
     );
   }
 
@@ -94,8 +92,6 @@ export async function POST(request: Request) {
     const {
       name,
       phone,
-      discordId,
-      discordUsername,
       dateOfBirth,
       gender = 'Nam',
       email,
@@ -127,8 +123,6 @@ export async function POST(request: Request) {
     const result = await studentService.createStudentFastOnboarding({
       name: name.trim(),
       phone: phone || '',
-      discordId,
-      discordUsername,
       actorId,
       actorName,
     });

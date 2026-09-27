@@ -86,26 +86,24 @@ CREATE TABLE teachers (
 );
 CREATE INDEX idx_teachers_status ON teachers(status);
 
--- BẢNG 4: STUDENTS (Học viên - SĐT phụ huynh, link bài tập, Snowflake Discord, trạng thái nghỉ học)
+-- BẢNG 4: STUDENTS (Học viên - SĐT phụ huynh, link bài tập, trạng thái nghỉ học)
 CREATE TABLE students (
     id VARCHAR(50) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     email CITEXT,
-    phone VARCHAR(50) NOT NULL,
+    phone VARCHAR(50),
     parent_phone VARCHAR(50),
-    assignment_url TEXT, -- Link tổng hợp bài làm (Drive / Notion / GitHub / Figma...)
-    discord_id VARCHAR(50), -- Snowflake ID
-    discord_username VARCHAR(100),
+    email CITEXT,
+    status VARCHAR(50) NOT NULL DEFAULT 'Đang học' CHECK (status IN ('Đang học', 'Tạm dừng', 'Đã nghỉ học', 'Bảo lưu', 'Đã tốt nghiệp')),
     date_of_birth DATE,
     gender VARCHAR(10) DEFAULT 'Nam' CHECK (gender IN ('Nam', 'Nữ')),
+    assignment_url TEXT, -- Link tổng hợp bài làm (Drive / Notion / GitHub / Figma...)
     address TEXT,
-    status VARCHAR(50) NOT NULL DEFAULT 'Đang học' CHECK (status IN ('Đang học', 'Tạm dừng', 'Đã nghỉ học', 'Bảo lưu', 'Đã tốt nghiệp')),
     avatar_url TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX idx_students_status ON students(status);
-CREATE INDEX idx_students_discord ON students(discord_id);
 
 -- BẢNG 5: CLASSES (Lớp học)
 CREATE TABLE classes (

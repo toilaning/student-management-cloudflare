@@ -7,7 +7,7 @@ import { ScheduleSlot } from '../src/types/schedule';
 
 describe('Custom Schedule Hours & Daily View Suite: Giai đoạn 1 & 2', () => {
   test('1. ClassEntity hỗ trợ startTime, endTime, scheduleDays (có CN: 8) và isRecurring', async () => {
-    const repo = new LocalRepository();
+    const repo = LocalRepository.getInstance();
     const testClass: ClassEntity = {
       id: 'CLS99',
       code: 'PYTH99',
@@ -32,7 +32,7 @@ describe('Custom Schedule Hours & Daily View Suite: Giai đoạn 1 & 2', () => {
   });
 
   test('2. BulkScheduleService sinh đúng ScheduleSlot với custom startTime và endTime của lớp', async () => {
-    const repo = new LocalRepository();
+    const repo = LocalRepository.getInstance();
     const testClass: ClassEntity = {
       id: 'CLS88',
       code: 'ENG88',
@@ -68,7 +68,7 @@ describe('Custom Schedule Hours & Daily View Suite: Giai đoạn 1 & 2', () => {
   });
 
   test('3. PUT /api/classes cập nhật đồng bộ slot tương lai (date >= today)', async () => {
-    const repo = new LocalRepository();
+    const repo = LocalRepository.getInstance();
     const todayStr = new Date().toISOString().split('T')[0];
     const testClass: ClassEntity = {
       id: 'CLS77',

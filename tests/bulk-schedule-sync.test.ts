@@ -22,7 +22,7 @@ test('Bulk Schedule Generation & 2-Way Sync Suite', async (t) => {
       tuitionFee: 2000000,
       scheduleDays: [2, 4, 6], // Thứ 2, 4, 6
       shiftId: 1,
-      meetingLink: 'https://discord.gg/test-room',
+      meetingLink: 'https://meet.google.com/test-room',
       status: 'Đang mở' as const,
       createdAt: new Date().toISOString(),
     };
@@ -256,7 +256,6 @@ test('Bulk Schedule Generation & 2-Way Sync Suite', async (t) => {
       scheduleDays: [2, 4],
       shiftId: 1,
       status: 'Đang mở' as const,
-      createdAt: new Date().toISOString(),
     });
 
     // Tạo 1 ca tương lai

@@ -18,7 +18,6 @@ describe('Account & Profile 2-Way Synchronization Suite', () => {
       name: 'Tên Ban Đầu Học Sinh',
       email: 'initial_st@school.edu.vn',
       isActive: true,
-      createdAt: new Date().toISOString()
     });
 
     await repo.createStudent({
@@ -67,7 +66,6 @@ describe('Account & Profile 2-Way Synchronization Suite', () => {
       name: 'Thầy Cũ',
       email: 'old_teacher@school.edu.vn',
       isActive: true,
-      createdAt: new Date().toISOString()
     });
 
     await repo.createTeacher({
@@ -114,7 +112,6 @@ describe('Account & Profile 2-Way Synchronization Suite', () => {
       name: 'Thầy Gốc',
       email: 'goc@school.edu.vn',
       isActive: true,
-      createdAt: new Date().toISOString()
     });
 
     await repo.createTeacher({
@@ -161,7 +158,6 @@ describe('Account & Profile 2-Way Synchronization Suite', () => {
       name: 'Em Gốc',
       email: 'em_goc@school.edu.vn',
       isActive: true,
-      createdAt: new Date().toISOString()
     });
 
     await repo.createStudent({

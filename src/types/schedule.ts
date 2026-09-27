@@ -26,7 +26,7 @@ export interface ScheduleSlot {
   endTime: string;   // "10:00"
   subject: string;
   topic?: string;
-  meetingLink?: string; // Link phòng học Discord / Room Link
+  meetingLink?: string; // Link phòng học online (Google Meet, Zoom...)
   status: 'Đã lên lịch' | 'Đã hoàn thành' | 'Đã hủy' | 'Đổi lịch';
 }
 
@@ -36,7 +36,7 @@ export interface ScheduleConflict {
   conflictingSlot: ScheduleSlot;
 }
 
-export type RequestType = 'XIN_NGHI' | 'DOI_LICH';
+export type RequestType = 'XIN_NGHI';
 export type RequestStatus = 'CHỜ_DUYỆT' | 'ĐÃ_DUYỆT' | 'TỪ_CHỐI';
 
 export interface ClassRequest {

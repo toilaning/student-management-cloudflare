@@ -12,8 +12,6 @@ interface StudentAttendanceDetail {
   id: string;
   name: string;
   phone?: string;
-  discordId?: string;
-  discordUsername?: string;
   checkinTime?: string;
   method?: string;
   note?: string;
@@ -399,9 +397,6 @@ export function LiveSessionTracker({
                     <div className="font-bold text-slate-800 truncate">{st.name}</div>
                     <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
                       <span className="font-mono text-indigo-600 font-semibold">{st.id}</span>
-                      {st.discordUsername && (
-                        <span>• Discord: @{st.discordUsername}</span>
-                      )}
                     </div>
                     {st.checkinTime && (
                       <div className="text-[10px] text-emerald-600 mt-0.5 font-medium">

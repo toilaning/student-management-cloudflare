@@ -50,7 +50,7 @@ export default function AdminTuitionPage() {
   const [studentId, setStudentId] = useState('');
   const [title, setTitle] = useState('');
   const [originalAmount, setOriginalAmount] = useState('');
-  const [discountAmount, setDiscountAmount] = useState(0);
+  const [sessionCount, setSessionCount] = useState(0);
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -264,7 +264,7 @@ export default function AdminTuitionPage() {
     setStudentId('');
     setTitle('');
     setOriginalAmount('');
-    setDiscountAmount(0);
+    setSessionCount(0);
     setNotes('');
 
     if (students.length === 0) {
@@ -383,13 +383,13 @@ export default function AdminTuitionPage() {
       return;
     }
     if (!originalAmount || Number(originalAmount) <= 0) {
-      setFormError('Học phí gốc phải lớn hơn 0 VNĐ.');
+      setFormError('Số tiền phải lớn hơn 0 VNĐ.');
       return;
     }
 
-    const finalAmount = Number(originalAmount) - Number(discountAmount || 0);
+    const finalAmount = Number(originalAmount);
     if (finalAmount <= 0) {
-      setFormError('Số tiền thực nộp phải lớn hơn 0 VNĐ.');
+      setFormError('Số tiền phải lớn hơn 0 VNĐ.');
       return;
     }
     if (!dueDate) {
@@ -407,7 +407,7 @@ export default function AdminTuitionPage() {
           studentId,
           title: title.trim(),
           originalAmount: Number(originalAmount),
-          discountAmount: Number(discountAmount) || 0,
+          sessionCount: Number(sessionCount) || 0,
           finalAmount,
           dueDate,
           notes: notes.trim(),
@@ -950,7 +950,7 @@ export default function AdminTuitionPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Học phí gốc (VNĐ) <span className="text-rose-500">*</span>
+                  Số tiền (VNĐ) <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -964,11 +964,11 @@ export default function AdminTuitionPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Miễn giảm (VNĐ)</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Số buổi</label>
                 <input
                   type="number"
-                  value={discountAmount}
-                  onChange={e => setDiscountAmount(Number(e.target.value))}
+                  value={sessionCount}
+                  onChange={e => setSessionCount(Number(e.target.value))}
                   placeholder="0"
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-mono text-slate-800 focus:outline-indigo-600"
                   min="0"
@@ -977,9 +977,9 @@ export default function AdminTuitionPage() {
             </div>
 
             <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-xl flex items-center justify-between">
-              <span className="text-xs font-semibold text-indigo-900">Số tiền thực nộp:</span>
+              <span className="text-xs font-semibold text-indigo-900">Số tiền:</span>
               <span className="text-sm font-bold font-mono text-indigo-700">
-                {Math.max(0, Number(originalAmount || 0) - Number(discountAmount || 0)).toLocaleString('vi-VN')} đ
+                {Math.max(0, Number(originalAmount || 0)).toLocaleString('vi-VN')} đ
               </span>
             </div>
 

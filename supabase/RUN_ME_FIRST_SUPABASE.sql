@@ -90,8 +90,8 @@ INSERT INTO public.classrooms (id, name, capacity, facilities, status) VALUES
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
 
 INSERT INTO public.classes (id, code, name, subject, teacher_id, room_id, start_time, end_time, schedule_days, is_recurring, tuition_fee, meeting_link, status) VALUES
-('CLS01', 'MATH101', 'Toán Cao Cấp Khóa 1', 'Toán Cao Cấp', 'GV001', 'P.101', '18:30', '20:30', '{2,4,6}', true, 1800000, 'https://discord.com/channels/edu-center/room-cls01', 'Đang mở'),
-('CLS02', 'ENG201', 'IELTS Master 7.0+', 'Tiếng Anh', 'GV002', 'P.301', '19:00', '21:00', '{3,5,7}', true, 2500000, 'https://discord.com/channels/edu-center/room-cls02', 'Đang mở')
+('CLS01', 'MATH101', 'Toán Cao Cấp Khóa 1', 'Toán Cao Cấp', 'GV001', 'P.101', '18:30', '20:30', '{2,4,6}', true, 1800000, 'https://meet.google.com/edu-room-cls01', 'Đang mở'),
+('CLS02', 'ENG201', 'IELTS Master 7.0+', 'Tiếng Anh', 'GV002', 'P.301', '19:00', '21:00', '{3,5,7}', true, 2500000, 'https://meet.google.com/edu-room-cls02', 'Đang mở')
 ON CONFLICT (id) DO UPDATE 
 SET start_time = EXCLUDED.start_time, 
     end_time = EXCLUDED.end_time, 
@@ -99,9 +99,9 @@ SET start_time = EXCLUDED.start_time,
     meeting_link = EXCLUDED.meeting_link;
 
 INSERT INTO public.schedule_slots (id, class_id, teacher_id, room_id, date, start_time, end_time, subject, meeting_link, status) VALUES
-('SCH0001', 'CLS01', 'GV001', 'P.101', CURRENT_DATE, '18:30', '20:30', 'Toán Cao Cấp', 'https://discord.com/channels/edu-center/room-cls01', 'Đã lên lịch'),
-('SCH0002', 'CLS02', 'GV002', 'P.301', CURRENT_DATE, '19:00', '21:00', 'Tiếng Anh', 'https://discord.com/channels/edu-center/room-cls02', 'Đang học'),
-('SCH0003', 'CLS01', 'GV001', 'P.101', CURRENT_DATE + INTERVAL '2 day', '18:30', '20:30', 'Toán Cao Cấp', 'https://discord.com/channels/edu-center/room-cls01', 'Đã lên lịch')
+('SCH0001', 'CLS01', 'GV001', 'P.101', CURRENT_DATE, '18:30', '20:30', 'Toán Cao Cấp', 'https://meet.google.com/edu-room-cls01', 'Đã lên lịch'),
+('SCH0002', 'CLS02', 'GV002', 'P.301', CURRENT_DATE, '19:00', '21:00', 'Tiếng Anh', 'https://meet.google.com/edu-room-cls02', 'Đang học'),
+('SCH0003', 'CLS01', 'GV001', 'P.101', CURRENT_DATE + INTERVAL '2 day', '18:30', '20:30', 'Toán Cao Cấp', 'https://meet.google.com/edu-room-cls01', 'Đã lên lịch')
 ON CONFLICT (id) DO UPDATE 
 SET start_time = EXCLUDED.start_time, 
     end_time = EXCLUDED.end_time,

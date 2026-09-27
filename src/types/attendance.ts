@@ -11,7 +11,7 @@ export interface AttendanceRecord {
   note?: string;
   originalSlotId?: string;
   makeupReason?: string;
-  method?: 'BOT' | 'MANUAL';
+  method?: 'STUDENT_QUICK' | 'MANUAL' | 'SYSTEM' | 'BOT';
   updatedBy: string; // GV001 hoặc ADMIN001
   updatedAt: string;
 }

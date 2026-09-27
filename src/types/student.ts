@@ -13,8 +13,6 @@ export interface Student {
   status: StudentStatus;
   enrolledClassIds: string[]; // Danh sách mã lớp đang tham gia
   avatarUrl?: string;
-  discordId?: string;
-  discordUsername?: string;
   parentPhone?: string;
   assignmentUrl?: string;
   createdAt: string;

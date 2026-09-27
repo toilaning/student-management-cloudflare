@@ -115,8 +115,6 @@ function mapStudentFromDb(row: any): Student {
     status: row.status,
     enrolledClassIds,
     avatarUrl: row.avatar_url || undefined,
-    discordId: row.discord_id || undefined,
-    discordUsername: row.discord_username || undefined,
     parentPhone: row.parent_phone || undefined,
     assignmentUrl: row.assignment_url || undefined,
     createdAt: row.created_at || new Date().toISOString(),
@@ -148,8 +146,6 @@ function mapStudentToDb(student: Student): any {
     address: student.address || null,
     status: student.status,
     avatar_url: student.avatarUrl || null,
-    discord_id: student.discordId || null,
-    discord_username: student.discordUsername || null,
     parent_phone: student.parentPhone || null,
     assignment_url: student.assignmentUrl || null,
 
@@ -323,6 +319,9 @@ function mapTuitionInvoiceFromDb(row: any): TuitionInvoice {
     id: row.id,
     studentId: row.student_id,
     classId: row.class_id,
+    packageId: row.package_id || undefined,
+    sessionCount: row.session_count !== undefined && row.session_count !== null ? Number(row.session_count) : undefined,
+    usedSessions: row.used_sessions !== undefined && row.used_sessions !== null ? Number(row.used_sessions) : undefined,
     title: row.title,
     amount: Number(row.amount),
     paidAmount: Number(row.paid_amount),
@@ -332,6 +331,7 @@ function mapTuitionInvoiceFromDb(row: any): TuitionInvoice {
     paidDate: row.paid_date ? (typeof row.paid_date === 'string' ? row.paid_date.split('T')[0] : row.paid_date) : undefined,
     paymentMethod: row.payment_method || undefined,
     transactionCode: row.transaction_code || undefined,
+    note: row.note || undefined,
   };
 }
 
@@ -340,6 +340,9 @@ function mapTuitionInvoiceToDb(inv: TuitionInvoice): any {
     id: inv.id,
     student_id: inv.studentId,
     class_id: inv.classId,
+    package_id: inv.packageId || null,
+    session_count: inv.sessionCount ?? 0,
+    used_sessions: inv.usedSessions ?? 0,
     title: inv.title,
     amount: inv.amount,
     paid_amount: inv.paidAmount,
@@ -349,6 +352,7 @@ function mapTuitionInvoiceToDb(inv: TuitionInvoice): any {
     paid_date: inv.paidDate || null,
     payment_method: inv.paymentMethod || null,
     transaction_code: inv.transactionCode || null,
+    note: inv.note || null,
     updated_at: new Date().toISOString(),
   };
 }

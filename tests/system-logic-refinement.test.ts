@@ -100,7 +100,6 @@ describe('System Logic Refinement Suite: Time Overlap, Asia/Saigon Timezone & At
       tuitionFee: 1000000,
       studentIds: [newStudentId],
       status: 'Đang mở',
-      createdAt: new Date().toISOString()
     });
 
     // Tạo slot cho lớp đó nhưng chưa có bản ghi điểm danh nào

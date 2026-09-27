@@ -16,7 +16,6 @@ import {
   Calendar, 
   User, 
   BookOpen, 
-  ArrowRight,
   AlertCircle,
   Check,
   RotateCcw
@@ -278,7 +277,6 @@ export default function AdminRequestsPage() {
                 >
                   <option value="ALL">Tất cả loại đơn</option>
                   <option value="XIN_NGHI">Đơn xin nghỉ học</option>
-                  <option value="DOI_LICH">Đề xuất đổi ca</option>
                 </select>
               </div>
 
@@ -312,7 +310,6 @@ export default function AdminRequestsPage() {
               const student = studentMap.get(req.studentId);
               const cls = classMap.get(req.classId);
               const origSlot = slotMap.get(req.scheduleSlotId);
-              const targetSlot = req.targetScheduleSlotId ? slotMap.get(req.targetScheduleSlotId) : null;
 
               return (
                 <div 
@@ -324,12 +321,8 @@ export default function AdminRequestsPage() {
                   {/* Top Bar */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
                     <div className="flex flex-wrap items-center gap-3">
-                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
-                        req.type === 'XIN_NGHI' 
-                          ? 'bg-amber-100 text-amber-900 border border-amber-200' 
-                          : 'bg-indigo-100 text-indigo-900 border border-indigo-200'
-                      }`}>
-                        {req.type === 'XIN_NGHI' ? 'Đơn xin nghỉ học' : 'Đề xuất đổi ca'}
+                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-200`}>
+                        Đơn xin nghỉ học
                       </span>
                       <span className="font-bold text-slate-900 text-sm">
                         Mã đơn: #{req.id}
@@ -391,7 +384,7 @@ export default function AdminRequestsPage() {
                     <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
                       <span className="font-semibold text-slate-600 flex items-center gap-1 mb-1">
                         <Calendar size={13} className="text-slate-500" />
-                        {req.type === 'XIN_NGHI' ? 'Ca học xin nghỉ phép:' : 'Ca học hiện tại cần đổi:'}
+                        Ca học xin nghỉ phép:
                       </span>
                       {origSlot ? (
                         <div className="text-slate-800 space-y-0.5">
@@ -406,27 +399,6 @@ export default function AdminRequestsPage() {
                         <div className="text-slate-600 font-medium">Mã ca: {req.scheduleSlotId}</div>
                       )}
                     </div>
-
-                    {req.type === 'DOI_LICH' && (
-                      <div className="p-2.5 rounded-lg bg-indigo-50/50 border border-indigo-100">
-                        <span className="font-semibold text-indigo-700 flex items-center gap-1 mb-1">
-                          <ArrowRight size={13} className="text-indigo-600" />
-                          Ca học mới đề xuất chuyển sang:
-                        </span>
-                        {targetSlot ? (
-                          <div className="text-indigo-950 space-y-0.5">
-                            <div className="font-bold text-indigo-900">
-                              📅 {formatSlotDate(targetSlot.date)} - {getShiftLabel(targetSlot.shiftId)}
-                            </div>
-                            <div className="text-slate-600 text-[11px]">
-                              Phòng: <strong>{targetSlot.roomId}</strong> • GV: {targetSlot.teacherId} • Môn: <strong>{targetSlot.subject}</strong>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-slate-600 font-medium">Mã ca mới: {req.targetScheduleSlotId || 'Chưa xác định'}</div>
-                        )}
-                      </div>
-                    )}
                   </div>
 
                   {/* Reason & Review Note */}

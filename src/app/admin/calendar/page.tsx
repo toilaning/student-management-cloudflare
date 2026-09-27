@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { Header } from '@/components/common/Header';
-import { ScheduleSlot } from '@/types/schedule';
+import { ScheduleSlot, TimeShift, TIME_SHIFTS } from '@/types/schedule';
 import { Teacher } from '@/types/teacher';
 import { ClassEntity } from '@/types/classroom';
 import { Student } from '@/types/student';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Video, ExternalLink, Users, Clock, BookOpen, UserCheck, AlertCircle, X, CheckCircle, HelpCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Video, ExternalLink, Users, Clock, BookOpen, UserCheck, AlertCircle, X, CheckCircle, HelpCircle, MapPin } from 'lucide-react';
 import { getTodayDateStr } from '@/utils/date';
 
 export default function AdminCalendarPage() {
@@ -16,6 +16,7 @@ export default function AdminCalendarPage() {
   const [classes, setClasses] = useState<ClassEntity[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(false);
+  const [shifts, setShifts] = useState<TimeShift[]>(TIME_SHIFTS);
 
   // Modal xem chi tiết học sinh buổi học
   const [selectedSlotForStudents, setSelectedSlotForStudents] = useState<ScheduleSlot | null>(null);
@@ -35,6 +36,7 @@ export default function AdminCalendarPage() {
       const stData = await stRes.json();
 
       setSlots(slotData.slots || []);
+      if (slotData.shifts) setShifts(slotData.shifts);
       setTeachers(tcData.teachers || []);
       setClasses(clsData.classes || []);
       setStudents(stData.students || []);
@@ -94,6 +96,8 @@ export default function AdminCalendarPage() {
     .sort((a, b) => (a.startTime || '00:00').localeCompare(b.startTime || '00:00'));
 
   const canceledSlots = slots.filter(s => s.status === 'Đã hủy');
+
+  const sortedShifts = [...shifts].sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
@@ -160,108 +164,124 @@ export default function AdminCalendarPage() {
           </div>
         </div>
 
-        {/* Danh Sách Lớp Học Trong Ngày (Timeline / Card List) */}
+        {/* Lưới ma trận: trục ngang = Ca giờ (5 ca), trục dọc = lớp/ca dạy trong ngày */}
         {loading ? (
           <div className="p-12 text-center text-slate-400 text-sm">Đang tải danh sách lớp học ngày {selectedDate}...</div>
         ) : activeSlots.length > 0 ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {activeSlots.map(slot => {
-                const cls = classMap[slot.classId];
-                const studentCount = (cls?.studentIds || []).length;
-                const runtimeStatus = getSlotRuntimeStatus(slot);
-                const teacherName = teacherMap[slot.teacherId] || slot.teacherId;
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-x-auto">
+              <table className="w-full border-collapse min-w-[900px]">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="p-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider border-r border-slate-200 w-48 sticky left-0 bg-slate-50">
+                      Lớp / Ca dạy
+                    </th>
+                    {sortedShifts.map(shift => (
+                      <th key={shift.id} className="p-3 text-center text-xs font-bold text-slate-700 border-r border-slate-200">
+                        <div className="font-bold text-indigo-700 text-xs">Ca {shift.id}</div>
+                        <div className="text-[11px] font-mono text-slate-500 mt-0.5 font-normal">
+                          {shift.startTime} - {shift.endTime}
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeSlots.map(slot => {
+                    const cls = classMap[slot.classId];
+                    const studentCount = (cls?.studentIds || []).length;
+                    const runtimeStatus = getSlotRuntimeStatus(slot);
+                    const teacherName = teacherMap[slot.teacherId] || slot.teacherId;
 
-                return (
-                  <div 
-                    key={slot.id} 
-                    className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 hover:border-indigo-300 hover:shadow-md transition-all flex flex-col justify-between space-y-4"
-                  >
-                    <div className="space-y-3">
-                      {/* Badge khung giờ & Trạng thái */}
-                      <div className="flex items-center justify-between">
-                        <span className="px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs font-bold font-mono flex items-center gap-1.5 shadow-2xs">
-                          <Clock size={13} className="text-amber-600" />
-                          {slot.startTime} - {slot.endTime}
-                        </span>
-                        <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold border ${runtimeStatus.color}`}>
-                          {runtimeStatus.label}
-                        </span>
-                      </div>
+                    return (
+                      <tr key={slot.id} className="border-b border-slate-100 hover:bg-slate-50/50">
+                        <td className="p-3 align-top bg-slate-50/60 border-r border-slate-200 sticky left-0 bg-slate-50">
+                          <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+                            Mã lớp: {slot.classId}
+                          </div>
+                          <div className="font-bold text-slate-800 text-sm mt-0.5 leading-snug">
+                            {cls?.name || slot.subject}
+                          </div>
+                          <div className="text-xs text-indigo-600 font-semibold mt-0.5">
+                            {slot.subject}
+                          </div>
+                        </td>
+                        {sortedShifts.map(shift => {
+                          const active = slot.shiftId === shift.id;
+                          return (
+                            <td
+                              key={shift.id}
+                              className={`p-2 align-top border-r border-slate-100 min-h-[120px] ${active ? 'bg-blue-50/30' : 'bg-white'}`}
+                            >
+                              {active ? (
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded text-[10px] font-bold font-mono flex items-center gap-1">
+                                      <Clock size={11} className="text-amber-600" />
+                                      {slot.startTime} - {slot.endTime}
+                                    </span>
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold border ${runtimeStatus.color}`}>
+                                      {runtimeStatus.label}
+                                    </span>
+                                  </div>
 
-                      {/* Tên lớp & Mã lớp */}
-                      <div>
-                        <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
-                          Mã lớp: {slot.classId}
-                        </div>
-                        <h3 className="font-bold text-slate-800 text-base mt-0.5 leading-snug">
-                          {cls?.name || slot.subject}
-                        </h3>
-                        <p className="text-xs text-indigo-600 font-semibold mt-0.5">
-                          {slot.subject} ({slot.classId})
-                        </p>
-                      </div>
+                                  <div className="space-y-1 text-[11px] text-slate-500">
+                                    <div className="flex items-center gap-1">
+                                      <UserCheck size={11} className="text-indigo-500 shrink-0" />
+                                      <span className="truncate">{teacherName} ({slot.teacherId})</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <Users size={11} className="text-emerald-500 shrink-0" />
+                                      <span className="font-bold text-indigo-600">{studentCount} học viên</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <MapPin size={11} className="text-slate-400 shrink-0" />
+                                      <span>{slot.roomId}</span>
+                                    </div>
+                                  </div>
 
-                      {/* Thông tin Giảng viên, Phòng & Sĩ số */}
-                      <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100 space-y-2 text-xs text-slate-600">
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-400 flex items-center gap-1.5">
-                            <UserCheck size={14} /> Giảng viên:
-                          </span>
-                          <span className="font-bold text-slate-800">
-                            {teacherName} ({slot.teacherId})
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-400">Phòng học:</span>
-                          <span className="font-semibold text-slate-700">{slot.roomId}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-400 flex items-center gap-1.5">
-                            <Users size={14} /> Sĩ số:
-                          </span>
-                          <span className="font-bold text-indigo-600">{studentCount} học viên</span>
-                        </div>
-                      </div>
+                                  {slot.meetingLink ? (
+                                    <a
+                                      href={slot.meetingLink}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-700 font-bold"
+                                    >
+                                      <Video size={12} /> Vào Phòng học online <ExternalLink size={10} />
+                                    </a>
+                                  ) : (
+                                    <div className="text-[10px] text-slate-400 italic">
+                                      Chưa gắn link phòng học online
+                                    </div>
+                                  )}
 
-                      {/* Link Discord / Phòng học Online trực tiếp */}
-                      {slot.meetingLink ? (
-                        <div className="pt-1">
-                          <a
-                            href={slot.meetingLink}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 font-bold bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-200 transition"
-                          >
-                            <Video size={14} /> Vào Phòng Học Discord <ExternalLink size={11} />
-                          </a>
-                        </div>
-                      ) : (
-                        <div className="text-[11px] text-slate-400 italic">
-                          Chưa gắn link phòng học Discord
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Nút xem chi tiết học sinh buổi học và nút sang Sổ điểm danh */}
-                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedSlotForStudents(slot)}
-                        className="py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
-                      >
-                        <Users size={13} /> Danh sách ({studentCount})
-                      </button>
-                      <a 
-                        href={`/admin/attendance?classId=${slot.classId}&date=${selectedDate}`}
-                        className="py-1.5 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-xs flex items-center gap-1"
-                      >
-                        Sổ điểm danh &rarr;
-                      </a>
-                    </div>
-                  </div>
-                );
-              })}
+                                  <div className="flex items-center gap-1.5 pt-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedSlotForStudents(slot)}
+                                      className="py-1 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-[11px] font-semibold transition flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <Users size={11} /> Danh sách ({studentCount})
+                                    </button>
+                                    <a
+                                      href={`/admin/attendance?classId=${slot.classId}&date=${selectedDate}`}
+                                      className="py-1 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-[11px] font-bold transition shadow-xs flex items-center gap-1"
+                                    >
+                                      Điểm danh &rarr;
+                                    </a>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-slate-200 text-center text-[11px]">—</div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
 
             {/* Các lớp đã hủy trong ngày nếu có */}

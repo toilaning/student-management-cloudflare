@@ -10,17 +10,11 @@ import {
   CalendarDays,
   FileCheck,
   Receipt,
-  Inbox,
   ArrowRight,
   Clock,
   AlertCircle,
   CheckCircle2,
   Headphones,
-  Hash,
-  Edit2,
-  HelpCircle,
-  Check,
-  X,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -33,13 +27,69 @@ export default function StudentDashboardPage() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Quản lý Discord ID của học sinh
-  const [showEditDiscord, setShowEditDiscord] = useState(false);
-  const [discordInput, setDiscordInput] = useState('');
-  const [discordUsernameInput, setDiscordUsernameInput] = useState('');
-  const [showDiscordGuide, setShowDiscordGuide] = useState(false);
-  const [discordMsg, setDiscordMsg] = useState<string | null>(null);
-  const [savingDiscord, setSavingDiscord] = useState(false);
+  // Điểm danh nhanh: trạng thái theo từng slot
+  const [checking, setChecking] = useState<string | null>(null);
+  const [checkinMsg, setCheckinMsg] = useState<string | null>(null);
+  const [checkinBadges, setCheckinBadges] = useState<Record<string, { status: string; time: string }>>({});
+
+  // Giờ hiện tại theo múi giờ VN, dạng phút từ đầu ngày
+  const getNowMinutesVN = () => {
+    const nowStr = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Saigon',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(new Date());
+    const [h, m] = nowStr.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  const timeToMinutes = (timeStr: string) => {
+    if (!timeStr) return 0;
+    const [h, m] = timeStr.trim().split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+  };
+
+  const getTodayStrVN = () =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Saigon' }).format(new Date());
+
+  // Trạng thái điểm danh của 1 slot: trả về thông tin để render nút/badge
+  const getSlotCheckinState = (slot: any) => {
+    const todayStr = getTodayStrVN();
+    // Ưu tiên badge mới point (sau khi bấm) hoặc record fetch sẵn
+    const fresh = checkinBadges[slot.id];
+    if (fresh) return { type: 'badge' as const, status: fresh.status, time: fresh.time };
+    const existing = attendance.find(
+      a => a.scheduleSlotId === slot.id && a.studentId === currentUser?.id,
+    );
+    if (existing && existing.status !== 'Chưa điểm danh') {
+      return { type: 'badge' as const, status: existing.status, time: existing.checkinTime || '' };
+    }
+    // Ngoài ngày hôm nay
+    if (slot.date !== todayStr) {
+      return { type: 'disabled' as const, reason: 'Chưa đến giờ' };
+    }
+    // So giờ hiện tại với ca
+    const nowMins = getNowMinutesVN();
+    const startMins = timeToMinutes(slot.startTime);
+    const endMins = timeToMinutes(slot.endTime);
+    const isOvernight = startMins > endMins;
+    if (isOvernight) {
+      // Ca qua đêm: hợp lệ khi nowMins >= startMins hoặc nowMins <= endMins.
+      const inShift = nowMins >= startMins || nowMins <= endMins;
+      if (!inShift) {
+        return { type: 'disabled' as const, reason: 'Chưa đến giờ' };
+      }
+    } else {
+      if (nowMins < startMins) {
+        return { type: 'disabled' as const, reason: 'Chưa đến giờ' };
+      }
+      if (nowMins > endMins) {
+        return { type: 'disabled' as const, reason: 'Ca đã kết thúc' };
+      }
+    }
+    return { type: 'enabled' as const };
+  };
 
   useEffect(() => {
     if (!isReady || !currentUser?.id) return;
@@ -66,10 +116,6 @@ export default function StudentDashboardPage() {
 
         const st = stData.student || null;
         setStudent(st);
-        if (st) {
-          setDiscordInput(st.discordId || '');
-          setDiscordUsernameInput(st.discordUsername || '');
-        }
         setSlots(slotsData.slots || []);
         setAttendance(attData.records || []);
         setFinanceSummary(finData || null);
@@ -83,34 +129,44 @@ export default function StudentDashboardPage() {
     load();
   }, [currentUser, isReady]);
 
-  const handleUpdateDiscord = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentUser?.id) return;
-    setSavingDiscord(true);
+
+  const handleCheckin = async (slotId: string) => {
+    if (!currentUser?.id || checking) return;
+    setChecking(slotId);
+    setCheckinMsg(null);
     try {
-      const res = await fetch(`/api/students/${currentUser.id}`, {
-        method: 'PATCH',
+      const res = await fetch('/api/attendance', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          discordId: discordInput.trim(),
-          discordUsername: discordUsernameInput.trim(),
-          actorId: currentUser.id,
-          actorRole: 'STUDENT',
+          action: 'STUDENT_CHECKIN',
+          studentId: currentUser.id,
+          scheduleSlotId: slotId,
         }),
       });
       const data = await res.json();
       if (res.ok) {
-        setStudent(data.student);
-        setShowEditDiscord(false);
-        setDiscordMsg('Cập nhật Discord ID thành công! Bạn đã sẵn sàng để bot điểm danh tự động.');
-        setTimeout(() => setDiscordMsg(null), 5000);
+        const rec = data.record;
+        const status = rec?.status || 'Có mặt';
+        const time = rec?.checkinTime || '';
+        setCheckinBadges(prev => ({ ...prev, [slotId]: { status, time } }));
+        const label = status === 'Có mặt' ? `Có mặt lúc ${time}` : `Đi muộn lúc ${time}`;
+        setCheckinMsg(`Điểm danh thành công: ${label}`);
+      } else if (res.status === 409) {
+        const rec = data.record;
+        if (rec) {
+          const status = rec.status || 'Có mặt';
+          const time = rec.checkinTime || '';
+          setCheckinBadges(prev => ({ ...prev, [slotId]: { status, time } }));
+        }
+        setCheckinMsg('Bạn đã được điểm danh trong ca này rồi.');
       } else {
-        alert(data.error || 'Cập nhật thất bại');
+        setCheckinMsg(data.error || 'Điểm danh thất bại, vui lòng thử lại.');
       }
     } catch (e: any) {
-      alert(e.message || 'Lỗi mạng');
+      setCheckinMsg(e.message || 'Lỗi mạng');
     } finally {
-      setSavingDiscord(false);
+      setChecking(null);
     }
   };
 
@@ -118,6 +174,11 @@ export default function StudentDashboardPage() {
   const absentCount = attendance.filter(a => a.status.includes('Vắng')).length;
   const attendanceRate =
     attendance.length > 0 ? ((presentCount / attendance.length) * 100).toFixed(0) : 100;
+
+  // Học phí tính theo SỐ BUỔI đã học (điểm danh): 'Có mặt' hoặc 'Đi muộn' đều tính là đã học.
+  const attendedSessions = attendance.filter(
+    a => a.status === 'Có mặt' || a.status === 'Đi muộn',
+  ).length;
 
   return (
     <RoleGuard allowedRoles={['STUDENT', 'ADMIN']}>
@@ -128,19 +189,19 @@ export default function StudentDashboardPage() {
         />
 
         <main className="p-6 max-w-7xl mx-auto w-full space-y-6">
-          {discordMsg && (
+          {checkinMsg && (
             <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center justify-between animate-in fade-in">
               <div className="flex items-center gap-2">
-                <Check size={16} className="text-emerald-600" />
-                <span>{discordMsg}</span>
+                <CheckCircle2 size={16} className="text-emerald-600" />
+                <span>{checkinMsg}</span>
               </div>
-              <button onClick={() => setDiscordMsg(null)} className="text-emerald-600 font-bold hover:underline">
+              <button onClick={() => setCheckinMsg(null)} className="text-emerald-600 font-bold hover:underline">
                 Đóng
               </button>
             </div>
           )}
 
-          {/* Banner Welcome & Thẻ liên kết Discord */}
+          {/* Banner Welcome */}
           <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-6 text-white shadow-md flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
             <div className="space-y-2">
               <span className="text-xs font-semibold uppercase tracking-wider bg-white/20 px-2.5 py-0.5 rounded-full">
@@ -152,43 +213,6 @@ export default function StudentDashboardPage() {
                 <strong className="text-white">{student?.enrolledClassIds?.length || 1} lớp</strong> tại trung tâm. Hãy
                 kiểm tra thời khóa biểu và hoàn thành đúng hạn nhé.
               </p>
-            </div>
-
-            {/* Widget Discord Link Status */}
-            <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/20 flex flex-col sm:flex-row items-start sm:items-center gap-3 shrink-0 w-full lg:w-auto justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-lg bg-indigo-500 flex items-center justify-center text-white shadow-xs">
-                  <Hash size={20} />
-                </div>
-                <div>
-                  <div className="text-[11px] text-emerald-100 uppercase tracking-wide font-semibold">
-                    Discord Snowflake ID
-                  </div>
-                  <div className="font-mono text-sm font-bold text-white">
-                    {student?.discordId ? student.discordId : <span className="text-amber-200">Chưa liên kết</span>}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                <button
-                  onClick={() => setShowDiscordGuide(true)}
-                  title="Hướng dẫn lấy Snowflake ID"
-                  className="px-2.5 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition"
-                >
-                  <HelpCircle size={14} /> Hướng dẫn
-                </button>
-                <button
-                  onClick={() => {
-                    setDiscordInput(student?.discordId || '');
-                    setDiscordUsernameInput(student?.discordUsername || '');
-                    setShowEditDiscord(true);
-                  }}
-                  className="px-3 py-1.5 bg-white text-emerald-900 hover:bg-emerald-50 rounded-lg text-xs font-bold flex items-center gap-1 transition shadow-xs"
-                >
-                  <Edit2 size={13} /> {student?.discordId ? 'Sửa ID' : 'Liên kết ngay'}
-                </button>
-              </div>
             </div>
           </div>
 
@@ -218,30 +242,43 @@ export default function StudentDashboardPage() {
               <p className="text-xs text-slate-400 mt-1">Mức cảnh báo tối đa: 3 buổi</p>
             </div>
 
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Công nợ học phí</span>
-                <span className="p-2 bg-rose-50 text-rose-600 rounded-lg">
-                  <Receipt size={20} />
-                </span>
-              </div>
-              <div className="mt-3 text-2xl font-bold text-rose-600 whitespace-nowrap">
-                {financeSummary ? (financeSummary.totalDebt / 1_000_000).toFixed(1) : 0} Tr
-              </div>
-              <p className="text-xs text-slate-400 mt-1 whitespace-nowrap">
-                Đã nộp: {financeSummary ? (financeSummary.totalPaid / 1_000_000).toFixed(1) : 0} triệu đ
-              </p>
+          </div>
+
+          {/* Học phí (Số buổi) & Hoá đơn — tách riêng khỏi khối thống kê điểm danh */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <Receipt className="text-emerald-600" size={20} />
+              <h2 className="font-bold text-slate-800 text-base">Học phí & Hoá đơn</h2>
             </div>
 
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Đơn đã gửi</span>
-                <span className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                  <Inbox size={20} />
-                </span>
+            {/* Số buổi đã học + Tổng học phí */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100">
+                <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Số buổi đã học</span>
+                <div className="mt-2 text-2xl font-bold text-emerald-700">
+                  {attendedSessions} <span className="text-xs font-semibold text-emerald-600">buổi</span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Điểm danh Có mặt / Đi muộn</p>
               </div>
-              <div className="mt-3 text-2xl font-bold text-blue-600">{requests.length} Đơn</div>
-              <p className="text-xs text-slate-400 mt-1">Xin nghỉ / Đề xuất đổi ca</p>
+
+              <div className="bg-white p-4 rounded-xl border border-slate-200">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Tổng học phí phải nộp</span>
+                <div className="mt-2 text-2xl font-bold text-slate-800 whitespace-nowrap">
+                  {financeSummary ? (financeSummary.totalBilled / 1_000_000).toFixed(1) : 0} Tr
+                </div>
+                <p className="text-xs text-slate-400 mt-1 whitespace-nowrap">
+                  Hoá đơn: {financeSummary ? financeSummary.invoiceCount : 0} phiếu
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-1">
+              <Link
+                href="/student/tuition"
+                className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 flex items-center gap-1"
+              >
+                Xem hoá đơn & thanh toán <ArrowRight size={14} />
+              </Link>
             </div>
           </div>
 
@@ -289,7 +326,7 @@ export default function StudentDashboardPage() {
                               rel="noreferrer"
                               className="font-bold text-emerald-600 hover:text-emerald-700 underline inline-flex items-center gap-1 whitespace-nowrap"
                             >
-                              <Headphones size={12} className="shrink-0" /> Vào phòng học Discord{' '}
+                              <Headphones size={12} className="shrink-0" /> Vào phòng học online{' '}
                               <ExternalLink size={10} className="shrink-0" />
                             </a>
                           ) : (
@@ -298,15 +335,48 @@ export default function StudentDashboardPage() {
                         </div>
                       </div>
                     </div>
-                    <span
-                      className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap shrink-0 ${
-                        slot.status === 'Đã hoàn thành'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-blue-50 text-blue-700 border border-blue-200'
-                      }`}
-                    >
-                      {slot.status}
-                    </span>
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      {(() => {
+                        const state = getSlotCheckinState(slot);
+                        if (state.type === 'badge') {
+                          const isLate = state.status === 'Đi muộn';
+                          return (
+                            <span
+                              className={`text-xs px-2.5 py-1 rounded-full font-semibold whitespace-nowrap ${
+                                isLate
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              }`}
+                            >
+                              {state.status === 'Có mặt' ? 'Có mặt' : state.status}
+                              {state.time ? ` lúc ${state.time}` : ''}
+                            </span>
+                          );
+                        }
+                        if (state.type === 'enabled') {
+                          return (
+                            <button
+                              onClick={() => handleCheckin(slot.id)}
+                              disabled={checking === slot.id}
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs disabled:opacity-50 transition whitespace-nowrap"
+                            >
+                              {checking === slot.id ? 'Đang điểm danh...' : 'Điểm danh nhanh'}
+                            </button>
+                          );
+                        }
+                        return (
+                          <div className="flex flex-col items-end gap-1">
+                            <button
+                              disabled
+                              className="px-3 py-1.5 bg-slate-200 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed whitespace-nowrap"
+                            >
+                              Điểm danh nhanh
+                            </button>
+                            <span className="text-[10px] text-slate-400 whitespace-nowrap">{state.reason}</span>
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -355,161 +425,6 @@ export default function StudentDashboardPage() {
             </div>
           </div>
         </main>
-
-        {/* Modal Cập Nhật Discord ID Của Học Sinh */}
-        {showEditDiscord && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-emerald-50/50">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white">
-                    <Hash size={18} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-800 text-sm">Liên Kết Discord Cá Nhân</h3>
-                    <p className="text-[11px] text-slate-500">Kích hoạt tính năng bot điểm danh tự động</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowEditDiscord(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-white"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <form onSubmit={handleUpdateDiscord} className="p-5 space-y-4 text-xs">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
-                    <span>Discord Snowflake ID *</span>
-                    <button
-                      type="button"
-                      onClick={() => setShowDiscordGuide(true)}
-                      className="text-emerald-700 hover:underline font-normal text-[10px]"
-                    >
-                      Hướng dẫn lấy ID
-                    </button>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Chuỗi 18-19 số (VD: 852012345678901234)"
-                    value={discordInput}
-                    onChange={e => setDiscordInput(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-emerald-600 text-xs font-mono"
-                    autoFocus
-                  />
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Để trống nếu muốn hủy liên kết tài khoản Discord hiện tại.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Discord Username (Tùy chọn)</label>
-                  <input
-                    type="text"
-                    placeholder="Tên tài khoản Discord của bạn (VD: hoangnam_dev)"
-                    value={discordUsernameInput}
-                    onChange={e => setDiscordUsernameInput(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-emerald-600 text-xs"
-                  />
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowEditDiscord(false)}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={savingDiscord}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs shadow-xs disabled:opacity-50"
-                  >
-                    {savingDiscord ? 'Đang lưu...' : 'Lưu Thay Đổi'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Modal Hướng Dẫn Lấy Snowflake ID Cho Học Sinh */}
-        {showDiscordGuide && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-emerald-50/60">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold">
-                    <Hash size={18} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-800 text-sm">Hướng Dẫn Lấy Discord Snowflake ID</h3>
-                    <p className="text-[11px] text-slate-500">3 bước đơn giản để kích hoạt điểm danh tự động</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowDiscordGuide(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-white"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="p-5 space-y-4 text-xs overflow-y-auto">
-                <div className="flex items-start gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
-                  <div className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold shrink-0 text-xs">
-                    1
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-800">Bật Chế Độ Nhà Phát Triển (Developer Mode)</h4>
-                    <p className="text-slate-600 mt-0.5 leading-relaxed">
-                      Mở ứng dụng Discord → Vào <strong>Cài đặt người dùng (User Settings)</strong> (biểu tượng bánh răng ⚙️ ở dưới cùng bên trái) → Chọn mục <strong>Nâng cao (Advanced)</strong> → Bật <strong>Chế độ nhà phát triển (Developer Mode)</strong>.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
-                  <div className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold shrink-0 text-xs">
-                    2
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-800">Sao Chép Snowflake ID Cá Nhân</h4>
-                    <p className="text-slate-600 mt-0.5 leading-relaxed">
-                      Nhấp chuột phải vào ảnh đại diện (avatar) hoặc tên của bạn trên Discord → Chọn dòng cuối cùng:{' '}
-                      <strong>"Sao chép ID người dùng" (Copy User ID)</strong>.
-                    </p>
-                    <p className="text-[11px] text-emerald-700 font-mono mt-1">
-                      Snowflake ID là chuỗi số dài khoảng 18-19 số, ví dụ: <code>852012345678901234</code>.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
-                  <div className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold shrink-0 text-xs">
-                    3
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-800">Dán ID Vào Ô Liên Kết</h4>
-                    <p className="text-slate-600 mt-0.5 leading-relaxed">
-                      Dán chuỗi số vừa sao chép vào mục <strong>Discord Snowflake ID</strong> rồi nhấn <strong>Lưu Thay Đổi</strong>. Bot học tập sẽ tự động điểm danh khi bạn tham gia kênh thoại lớp học!
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
-                <button
-                  onClick={() => setShowDiscordGuide(false)}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold"
-                >
-                  Đã hiểu
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </RoleGuard>
   );

@@ -339,7 +339,7 @@ export default function TeacherClassesPage() {
                     rel="noreferrer"
                     className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1"
                   >
-                    Vào phòng học Discord ↗
+                    Vào phòng học online ↗
                   </a>
                 )}
               </div>

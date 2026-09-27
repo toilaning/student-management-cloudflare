@@ -44,8 +44,7 @@ export function QuickStudentModal({ studentId, onClose }: QuickStudentModalProps
     const text = `Học viên: ${student.name} (${student.id})
 SĐT Học sinh: ${student.phone || 'Chưa cập nhật'}
 SĐT Phụ huynh: ${student.parentPhone || 'Chưa cập nhật'}
-Link Bài tập: ${student.assignmentUrl || 'Chưa có'}
-Discord: ${student.discordId || student.discordUsername || 'Chưa liên kết'}`;
+Link Bài tập: ${student.assignmentUrl || 'Chưa có'}`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -135,17 +134,6 @@ Discord: ${student.discordId || student.discordUsername || 'Chưa liên kết'}`
                 ) : (
                   <p className="text-slate-400 italic">Học sinh chưa cập nhật link bài tập</p>
                 )}
-              </div>
-
-              {/* Snowflake Discord */}
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
-                <span className="text-[11px] font-semibold text-slate-400">Discord Snowflake ID</span>
-                <div className="font-mono text-slate-800 font-bold flex items-center gap-2">
-                  <span>{student.discordId || 'Chưa liên kết'}</span>
-                  {student.discordUsername && (
-                    <span className="text-[11px] font-normal text-slate-500 font-sans">(@{student.discordUsername})</span>
-                  )}
-                </div>
               </div>
 
               {/* Action nút copy */}

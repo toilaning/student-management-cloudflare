@@ -20,6 +20,6 @@ export interface ClassEntity {
   startTime?: string; // Format HH:mm ví dụ '18:30'
   endTime?: string;   // Format HH:mm ví dụ '20:30'
   isRecurring?: boolean; // Mặc định true: Lớp chạy xuyên suốt liên tục
-  meetingLink?: string; // Link phòng học Discord / Room Link
+  meetingLink?: string; // Link phòng học online (Google Meet, Zoom...)
   status: 'Đang mở' | 'Sắp khai giảng' | 'Đã kết thúc';
 }

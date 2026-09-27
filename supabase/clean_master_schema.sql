@@ -42,7 +42,6 @@ CREATE TABLE IF NOT EXISTS public.students (
     name VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
     email VARCHAR(255),
-    discord_id VARCHAR(50),
     status VARCHAR(50) NOT NULL DEFAULT 'Đang học',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -71,7 +70,7 @@ CREATE TABLE IF NOT EXISTS public.classes (
     schedule_days INT[] NOT NULL DEFAULT '{2,4,6}',  -- Thứ trong tuần [2, 4, 6] (8 là Chủ Nhật)
     is_recurring BOOLEAN NOT NULL DEFAULT true,      -- Chạy xuyên suốt liên tục
     tuition_fee NUMERIC(12, 0) NOT NULL DEFAULT 1500000,
-    meeting_link TEXT,                               -- Link phòng học Discord
+    meeting_link TEXT,                               -- Link phòng học online (meet/zoom...)
     student_ids TEXT[] NOT NULL DEFAULT '{}',
     status VARCHAR(50) NOT NULL DEFAULT 'Đang mở',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -103,7 +102,7 @@ CREATE TABLE IF NOT EXISTS public.attendance_records (
     status VARCHAR(20) NOT NULL DEFAULT 'CÓ_MẶT', -- 'CÓ_MẶT', 'VẮNG_MẶT', 'ĐI_MUỘN', 'NGHỈ_CÓ_PHÉP'
     note TEXT,
     checkin_time TIMESTAMPTZ,
-    method VARCHAR(20) DEFAULT 'MANUAL',          -- 'MANUAL', 'BOT', 'ADMIN_OVERRIDE'
+    method VARCHAR(20) DEFAULT 'MANUAL',          -- 'MANUAL', 'STUDENT_QUICK', 'STUDENT_CHECKIN', 'ADMIN_OVERRIDE'
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -221,14 +220,14 @@ ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
 
 -- 5. Classes (Custom start_time, end_time, schedule_days, is_recurring = true)
 INSERT INTO public.classes (id, code, name, subject, teacher_id, room_id, start_time, end_time, schedule_days, is_recurring, tuition_fee, meeting_link, student_ids, status) VALUES
-('CLS01', 'MATH101', 'Toán Cao Cấp Khóa 1', 'Toán Cao Cấp', 'GV001', 'P.101', '18:30', '20:30', '{2,4,6}', true, 1800000, 'https://discord.com/channels/edu-center/room-cls01', ARRAY['ST001', 'ST002'], 'Đang mở'),
-('CLS02', 'ENG201', 'IELTS Master 7.0+', 'Tiếng Anh', 'GV002', 'P.301', '19:00', '21:00', '{3,5,7}', true, 2500000, 'https://discord.com/channels/edu-center/room-cls02', ARRAY['ST001'], 'Đang mở'),
-('CLS03', 'PROG301', 'Lập trình Fullstack Web & Cloud', 'Lập trình', 'GV003', 'P.201', '14:00', '16:00', '{7,8}', true, 2800000, 'https://discord.com/channels/edu-center/room-cls03', ARRAY['ST002'], 'Đang mở')
+('CLS01', 'MATH101', 'Toán Cao Cấp Khóa 1', 'Toán Cao Cấp', 'GV001', 'P.101', '18:30', '20:30', '{2,4,6}', true, 1800000, 'https://meet.google.com/edu-room-cls01', ARRAY['ST001', 'ST002'], 'Đang mở'),
+('CLS02', 'ENG201', 'IELTS Master 7.0+', 'Tiếng Anh', 'GV002', 'P.301', '19:00', '21:00', '{3,5,7}', true, 2500000, 'https://meet.google.com/edu-room-cls02', ARRAY['ST001'], 'Đang mở'),
+('CLS03', 'PROG301', 'Lập trình Fullstack Web & Cloud', 'Lập trình', 'GV003', 'P.201', '14:00', '16:00', '{7,8}', true, 2800000, 'https://meet.google.com/edu-room-cls03', ARRAY['ST002'], 'Đang mở')
 ON CONFLICT (id) DO UPDATE SET start_time = EXCLUDED.start_time, end_time = EXCLUDED.end_time, is_recurring = EXCLUDED.is_recurring;
 
 -- 6. Schedule Slots mẫu (Khớp đúng giờ custom của lớp)
 INSERT INTO public.schedule_slots (id, class_id, teacher_id, room_id, date, start_time, end_time, subject, meeting_link, status) VALUES
-('SCH0001', 'CLS01', 'GV001', 'P.101', '2026-09-23', '18:30', '20:30', 'Toán Cao Cấp', 'https://discord.com/channels/edu-center/room-cls01', 'Đã lên lịch'),
-('SCH0002', 'CLS02', 'GV002', 'P.301', '2026-09-24', '19:00', '21:00', 'Tiếng Anh', 'https://discord.com/channels/edu-center/room-cls02', 'Đã lên lịch'),
-('SCH0003', 'CLS03', 'GV003', 'P.201', '2026-09-26', '14:00', '16:00', 'Lập trình', 'https://discord.com/channels/edu-center/room-cls03', 'Đã lên lịch')
+('SCH0001', 'CLS01', 'GV001', 'P.101', '2026-09-23', '18:30', '20:30', 'Toán Cao Cấp', 'https://meet.google.com/edu-room-cls01', 'Đã lên lịch'),
+('SCH0002', 'CLS02', 'GV002', 'P.301', '2026-09-24', '19:00', '21:00', 'Tiếng Anh', 'https://meet.google.com/edu-room-cls02', 'Đã lên lịch'),
+('SCH0003', 'CLS03', 'GV003', 'P.201', '2026-09-26', '14:00', '16:00', 'Lập trình', 'https://meet.google.com/edu-room-cls03', 'Đã lên lịch')
 ON CONFLICT (id) DO UPDATE SET start_time = EXCLUDED.start_time, end_time = EXCLUDED.end_time;

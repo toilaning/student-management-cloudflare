@@ -6,7 +6,6 @@ import { PaginationControls } from '@/components/common/PaginationControls';
 import { Student } from '@/types/student';
 import { ClassEntity } from '@/types/classroom';
 import {
-  Users,
   Search,
   BookOpen,
   Plus,
@@ -15,10 +14,6 @@ import {
   Check,
   Zap,
   Copy,
-  Edit2,
-  HelpCircle,
-  Hash,
-  ExternalLink,
 } from 'lucide-react';
 
 export default function AdminStudentsPage() {
@@ -48,8 +43,6 @@ export default function AdminStudentsPage() {
   const [fastData, setFastData] = useState({
     name: '',
     phone: '',
-    discordId: '',
-    discordUsername: '',
   });
 
   // Modal Kết quả bàn giao tài khoản vừa tạo
@@ -59,18 +52,8 @@ export default function AdminStudentsPage() {
     username: string;
     defaultPassword: string;
     phone: string;
-    discordId?: string;
   } | null>(null);
   const [copiedHandover, setCopiedHandover] = useState(false);
-
-  // Modal Sửa Discord ID (Snowflake)
-  const [editingDiscordStudent, setEditingDiscordStudent] = useState<Student | null>(null);
-  const [editDiscordId, setEditDiscordId] = useState('');
-  const [editDiscordUsername, setEditDiscordUsername] = useState('');
-  const [savingDiscord, setSavingDiscord] = useState(false);
-
-  // Modal Hướng dẫn Discord Snowflake ID
-  const [showDiscordGuideModal, setShowDiscordGuideModal] = useState(false);
 
   // Modal Thêm Học Viên Đầy Đủ (Full Form)
   const [showAddModal, setShowAddModal] = useState(false);
@@ -81,8 +64,6 @@ export default function AdminStudentsPage() {
     gender: 'Nam' as 'Nam' | 'Nữ',
     dateOfBirth: '2008-01-01',
     address: 'TP. Hà Nội',
-    discordId: '',
-    discordUsername: '',
     selectedClassIds: [] as string[],
     parentPhone: '',
     homeTown: '',
@@ -196,8 +177,6 @@ export default function AdminStudentsPage() {
         body: JSON.stringify({
           name: fastData.name.trim(),
           phone: fastData.phone.trim(),
-          discordId: fastData.discordId.trim() || undefined,
-          discordUsername: fastData.discordUsername.trim() || undefined,
           fastOnboarding: true,
         }),
       });
@@ -210,9 +189,8 @@ export default function AdminStudentsPage() {
           username: data.student.id.toLowerCase(),
           defaultPassword: data.defaultPassword || '123456',
           phone: data.student.phone || '',
-          discordId: data.student.discordId,
         });
-        setFastData({ name: '', phone: '', discordId: '', discordUsername: '' });
+        setFastData({ name: '', phone: '' });
         await loadStudents(page, pageSize, searchTerm);
       } else {
         alert(data.error || 'Tạo nhanh học viên thất bại');
@@ -240,8 +218,6 @@ export default function AdminStudentsPage() {
           gender: newStudentData.gender,
           dateOfBirth: newStudentData.dateOfBirth,
           address: newStudentData.address,
-          discordId: newStudentData.discordId.trim() || undefined,
-          discordUsername: newStudentData.discordUsername.trim() || undefined,
           enrolledClassIds: newStudentData.selectedClassIds,
           parentPhone: newStudentData.parentPhone,
           homeTown: newStudentData.homeTown,
@@ -265,7 +241,6 @@ export default function AdminStudentsPage() {
           username: data.student.id.toLowerCase(),
           defaultPassword: data.defaultPassword || '123456',
           phone: data.student.phone || '',
-          discordId: data.student.discordId,
         });
         setNewStudentData({
           name: '',
@@ -274,8 +249,6 @@ export default function AdminStudentsPage() {
           gender: 'Nam',
           dateOfBirth: '2008-01-01',
           address: 'TP. Hà Nội',
-          discordId: '',
-          discordUsername: '',
           selectedClassIds: [],
           parentPhone: '',
           homeTown: '',
@@ -295,37 +268,6 @@ export default function AdminStudentsPage() {
       }
     } catch (e: any) {
       alert(e.message || 'Lỗi kết nối máy chủ');
-    }
-  };
-
-  // Cập nhật Discord ID / Username
-  const handleSaveDiscordInfo = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingDiscordStudent) return;
-    setSavingDiscord(true);
-    try {
-      const res = await fetch(`/api/students/${editingDiscordStudent.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          discordId: editDiscordId.trim(),
-          discordUsername: editDiscordUsername.trim(),
-          actorId: 'ADMIN001',
-          actorRole: 'ADMIN',
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setActionMessage(`Đã cập nhật Discord ID cho học viên [${editingDiscordStudent.id}]`);
-        setEditingDiscordStudent(null);
-        await loadStudents(page, pageSize, searchTerm);
-      } else {
-        alert(data.error || 'Cập nhật Discord ID thất bại');
-      }
-    } catch (e: any) {
-      alert(e.message || 'Lỗi mạng');
-    } finally {
-      setSavingDiscord(false);
     }
   };
 
@@ -389,7 +331,7 @@ Mã học sinh: ${createdStudentInfo.id}
 Tên đăng nhập: ${createdStudentInfo.username}
 Mật khẩu mặc định: ${createdStudentInfo.defaultPassword}
 Hệ thống học tập: https://student-management.local
-Lưu ý: Học viên vui lòng đăng nhập, đổi mật khẩu và liên kết Discord ID (Snowflake) để kích hoạt điểm danh tự động!`;
+Lưu ý: Học viên vui lòng đăng nhập và đổi mật khẩu lần đầu để bảo mật tài khoản!`;
 
     navigator.clipboard.writeText(handoverText);
     setCopiedHandover(true);
@@ -424,7 +366,7 @@ Lưu ý: Học viên vui lòng đăng nhập, đổi mật khẩu và liên kế
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
       <Header
         title="Quản lý Học viên"
-        subtitle="Hồ sơ học sinh chuẩn hóa YYxxx (ví dụ 26001), 1-Click Fast Onboarding & Discord Snowflake ID"
+        subtitle="Hồ sơ học sinh chuẩn hóa YYxxx (ví dụ 26001) & 1-Click Fast Onboarding"
       />
 
       <main className="p-6 max-w-7xl mx-auto w-full space-y-6">
@@ -565,7 +507,7 @@ Lưu ý: Học viên vui lòng đăng nhập, đổi mật khẩu và liên kế
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Tìm theo mã YYxxx, họ tên, Discord ID..."
+              placeholder="Tìm theo mã YYxxx, họ tên, SĐT, email..."
               value={searchTerm}
               onChange={e => handleSearchChange(e.target.value)}
               className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-indigo-600"
@@ -575,12 +517,6 @@ Lưu ý: Học viên vui lòng đăng nhập, đổi mật khẩu và liên kế
             <div className="text-xs text-slate-500 font-medium hidden md:block">
               Tổng số: <span className="font-bold text-slate-800">{total}</span> học viên
             </div>
-            <button
-              onClick={() => setShowDiscordGuideModal(true)}
-              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
-            >
-              <HelpCircle size={15} className="text-indigo-600" /> Hướng dẫn Snowflake ID
-            </button>
             <button
               onClick={() => setShowAddModal(true)}
               className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
@@ -604,7 +540,6 @@ Lưu ý: Học viên vui lòng đăng nhập, đổi mật khẩu và liên kế
                 <tr>
                   <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold">Mã Học Sinh</th>
                   <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold">Họ và tên</th>
-                  <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold">Discord Snowflake ID</th>
                   <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold">Liên hệ / Email</th>
                   <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold">Mục tiêu & Khối</th>
                   <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold">Lớp đang theo học</th>
@@ -621,32 +556,6 @@ Lưu ý: Học viên vui lòng đăng nhập, đổi mật khẩu và liên kế
                     </td>
                     <td className="px-3 sm:px-4 py-2.5 sm:py-3 font-semibold text-slate-800 whitespace-nowrap min-w-[160px]">
                       {st.name}
-                    </td>
-                    <td className="px-3 sm:px-4 py-2.5 sm:py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        {st.discordId ? (
-                          <span className="font-mono text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200 flex items-center gap-1">
-                            <Hash size={12} className="text-indigo-600" />
-                            {st.discordId}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 italic text-[11px]">Chưa liên kết</span>
-                        )}
-                        <button
-                          onClick={() => {
-                            setEditingDiscordStudent(st);
-                            setEditDiscordId(st.discordId || '');
-                            setEditDiscordUsername(st.discordUsername || '');
-                          }}
-                          title="Sửa Discord Snowflake ID"
-                          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition"
-                        >
-                          <Edit2 size={13} />
-                        </button>
-                      </div>
-                      {st.discordUsername && (
-                        <div className="text-[10px] text-slate-400 mt-0.5">@{st.discordUsername}</div>
-                      )}
                     </td>
                     <td className="px-3 sm:px-4 py-2.5 sm:py-3 text-slate-600 whitespace-nowrap">
                       <div className="font-medium">{st.phone || 'Chưa có SĐT'}</div>
@@ -771,38 +680,6 @@ Lưu ý: Học viên vui lòng đăng nhập, đổi mật khẩu và liên kế
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
-                    <span>Discord Snowflake ID</span>
-                    <button
-                      type="button"
-                      onClick={() => setShowDiscordGuideModal(true)}
-                      className="text-indigo-600 hover:underline font-normal text-[10px]"
-                    >
-                      Cách lấy?
-                    </button>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="18-19 số (VD: 8520...)"
-                    value={fastData.discordId}
-                    onChange={e => setFastData({ ...fastData, discordId: e.target.value })}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Discord Username</label>
-                  <input
-                    type="text"
-                    placeholder="username (tùy chọn)"
-                    value={fastData.discordUsername}
-                    onChange={e => setFastData({ ...fastData, discordUsername: e.target.value })}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs"
-                  />
-                </div>
-              </div>
-
               <div className="bg-indigo-50/60 p-3 rounded-xl border border-indigo-100 text-[11px] text-indigo-800 space-y-1">
                 <div className="font-bold flex items-center gap-1.5">
                   <Check size={14} className="text-indigo-600" /> Hệ thống tự động thiết lập:
@@ -876,12 +753,6 @@ Lưu ý: Học viên vui lòng đăng nhập, đổi mật khẩu và liên kế
                     {createdStudentInfo.defaultPassword}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500 font-sans">Discord Snowflake:</span>
-                  <span className="text-slate-700 font-sans">
-                    {createdStudentInfo.discordId || 'Chưa liên kết'}
-                  </span>
-                </div>
               </div>
 
               <div className="flex items-center gap-2">
@@ -903,157 +774,6 @@ Lưu ý: Học viên vui lòng đăng nhập, đổi mật khẩu và liên kế
                   Đóng
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Sửa Discord ID (Snowflake) Cho Học Sinh */}
-      {editingDiscordStudent && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
-              <div>
-                <h3 className="font-bold text-slate-800 text-sm">Cập Nhật Discord Snowflake ID</h3>
-                <p className="text-[11px] text-slate-500">
-                  Học viên: <strong className="text-slate-800">{editingDiscordStudent.name}</strong> ({editingDiscordStudent.id})
-                </p>
-              </div>
-              <button
-                onClick={() => setEditingDiscordStudent(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveDiscordInfo} className="p-5 space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
-                  <span>Discord Snowflake ID</span>
-                  <button
-                    type="button"
-                    onClick={() => setShowDiscordGuideModal(true)}
-                    className="text-indigo-600 hover:underline font-normal text-[10px]"
-                  >
-                    Xem hướng dẫn lấy ID
-                  </button>
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ví dụ: 852012345678901234 (để trống nếu muốn hủy liên kết)"
-                  value={editDiscordId}
-                  onChange={e => setEditDiscordId(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs font-mono"
-                  autoFocus
-                />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Snowflake ID gồm chuỗi 18-19 chữ số được Discord cấp riêng cho từng người dùng.
-                </p>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Discord Username (Tùy chọn)</label>
-                <input
-                  type="text"
-                  placeholder="Ví dụ: hoangnam_dev"
-                  value={editDiscordUsername}
-                  onChange={e => setEditDiscordUsername(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingDiscordStudent(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingDiscord}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs shadow-xs disabled:opacity-50"
-                >
-                  {savingDiscord ? 'Đang lưu...' : 'Lưu Thay Đổi'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Bản Hướng Dẫn Lấy Discord Snowflake ID */}
-      {showDiscordGuideModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-indigo-50/60">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold">
-                  <Hash size={18} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-800 text-sm">Hướng Dẫn Lấy Discord Snowflake ID</h3>
-                  <p className="text-[11px] text-slate-500">3 bước đơn giản để kích hoạt điểm danh tự động</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowDiscordGuideModal(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-white"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4 text-xs overflow-y-auto">
-              <div className="flex items-start gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
-                <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold shrink-0 text-xs">
-                  1
-                </div>
-                <div>
-                  <h4 className="font-bold text-slate-800">Bật Chế Độ Nhà Phát Triển (Developer Mode)</h4>
-                  <p className="text-slate-600 mt-0.5 leading-relaxed">
-                    Mở Discord → Vào <strong>Cài đặt người dùng (User Settings)</strong> (biểu tượng bánh răng ⚙️ ở góc trái) → Chọn mục <strong>Nâng cao (Advanced)</strong> → Bật công tắc <strong>Chế độ nhà phát triển (Developer Mode)</strong>.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
-                <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold shrink-0 text-xs">
-                  2
-                </div>
-                <div>
-                  <h4 className="font-bold text-slate-800">Sao Chép Snowflake ID Cá Nhân</h4>
-                  <p className="text-slate-600 mt-0.5 leading-relaxed">
-                    Nhấp chuột phải vào avatar hoặc tên tài khoản của bạn (hoặc nhấn giữ trên điện thoại) → Chọn dòng cuối cùng: <strong>"Sao chép ID người dùng" (Copy User ID)</strong>.
-                  </p>
-                  <p className="text-[11px] text-indigo-600 font-mono mt-1">
-                    ID hợp lệ là chuỗi số dài khoảng 18-19 ký tự, ví dụ: <code>852012345678901234</code>.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
-                <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold shrink-0 text-xs">
-                  3
-                </div>
-                <div>
-                  <h4 className="font-bold text-slate-800">Dán ID Vào Hệ Thống</h4>
-                  <p className="text-slate-600 mt-0.5 leading-relaxed">
-                    Dán chuỗi số vừa copy vào ô <strong>Discord Snowflake ID</strong> rồi bấm Lưu. Bot Discord của trung tâm sẽ tự động nhận diện và điểm danh khi bạn tham gia phòng học trực tuyến!
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
-              <button
-                onClick={() => setShowDiscordGuideModal(false)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold"
-              >
-                Đã hiểu
-              </button>
             </div>
           </div>
         </div>
@@ -1107,29 +827,6 @@ Lưu ý: Học viên vui lòng đăng nhập, đổi mật khẩu và liên kế
                     <option value="Nam">Nam</option>
                     <option value="Nữ">Nữ</option>
                   </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Discord Snowflake ID</label>
-                  <input
-                    type="text"
-                    placeholder="18-19 chữ số"
-                    value={newStudentData.discordId}
-                    onChange={e => setNewStudentData({ ...newStudentData, discordId: e.target.value })}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Discord Username</label>
-                  <input
-                    type="text"
-                    placeholder="username"
-                    value={newStudentData.discordUsername}
-                    onChange={e => setNewStudentData({ ...newStudentData, discordUsername: e.target.value })}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-indigo-600 text-xs"
-                  />
                 </div>
               </div>
 
