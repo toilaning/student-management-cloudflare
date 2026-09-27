@@ -8,7 +8,7 @@ import { ScheduleSlot, TimeShift, TIME_SHIFTS } from '@/types/schedule';
 import { ClassEntity } from '@/types/classroom';
 import { Calendar, Clock, MapPin, CheckCircle2, Users, BookOpen, Sparkles, Plus, Video, ExternalLink, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
 import Link from 'next/link';
-import { getTodayDateStr, getTodayDateStrByDate } from '@/utils/date';
+import { getTodayDateStr, getTodayDateStrByDate, formatTimeHM } from '@/utils/date';
 import { HorizontalTimelineAxis, TimelineGridLines, clampSlotToTimeline, minuteToPercent } from '@/components/schedule/Timeline';
 
 const DAY_LABELS: Record<number, string> = {
@@ -263,7 +263,7 @@ export default function TeacherSchedulePage() {
                                 </div>
                                 <span className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-0.5 w-fit whitespace-nowrap shrink-0">
                                   <Clock size={11} className="shrink-0" />
-                                  {slot.startTime} - {slot.endTime}
+                                  {formatTimeHM(slot.startTime)} - {formatTimeHM(slot.endTime)}
                                 </span>
                               </div>
 

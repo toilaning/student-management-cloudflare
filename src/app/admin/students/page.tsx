@@ -562,7 +562,7 @@ Lưu ý: Học viên vui lòng đăng nhập và đổi mật khẩu lần đầ
                 <tr>
                   <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold">Mã Học Sinh</th>
                   <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold">Họ và tên</th>
-                  <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold">Liên hệ / Email</th>
+                  <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold">Liên hệ</th>
                   <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold">Mục tiêu & Khối</th>
                   <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold">Lớp đang theo học</th>
                   <th className="whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-semibold text-center">Số buổi còn lại</th>
@@ -581,7 +581,6 @@ Lưu ý: Học viên vui lòng đăng nhập và đổi mật khẩu lần đầ
                     </td>
                     <td className="px-3 sm:px-4 py-2.5 sm:py-3 text-slate-600 whitespace-nowrap">
                       <div className="font-medium">{st.phone || 'Chưa có SĐT'}</div>
-                      <div className="text-[11px] text-slate-400">{st.email}</div>
                     </td>
                     <td className="px-3 sm:px-4 py-2.5 sm:py-3 font-medium text-indigo-600">
                       <div className="font-bold text-slate-700 whitespace-nowrap">{st.targetUniversity || '—'}</div>

@@ -38,6 +38,17 @@ export function minutesTo24h(totalMinutes: number): string {
 }
 
 /**
+ * Chuẩn hóa chuỗi giờ về HH:mm (bỏ phần giây nếu có, ví dụ "18:30:00" -> "18:30").
+ * Dùng khi DB lưu schedule_slots.start_time/end_time dạng HH:mm:ss.
+ */
+export function formatTimeHM(timeStr?: string): string {
+  if (!timeStr) return '';
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return timeStr;
+  return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+}
+
+/**
  * Trả về chuỗi YYYY-MM-DD cho một Date cụ thể, theo múi giờ Việt Nam (Asia/Saigon).
  * Dùng để cộng/trừ ngày an toàn không bị lệch múi giờ UTC.
  */

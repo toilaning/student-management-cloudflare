@@ -37,7 +37,7 @@ export async function PATCH(
     const {
       actorId, actorRole, phone, email, address, name,
       status, homeTown, gradeLevel, targetUniversity, customUniversity, examBlock,
-      studyGoal, facebookUrl, otherNotes, registeredDate, parentPhone,
+      studyGoal, facebookUrl, otherNotes, registeredDate, parentPhone, assignmentUrl,
       remainingSessions, totalSessionsInMonth, attendedSessionsInMonth, absentSessionsInMonth
     } = body;
 
@@ -79,6 +79,7 @@ export async function PATCH(
     if (facebookUrl !== undefined) { student.facebookUrl = facebookUrl.trim(); needUpdate = true; }
     if (otherNotes !== undefined) { student.otherNotes = otherNotes.trim(); needUpdate = true; }
     if (parentPhone !== undefined) { student.parentPhone = parentPhone.trim(); needUpdate = true; }
+    if (assignmentUrl !== undefined) { student.assignmentUrl = assignmentUrl.trim(); needUpdate = true; }
     if (registeredDate !== undefined) { student.registeredDate = registeredDate; needUpdate = true; }
     if (remainingSessions !== undefined) { student.remainingSessions = Number(remainingSessions); needUpdate = true; }
     if (totalSessionsInMonth !== undefined) { student.totalSessionsInMonth = Number(totalSessionsInMonth); needUpdate = true; }

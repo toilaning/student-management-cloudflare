@@ -15,6 +15,7 @@ import {
   History, 
   CreditCard,
   Inbox,
+  Settings,
   UserCheck,
   Building2,
   Receipt,
@@ -66,6 +67,7 @@ export const Sidebar: React.FC = () => {
     { label: 'Lịch sử Chuyên cần', href: '/student/attendance', icon: FileCheck },
     { label: 'Đơn xin nghỉ / Đổi ca', href: '/student/requests', icon: Inbox },
     { label: 'Học phí & Thanh toán', href: '/student/tuition', icon: CreditCard },
+    { label: 'Cài đặt / Hồ sơ', href: '/student/settings', icon: Settings },
   ];
 
   let currentNav = adminNav;

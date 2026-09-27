@@ -389,19 +389,12 @@ export default function StudentClassesPage() {
                             <Check size={14} /> Ca đang chọn: {shiftName}
                           </button>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={targetShiftByClass[cls.id] || ''}
-                            onChange={e => {
-                              const val = e.target.value;
-                              setTargetShiftByClass(prev => ({
-                                ...prev,
-                                [cls.id]: val ? Number(val) : (undefined as any),
-                              }));
-                            }}
-                            className="flex-1 border border-slate-200 rounded-xl px-2.5 py-2.5 text-xs text-slate-700 bg-white focus:outline-blue-600"
-                          >
-                            <option value="">Đổi sang ca nào...</option>
+                        {/* Chọn ca mới dạng NÚT bấm (thay dropdown) */}
+                        <div className="space-y-2">
+                          <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
+                            <RefreshCw size={11} /> Chọn ca muốn đổi sang:
+                          </span>
+                          <div className="grid grid-cols-2 gap-1.5">
                             {shifts
                               .filter(s => s.id !== (cls.shiftId ?? 1))
                               .map(s => {
@@ -412,22 +405,48 @@ export default function StudentClassesPage() {
                                   : conflicts
                                   ? 'Trùng giờ với lớp khác bạn đang học'
                                   : '';
+                                const selected = targetShiftByClass[cls.id] === s.id;
                                 return (
-                                  <option key={s.id} value={s.id} disabled={!!disabledReason} title={disabledReason || undefined}>
-                                    {s.name} ({s.startTime} - {s.endTime}){disabledReason ? ` — ⛔ ${disabledReason}` : ''}
-                                  </option>
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    disabled={!!disabledReason || actionLoadingId === cls.id}
+                                    onClick={() => {
+                                      setTargetShiftByClass(prev => ({
+                                        ...prev,
+                                        [cls.id]: prev[cls.id] === s.id ? (undefined as any) : s.id,
+                                      }));
+                                    }}
+                                    title={disabledReason || undefined}
+                                    className={`relative px-2 py-2 rounded-xl text-[11px] font-bold border transition text-left leading-tight disabled:opacity-40 disabled:cursor-not-allowed ${
+                                      selected
+                                        ? 'border-rose-400 bg-rose-50 text-rose-700 ring-2 ring-rose-200'
+                                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    {disabledReason && (
+                                      <span className="absolute -top-1.5 -right-1.5 text-base" aria-hidden>⛔</span>
+                                    )}
+                                    <span className="block font-bold">{s.name}</span>
+                                    <span className="block font-mono text-[10px] text-slate-400">
+                                      {s.startTime} - {s.endTime}
+                                    </span>
+                                  </button>
                                 );
                               })}
-                          </select>
-                          <button
-                            onClick={() => handleChangeShift(cls.id, cls.name, cls.shiftId ?? 1)}
-                            disabled={actionLoadingId === cls.id || !targetShiftByClass[cls.id]}
-                            className="px-3 py-2.5 bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer whitespace-nowrap disabled:opacity-50"
-                            title="Đổi ca trực tiếp (không cần duyệt)"
-                          >
-                            <RefreshCw size={12} className={actionLoadingId === cls.id ? 'animate-spin' : ''} /> Đổi ca
-                          </button>
+                          </div>
+                          {shifts.filter(s => s.id !== (cls.shiftId ?? 1)).length === 0 && (
+                            <p className="text-[11px] text-slate-400 italic">Không có ca nào khác để đổi.</p>
+                          )}
                         </div>
+                        <button
+                          onClick={() => handleChangeShift(cls.id, cls.name, cls.shiftId ?? 1)}
+                          disabled={actionLoadingId === cls.id || !targetShiftByClass[cls.id]}
+                          className="w-full py-2.5 bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer whitespace-nowrap disabled:opacity-50"
+                          title="Đổi sang ca đã chọn (không cần duyệt)"
+                        >
+                          <RefreshCw size={12} className={actionLoadingId === cls.id ? 'animate-spin' : ''} /> Đổi ca
+                        </button>
                       </div>
                     ) : isFull ? (
                       /* ⬛ Đã đủ chỗ: Nhãn 'Hết chỗ' */

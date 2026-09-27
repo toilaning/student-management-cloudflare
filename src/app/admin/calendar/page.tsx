@@ -7,7 +7,7 @@ import { Teacher } from '@/types/teacher';
 import { ClassEntity } from '@/types/classroom';
 import { Student } from '@/types/student';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Video, ExternalLink, Users, Clock, UserCheck, X, MapPin } from 'lucide-react';
-import { getTodayDateStr } from '@/utils/date';
+import { getTodayDateStr, formatTimeHM } from '@/utils/date';
 import { HorizontalTimelineAxis, TimelineGridLines, clampSlotToTimeline, minuteToPercent } from '@/components/schedule/Timeline';
 
 export default function AdminCalendarPage() {
@@ -213,7 +213,7 @@ export default function AdminCalendarPage() {
                               </div>
                               <span className="text-[11px] font-mono font-bold text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-2 py-0.5 flex items-center gap-1 whitespace-nowrap shrink-0">
                                 <Clock size={11} className="text-amber-600" />
-                                {slot.startTime} - {slot.endTime}
+                                {formatTimeHM(slot.startTime)} - {formatTimeHM(slot.endTime)}
                               </span>
                             </div>
 
@@ -281,7 +281,7 @@ export default function AdminCalendarPage() {
                     <div key={s.id} className="p-3 bg-slate-100 rounded-xl border border-slate-200 text-xs text-slate-400 flex items-center justify-between opacity-70">
                       <div>
                         <div className="font-semibold line-through">{s.subject} ({s.classId})</div>
-                        <div className="text-[11px] font-mono">{s.startTime} - {s.endTime}</div>
+                        <div className="text-[11px] font-mono">{formatTimeHM(s.startTime)} - {formatTimeHM(s.endTime)}</div>
                       </div>
                       <span className="text-[10px] px-2 py-0.5 rounded bg-slate-200 font-bold">Đã hủy</span>
                     </div>
@@ -312,7 +312,7 @@ export default function AdminCalendarPage() {
               <div>
                 <h3 className="font-bold text-slate-800 text-base">Danh Sách Học Viên Buổi Học</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Lớp: <strong className="text-slate-700">{selectedSlotForStudents.subject}</strong> ({selectedSlotForStudents.classId}) • Khung giờ: <span className="font-mono font-bold text-indigo-600">{selectedSlotForStudents.startTime} - {selectedSlotForStudents.endTime}</span>
+                  Lớp: <strong className="text-slate-700">{selectedSlotForStudents.subject}</strong> ({selectedSlotForStudents.classId}) • Khung giờ: <span className="font-mono font-bold text-indigo-600">{formatTimeHM(selectedSlotForStudents.startTime)} - {formatTimeHM(selectedSlotForStudents.endTime)}</span>
                 </p>
               </div>
               <button 
