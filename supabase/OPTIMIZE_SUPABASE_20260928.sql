@@ -199,6 +199,8 @@ ALTER TABLE public.students DROP CONSTRAINT IF EXISTS students_exam_block_check;
 -- class_requests: constraint cũ chặn trạng thái/loại tiếng Việt mà code gửi
 ALTER TABLE public.class_requests DROP CONSTRAINT IF EXISTS class_requests_status_check;
 ALTER TABLE public.class_requests DROP CONSTRAINT IF EXISTS class_requests_type_check;
+-- tuition_invoices: constraint cũ chỉ cho DA_NOP/CON_NO/... nhưng code ghi tiếng Việt
+ALTER TABLE public.tuition_invoices DROP CONSTRAINT IF EXISTS tuition_invoices_status_check;
 
 -- ============================================================================
 -- 6. INDEX TỐI ƯU HÓA TRUY VẤN (đảm bảo không thiếu)
