@@ -90,8 +90,9 @@ ALTER TABLE public.attendance_records
     ALTER COLUMN checkin_time TYPE VARCHAR(20)
     USING CASE
         WHEN checkin_time IS NULL THEN NULL
-        WHEN checkin_time::text ~ '^[0-9]{2}:[0-9]{2}' THEN checkin_time::text
-        ELSE to_char(checkin_time, 'HH24:MI:SS')
+        WHEN checkin_time::text ~ '^[0-9]{2}:[0-9]{2}' THEN substring(checkin_time::text from 1 for 20)
+        WHEN checkin_time::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN substring(checkin_time::text from 12 for 8)
+        ELSE substring(checkin_time::text from 1 for 20)
     END;
 
 -- ============================================================================
