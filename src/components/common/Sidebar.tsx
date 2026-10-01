@@ -35,36 +35,25 @@ export const Sidebar: React.FC = () => {
   const role = currentUser.role;
 
   const adminNav = [
-    { label: 'Tổng quan', href: '/admin/dashboard', icon: LayoutDashboard },
-    { label: 'Lịch học trung tâm', href: '/admin/calendar', icon: CalendarDays },
-    { label: 'Sổ Điểm danh Toàn trường', href: '/admin/attendance', icon: UserCheck },
-    { label: 'Duyệt đơn & Đổi ca', href: '/admin/requests', icon: Inbox },
-    { label: 'Quản lý Lớp học', href: '/admin/classes', icon: BookOpen },
-    { label: 'Đội ngũ Giáo viên', href: '/admin/teachers', icon: UserCheck },
-    { label: 'Danh sách Học viên', href: '/admin/students', icon: Users },
-    { label: 'Sổ Thu - Chi & Công nợ', href: '/admin/finance', icon: Coins },
-    { label: 'Công nợ & Học phí', href: '/admin/tuition', icon: Receipt },
-    { label: 'Tài khoản & Mật khẩu', href: '/admin/accounts', icon: KeyRound },
-    { label: 'Nhật ký Hệ thống', href: '/admin/audit', icon: History },
-    { label: 'Hướng dẫn tích hợp', href: '/admin/guides', icon: HelpCircle },
+    { label: 'Trang Chủ', href: '/admin/dashboard', icon: LayoutDashboard },
+    { label: 'Học Viên', href: '/admin/students', icon: Users },
+    { label: 'Điểm Danh', href: '/admin/attendance', icon: UserCheck },
+    { label: 'Nhật Ký Đổi Ca', href: '/admin/requests', icon: Inbox },
+    { label: 'Thu - Chi & Học Phí', href: '/admin/finance', icon: Coins },
   ];
 
   const teacherNav = [
-    { label: 'Bàn làm việc', href: '/teacher/dashboard', icon: LayoutDashboard },
-    { label: 'Lịch dạy của tôi', href: '/teacher/schedule', icon: CalendarDays },
-    { label: 'Lớp học phụ trách', href: '/teacher/classes', icon: BookOpen },
-    { label: 'Sổ Điểm danh', href: '/teacher/attendance', icon: FileCheck },
-    { label: 'Duyệt đơn xin nghỉ/đổi ca', href: '/teacher/requests', icon: Inbox },
+    { label: 'Bàn Làm Việc', href: '/teacher/dashboard', icon: LayoutDashboard },
+    { label: 'Sổ Điểm Danh', href: '/teacher/attendance', icon: FileCheck },
+    { label: 'Nhật Ký Đổi Ca', href: '/teacher/requests', icon: Inbox },
+    { label: 'Lịch Dạy & Lớp', href: '/teacher/schedule', icon: CalendarDays },
   ];
 
   const studentNav = [
-    { label: 'Góc học tập', href: '/student/dashboard', icon: LayoutDashboard },
-    { label: 'Thời khóa biểu', href: '/student/schedule', icon: CalendarDays },
-    { label: 'Đăng ký Lớp học', href: '/student/classes', icon: BookOpen },
-    { label: 'Lịch sử Chuyên cần', href: '/student/attendance', icon: FileCheck },
-    { label: 'Đơn xin nghỉ / Đổi ca', href: '/student/requests', icon: Inbox },
-    { label: 'Học phí & Thanh toán', href: '/student/tuition', icon: CreditCard },
-    { label: 'Cài đặt / Hồ sơ', href: '/student/settings', icon: Settings },
+    { label: 'Góc Học Tập', href: '/student/dashboard', icon: LayoutDashboard },
+    { label: 'Đổi Ca Học', href: '/student/requests', icon: Inbox },
+    { label: 'Học Phí & VietQR', href: '/student/tuition', icon: CreditCard },
+    { label: 'Lịch Học', href: '/student/schedule', icon: CalendarDays },
   ];
 
   let currentNav = adminNav;

@@ -4,73 +4,64 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Header } from '@/components/common/Header';
 import { useApp } from '@/context/AppContext';
 import { RoleGuard } from '@/components/common/RoleGuard';
-import { Modal } from '@/components/common/Modal';
-import { ClassRequest, RequestType, ScheduleSlot, TIME_SHIFTS } from '@/types/schedule';
-import { Inbox, Plus, Send, AlertCircle } from 'lucide-react';
+import { ScheduleSlot, TIME_SHIFTS } from '@/types/schedule';
+import { 
+  ArrowRightLeft, 
+  CheckCircle2, 
+  Calendar, 
+  Clock, 
+  Sparkles, 
+  AlertCircle, 
+  History,
+  Check
+} from 'lucide-react';
 
-export default function StudentRequestsPage() {
+export default function StudentShiftChangePage() {
   const { currentUser, isReady } = useApp();
-  const [requests, setRequests] = useState<ClassRequest[]>([]);
-  const [studentClasses, setStudentClasses] = useState<any[]>([]);
-  const [myScheduleSlots, setMyScheduleSlots] = useState<ScheduleSlot[]>([]);
-  const [allScheduleSlots, setAllScheduleSlots] = useState<ScheduleSlot[]>([]);
+  const [requests, setRequests] = useState<any[]>([]);
+  const [mySlots, setMySlots] = useState<ScheduleSlot[]>([]);
+  const [availableSlots, setAvailableSlots] = useState<ScheduleSlot[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [selectedCurrentSlotId, setSelectedCurrentSlotId] = useState<string>('');
+  const [selectedTargetSlotId, setSelectedTargetSlotId] = useState<string>('');
+  const [reason, setReason] = useState<string>('');
+  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const [form, setForm] = useState<{
-    classId: string;
-    type: RequestType;
-    reason: string;
-    scheduleSlotId: string;
-    targetScheduleSlotId: string;
-  }>({
-    classId: '',
-    type: 'XIN_NGHI',
-    reason: '',
-    scheduleSlotId: '',
-    targetScheduleSlotId: '',
-  });
+  const showToast = (text: string, type: 'success' | 'error' = 'success') => {
+    setToastMessage({ type, text });
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   const loadData = async () => {
     if (!isReady || !currentUser?.id) return;
     setLoading(true);
     try {
-      const [reqRes, clsRes, mySchedRes, allSchedRes] = await Promise.all([
+      const [reqRes, mySchedRes, allSchedRes] = await Promise.all([
         fetch(`/api/requests?studentId=${currentUser.id}`),
-        fetch(`/api/classes?studentId=${currentUser.id}`),
         fetch(`/api/schedule?studentId=${currentUser.id}`),
         fetch(`/api/schedule`),
       ]);
 
-      const [reqData, clsData, mySchedData, allSchedData] = await Promise.all([
+      const [reqData, mySchedData, allSchedData] = await Promise.all([
         reqRes.json(),
-        clsRes.json(),
         mySchedRes.json(),
         allSchedRes.json(),
       ]);
 
       setRequests(reqData.requests || []);
-      const classes = clsData.classes || [];
-      setStudentClasses(classes);
-      setMyScheduleSlots(mySchedData.slots || []);
-      setAllScheduleSlots(allSchedData.slots || []);
+      const userSlots: ScheduleSlot[] = mySchedData.slots || [];
+      const allSlots: ScheduleSlot[] = allSchedData.slots || [];
+      setMySlots(userSlots);
 
-      if (classes.length > 0) {
-        const initialClassId = classes[0].id;
-        const initialSlots = (mySchedData.slots || []).filter(
-          (s: ScheduleSlot) => s.classId === initialClassId
-        );
-        setForm(prev => ({
-          ...prev,
-          classId: initialClassId,
-          scheduleSlotId: initialSlots[0]?.id || '',
-          targetScheduleSlotId: '',
-        }));
+      if (userSlots.length > 0 && !selectedCurrentSlotId) {
+        setSelectedCurrentSlotId(userSlots[0].id);
       }
+
+      setAvailableSlots(allSlots);
     } catch (e) {
       console.error(e);
+      showToast('Lỗi khi nạp dữ liệu ca học', 'error');
     } finally {
       setLoading(false);
     }
@@ -80,52 +71,26 @@ export default function StudentRequestsPage() {
     loadData();
   }, [currentUser, isReady]);
 
-  // Các ca học của học sinh trong lớp đang chọn
-  const availableMySlots = useMemo(() => {
-    if (!form.classId) return [];
-    return myScheduleSlots.filter(s => s.classId === form.classId);
-  }, [form.classId, myScheduleSlots]);
+  // Các ca học tương lai khác có thể đổi sang
+  const currentSlotObj = useMemo(() => {
+    return mySlots.find(s => s.id === selectedCurrentSlotId);
+  }, [mySlots, selectedCurrentSlotId]);
 
-  // Format hiển thị ngày & thứ
-  const formatSlotDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    try {
-      const d = new Date(dateStr);
-      const days = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-      const dayName = days[d.getDay()] || '';
-      const [year, month, day] = dateStr.split('-');
-      return `${dayName}, ${day}/${month}/${year}`;
-    } catch {
-      return dateStr;
-    }
-  };
+  const targetEligibleSlots = useMemo(() => {
+    return availableSlots.filter(s => s.id !== selectedCurrentSlotId);
+  }, [availableSlots, selectedCurrentSlotId]);
 
-  const getShiftLabel = (shiftId: number) => {
-    const s = TIME_SHIFTS.find(ts => ts.id === shiftId);
-    return s ? `${s.name} (${s.startTime} - ${s.endTime})` : `Ca ${shiftId}`;
-  };
-
-  const handleClassChange = (newClassId: string) => {
-    const slots = myScheduleSlots.filter(s => s.classId === newClassId);
-    setForm(prev => ({
-      ...prev,
-      classId: newClassId,
-      scheduleSlotId: slots[0]?.id || '',
-      targetScheduleSlotId: '',
-    }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Xử lý đổi ca tự động 100% không cần duyệt
+  const handleAutoShiftChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg('');
-
-    if (!form.reason.trim()) {
-      setErrorMsg('Vui lòng nhập lý do chi tiết.');
+    if (!selectedCurrentSlotId || !selectedTargetSlotId) {
+      showToast('Vui lòng chọn ca hiện tại và ca muốn chuyển đến', 'error');
       return;
     }
 
-    if (!form.scheduleSlotId) {
-      setErrorMsg('Vui lòng chọn ca học cần xin nghỉ.');
+    const targetSlot = availableSlots.find(s => s.id === selectedTargetSlotId);
+    if (!targetSlot) {
+      showToast('Ca học đích không hợp lệ', 'error');
       return;
     }
 
@@ -136,274 +101,213 @@ export default function StudentRequestsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           studentId: currentUser?.id || "",
-          classId: form.classId,
-          scheduleSlotId: form.scheduleSlotId,
-          type: 'XIN_NGHI',
-          reason: form.reason.trim(),
+          classId: currentSlotObj?.classId || targetSlot.classId,
+          scheduleSlotId: selectedCurrentSlotId,
+          targetScheduleSlotId: selectedTargetSlotId,
+          type: 'DOI_LICH',
+          reason: reason.trim() || 'Học sinh đổi ca theo nguyện vọng cá nhân',
         }),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        setShowModal(false);
-        setForm(prev => ({ ...prev, reason: '', targetScheduleSlotId: '' }));
+        showToast('🎉 Đổi ca thành công 100%! Lịch mới đã được cập nhật ngay lập tức.');
+        setReason('');
+        setSelectedTargetSlotId('');
         await loadData();
       } else {
-        setErrorMsg(data.error || 'Có lỗi xảy ra khi gửi đơn.');
+        showToast(data.error || 'Có lỗi xảy ra khi đổi ca', 'error');
       }
-    } catch (e: any) {
-      setErrorMsg(e.message || 'Lỗi mạng hoặc hệ thống.');
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi mạng khi gửi đổi ca', 'error');
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Helper tìm thông tin slot theo ID
-  const findSlotInfo = (slotId: string) => {
-    return allScheduleSlots.find(s => s.id === slotId) || myScheduleSlots.find(s => s.id === slotId);
+  // Helper format slot label
+  const formatSlot = (slot?: ScheduleSlot) => {
+    if (!slot) return '';
+    return `[${slot.date}] ${slot.startTime} - ${slot.endTime} (${slot.subject || 'Lớp xưởng'}) - Phòng ${slot.roomId}`;
   };
 
   return (
     <RoleGuard allowedRoles={['STUDENT', 'ADMIN']}>
-      <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
+      <div className="flex-1 flex flex-col min-h-screen bg-slate-50 font-sans">
         <Header 
-          title="Đơn Xin Nghỉ Học" 
-          subtitle="Gửi yêu cầu xin nghỉ trực tiếp tới Ban Quản lý và Giảng viên phụ trách môn học" 
+          title="Đổi Ca Học Tự Động" 
+          subtitle="Tự do chuyển ca không cần chờ duyệt • Cập nhật lịch học mới tức thì trong 5 giây" 
         />
 
-        <main className="p-6 max-w-7xl mx-auto w-full space-y-6">
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
-            <div className="text-sm font-semibold text-slate-800">
-              Tổng số đơn đã nộp: <strong className="text-emerald-600">{requests.length}</strong> đơn
+        <main className="p-4 sm:p-6 max-w-5xl mx-auto w-full space-y-6">
+          {/* Toast */}
+          {toastMessage && (
+            <div className={`p-4 rounded-2xl shadow-lg border flex items-center gap-3 transition-all animate-in fade-in duration-150 ${
+              toastMessage.type === 'success' 
+                ? 'bg-emerald-50 text-emerald-900 border-emerald-300' 
+                : 'bg-rose-50 text-rose-900 border-rose-300'
+            }`}>
+              {toastMessage.type === 'success' ? <CheckCircle2 size={20} className="text-emerald-600" /> : <AlertCircle size={20} className="text-rose-600" />}
+              <span className="text-sm font-bold">{toastMessage.text}</span>
             </div>
-            <button
-              onClick={() => {
-                setErrorMsg('');
-                if (studentClasses.length > 0 && !form.classId) {
-                  const initialClassId = studentClasses[0].id;
-                  const initialSlots = myScheduleSlots.filter(s => s.classId === initialClassId);
-                  setForm(prev => ({
-                    ...prev,
-                    classId: initialClassId,
-                    scheduleSlotId: initialSlots[0]?.id || '',
-                  }));
-                }
-                setShowModal(true);
-              }}
-              className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg transition shadow-xs cursor-pointer"
-            >
-              <Plus size={16} /> Tạo đơn mới
-            </button>
-          </div>
+          )}
 
-          {/* Requests List */}
-          <div className="space-y-4">
-            {requests.map(req => {
-              const origSlot = findSlotInfo(req.scheduleSlotId);
-
-              return (
-                <div key={req.id} className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 hover:border-slate-300 transition space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded uppercase bg-amber-100 text-amber-800">
-                        Đơn xin nghỉ học
-                      </span>
-                      <span className="font-bold text-slate-800 text-sm">
-                        Mã đơn: {req.id} • Lớp {req.classId}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-400">
-                        {new Date(req.createdAt).toLocaleDateString('vi-VN')}
-                      </span>
-                      <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
-                        req.status === 'ĐÃ_DUYỆT'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : req.status === 'TỪ_CHỐI'
-                          ? 'bg-rose-100 text-rose-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {req.status}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Chi tiết ca học liên quan */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50/80 p-3 rounded-lg border border-slate-100 text-xs">
-                    <div>
-                      <span className="font-semibold text-slate-500">Ca xin nghỉ:</span>
-                      {origSlot ? (
-                        <div className="mt-1 text-slate-800 font-medium">
-                          📅 {formatSlotDate(origSlot.date)} - {getShiftLabel(origSlot.shiftId)}
-                          <div className="text-slate-500 text-[11px]">
-                            Môn: {origSlot.subject} | Phòng: {origSlot.roomId} | GV: {origSlot.teacherId}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="mt-1 text-slate-600 font-medium">Mã ca: {req.scheduleSlotId}</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="text-xs text-slate-700 space-y-1.5">
-                    <p className="p-3 bg-white rounded-lg border border-slate-100 italic text-slate-600">
-                      "{req.reason}"
-                    </p>
-
-                    {req.reviewNote && (
-                      <div className="mt-2 text-xs flex items-center gap-2 p-2 bg-slate-50 rounded border border-slate-200">
-                        <span className="font-semibold text-slate-600">
-                          Phản hồi ({req.reviewedBy || 'Ban Quản trị / Giảng viên'}):
-                        </span>
-                        <span className="font-medium text-slate-800">{req.reviewNote}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-
-            {requests.length === 0 && (
-              <div className="py-12 text-center bg-white rounded-xl border border-slate-200 text-slate-400 text-sm">
-                Bạn chưa gửi đơn xin nghỉ học nào.
+          {/* KHỐI 1: FLAPPY ACTION CARD - CHỌN VÀ ĐỔI CA 1-CLICK */}
+          <div className="bg-white p-5 sm:p-7 rounded-3xl border-2 border-indigo-200 shadow-md space-y-5">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+                <ArrowRightLeft size={24} />
               </div>
-            )}
-          </div>
-
-          {/* Modal Tạo Đơn Mới (Dùng Modal Portal chuẩn phủ 100vw x 100vh) */}
-          <Modal
-            isOpen={showModal}
-            onClose={() => setShowModal(false)}
-            className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
-          >
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
-              <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
-                <Inbox size={18} className="text-emerald-600" />
-                Gửi đơn xin phép nghỉ học
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowModal(false)}
-                className="text-slate-400 hover:text-slate-600 text-lg cursor-pointer transition p-1"
-              >
-                ✕
-              </button>
+              <div>
+                <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                  Chuyển Sang Ca Học Khác
+                </h2>
+                <p className="text-xs text-slate-500 font-medium">
+                  Đổi xong lịch mới sẽ tự kích hoạt ngay, lịch cũ tự động gỡ bỏ.
+                </p>
+              </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 text-sm max-h-[80vh] overflow-y-auto">
-              {errorMsg && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs flex items-center gap-2">
-                  <AlertCircle size={16} className="shrink-0" />
-                  <span>{errorMsg}</span>
+            <form onSubmit={handleAutoShiftChange} className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 1. Ca học hiện tại muốn bỏ */}
+                <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-200 space-y-2">
+                  <label className="block text-xs font-black text-slate-700 uppercase tracking-wider">
+                    1. Ca học hiện tại của bạn:
+                  </label>
+                  {mySlots.length === 0 ? (
+                    <div className="text-xs text-slate-400 py-3">Bạn chưa có ca học nào trong danh sách.</div>
+                  ) : (
+                    <select
+                      value={selectedCurrentSlotId}
+                      onChange={e => setSelectedCurrentSlotId(e.target.value)}
+                      className="w-full bg-white border-2 border-slate-300 rounded-xl p-3 text-xs sm:text-sm font-bold text-slate-900 focus:outline-indigo-600 cursor-pointer shadow-2xs"
+                    >
+                      {mySlots.map(s => (
+                        <option key={s.id} value={s.id}>
+                          [{s.date}] {s.startTime}-{s.endTime} | {s.subject} ({s.classId})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {currentSlotObj && (
+                    <div className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5 mt-1">
+                      <Clock size={13} className="text-slate-400" />
+                      Phòng: {currentSlotObj.roomId} • Giảng viên: {currentSlotObj.teacherId}
+                    </div>
+                  )}
                 </div>
-              )}
 
-              {/* 1. Loại yêu cầu (chỉ còn Xin nghỉ) */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Loại yêu cầu</label>
-                <div className="grid grid-cols-1 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setForm(prev => ({ ...prev, type: 'XIN_NGHI', targetScheduleSlotId: '' }));
-                      setErrorMsg('');
-                    }}
-                    className={`py-2.5 px-3 text-xs font-semibold rounded-xl border transition flex items-center justify-center gap-2 cursor-pointer ${
-                      form.type === 'XIN_NGHI'
-                        ? 'bg-amber-50 border-amber-400 text-amber-900 shadow-xs'
-                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                    Đơn xin nghỉ học
-                  </button>
-                </div>
-              </div>
-
-              {/* 2. Chọn lớp học */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Chọn môn / Lớp học đang tham gia <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  value={form.classId}
-                  onChange={e => handleClassChange(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 bg-white focus:outline-emerald-600 focus:border-emerald-600"
-                  required
-                >
-                  {studentClasses.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.id}) - Môn: {c.subject || c.name} - GV: {c.teacherId}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 3. Chọn ca học hiện tại */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Chọn ca học xin nghỉ <span className="text-rose-500">*</span>
-                </label>
-                {availableMySlots.length > 0 ? (
+                {/* 2. Ca học mới muốn chuyển sang */}
+                <div className="bg-indigo-50/60 p-4 rounded-2xl border-2 border-indigo-200 space-y-2">
+                  <label className="block text-xs font-black text-indigo-900 uppercase tracking-wider">
+                    2. Chọn ca học mới muốn vào:
+                  </label>
                   <select
-                    value={form.scheduleSlotId}
-                    onChange={e => {
-                      setForm(prev => ({
-                        ...prev,
-                        scheduleSlotId: e.target.value,
-                        targetScheduleSlotId: '',
-                      }));
-                    }}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 bg-white focus:outline-emerald-600 focus:border-emerald-600"
+                    value={selectedTargetSlotId}
+                    onChange={e => setSelectedTargetSlotId(e.target.value)}
                     required
+                    className="w-full bg-white border-2 border-indigo-400 rounded-xl p-3 text-xs sm:text-sm font-bold text-indigo-950 focus:outline-indigo-600 cursor-pointer shadow-2xs"
                   >
-                    {availableMySlots.map(slot => (
-                      <option key={slot.id} value={slot.id}>
-                        {formatSlotDate(slot.date)} - [{getShiftLabel(slot.shiftId)}] - Phòng: {slot.roomId} - GV: {slot.teacherId}
+                    <option value="">-- Bấm vào đây để chọn ca mới --</option>
+                    {targetEligibleSlots.map(s => (
+                      <option key={s.id} value={s.id}>
+                        [{s.date}] {s.startTime}-{s.endTime} | {s.subject} ({s.classId})
                       </option>
                     ))}
                   </select>
-                ) : (
-                  <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-amber-800 text-xs">
-                    Lớp này hiện chưa có lịch học nào được sắp xếp.
+                  <div className="text-[11px] font-semibold text-indigo-700 flex items-center gap-1.5 mt-1">
+                    <Sparkles size={13} className="text-indigo-600" />
+                    Chuyển tức thì • Không cần chờ quản lý hay giáo viên phê duyệt
                   </div>
-                )}
+                </div>
               </div>
 
-              {/* 5. Lý do xin phép */}
+              {/* Lý do (tùy chọn) */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Lý do chi tiết <span className="text-rose-500">*</span>
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  Ghi chú lý do (tùy chọn):
                 </label>
-                <textarea
-                  rows={3}
-                  value={form.reason}
-                  onChange={e => setForm({ ...form, reason: e.target.value })}
-                  placeholder="Nêu rõ lý do xin nghỉ..."
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-emerald-600 focus:border-emerald-600"
-                  required
-                ></textarea>
+                <input
+                  type="text"
+                  value={reason}
+                  onChange={e => setReason(e.target.value)}
+                  placeholder="VD: Trùng lịch kiểm tra tại trường, bận việc gia đình..."
+                  className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-indigo-600"
+                />
               </div>
 
-              {/* Action buttons */}
-              <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition text-xs font-semibold cursor-pointer"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting || !form.scheduleSlotId}
-                  className="flex items-center gap-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition shadow-xs cursor-pointer"
-                >
-                  <Send size={14} /> {submitting ? 'Đang gửi...' : 'Gửi đơn phê duyệt'}
-                </button>
-              </div>
+              {/* NÚT BẤM TO BẢN XÁC NHẬN ĐỔI CA */}
+              <button
+                type="submit"
+                disabled={submitting || !selectedTargetSlotId || !selectedCurrentSlotId}
+                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white rounded-2xl font-black text-base sm:text-lg transition-all shadow-md hover:shadow-indigo-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {submitting ? (
+                  <span>Đang xử lý đổi ca...</span>
+                ) : (
+                  <>
+                    <ArrowRightLeft size={20} />
+                    <span>XÁC NHẬN ĐỔI CA NGAY LẬP TỨC (5 GIÂY)</span>
+                  </>
+                )}
+              </button>
             </form>
-          </Modal>
+          </div>
+
+          {/* KHỐI 2: NHẬT KÝ ĐỔI CA ĐÃ THỰC HIỆN */}
+          <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-xs overflow-hidden">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-2 font-black text-slate-800 text-sm">
+                <History size={18} className="text-indigo-600" />
+                Lịch sử các lần đổi ca của bạn
+              </div>
+              <span className="text-xs font-bold text-slate-500">{requests.length} lượt</span>
+            </div>
+
+            {requests.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-xs">
+                Bạn chưa thực hiện lần đổi ca nào.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {requests.map(req => {
+                  const targetSlot = availableSlots.find(s => s.id === req.targetScheduleSlotId);
+                  const origSlot = availableSlots.find(s => s.id === req.scheduleSlotId) || mySlots.find(s => s.id === req.scheduleSlotId);
+
+                  return (
+                    <div key={req.id} className="p-4 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                            {req.id}
+                          </span>
+                          <span className="font-bold text-slate-800">
+                            {new Date(req.createdAt).toLocaleDateString('vi-VN')} {new Date(req.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-slate-600 font-medium flex items-center gap-1.5 flex-wrap">
+                          <span>Từ ca: <strong className="text-slate-900">[{req.scheduleSlotId}] {origSlot?.startTime || ''}</strong></span>
+                          <span>👉</span>
+                          <span>Sang ca: <strong className="text-emerald-700">[{req.targetScheduleSlotId || 'Ca mới'}] {targetSlot?.startTime || ''}</strong></span>
+                        </div>
+                        {req.reason && (
+                          <div className="text-[11px] text-slate-400 mt-0.5 italic">
+                            Lý do: "{req.reason}"
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="shrink-0 flex items-center gap-1.5 font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                        <Check size={14} className="stroke-[3]" />
+                        <span>Đã đổi thành công</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </main>
       </div>
     </RoleGuard>

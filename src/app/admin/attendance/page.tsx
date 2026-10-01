@@ -1,33 +1,22 @@
 'use client';
 
 import { getTodayDateStr } from '@/utils/date';
-
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { Header } from '@/components/common/Header';
 import { RoleGuard } from '@/components/common/RoleGuard';
-import { Modal } from '@/components/common/Modal';
 import { AttendanceRecord, AttendanceStatus } from '@/types/attendance';
 import { ScheduleSlot } from '@/types/schedule';
 import { ClassEntity } from '@/types/classroom';
 import { Student } from '@/types/student';
-import Link from 'next/link';
 import { 
   Calendar, 
-  BarChart3, 
-  BookOpen, 
-  Clock, 
-  Save, 
-  CheckCircle2, 
-  UserCheck, 
-  AlertCircle, 
-  Check, 
   RotateCw, 
-  PlusCircle, 
-  Search, 
+  CheckCircle2, 
+  AlertCircle, 
+  Edit3,
   X,
-  AlertTriangle,
-  Info,
-  Edit3
+  Clock,
+  Sparkles
 } from 'lucide-react';
 
 interface ExtendedAttendanceRecord extends AttendanceRecord {
@@ -35,43 +24,38 @@ interface ExtendedAttendanceRecord extends AttendanceRecord {
   studentPhone?: string;
 }
 
-function AdminAttendanceContent() {
-  const [editingAttendanceStudent, setEditingAttendanceStudent] = useState<any>(null);
-  const [editRemainingInput, setEditRemainingInput] = useState<number>(12);
-  const [studentDetailMap, setStudentDetailMap] = useState<Record<string, any>>({});
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
-  // Bộ lọc
+// 3 ca học đặc thù của Mr. Thuyết
+const SHIFT_OPTIONS = [
+  { id: 'shift_afternoon', name: 'Ca Chiều', time: '14:00 - 17:00' },
+  { id: 'shift_evening', name: 'Ca Tối', time: '18:00 - 21:00' },
+  { id: 'shift_night', name: 'Ca Đêm', time: '21:00 - 23:00' },
+];
+
+function AttendanceContent() {
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateStr());
-  const [classes, setClasses] = useState<ClassEntity[]>([]);
-  const [selectedClassId, setSelectedClassId] = useState<string>('ALL');
-  const [slots, setSlots] = useState<ScheduleSlot[]>([]);
+  const [selectedShiftPreset, setSelectedShiftPreset] = useState<string>('ALL');
   const [selectedSlotId, setSelectedSlotId] = useState<string>('');
   
-  // Dữ liệu học viên & điểm danh
+  const [slots, setSlots] = useState<ScheduleSlot[]>([]);
+  const [classes, setClasses] = useState<ClassEntity[]>([]);
   const [studentsMap, setStudentsMap] = useState<Map<string, Student>>(new Map());
   const [records, setRecords] = useState<ExtendedAttendanceRecord[]>([]);
-  
-  // Loading & Toast thông báo
+
   const [loadingSlots, setLoadingSlots] = useState<boolean>(false);
   const [loadingAttendance, setLoadingAttendance] = useState<boolean>(false);
-  const [saving, setSaving] = useState<boolean>(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Modal Điểm danh bù
-  const [isMakeupModalOpen, setIsMakeupModalOpen] = useState<boolean>(false);
-  const [makeupStudentId, setMakeupStudentId] = useState<string>('');
-  const [makeupStudentSearch, setMakeupStudentSearch] = useState<string>('');
-  const [makeupOriginalSlotId, setMakeupOriginalSlotId] = useState<string>('');
-  const [makeupReason, setMakeupReason] = useState<string>('');
-  const [makeupPastAbsences, setMakeupPastAbsences] = useState<AttendanceRecord[]>([]);
-  const [loadingAbsences, setLoadingAbsences] = useState<boolean>(false);
+  // Modal chỉnh nhanh số buổi còn lại
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [editRemainingInput, setEditRemainingInput] = useState<number>(12);
 
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setToastMessage({ type, text });
-    setTimeout(() => setToastMessage(null), 3500);
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // 1. Tải danh sách tất cả lớp học & toàn bộ học viên
+  // 1. Tải danh mục lớp & danh sách học viên
   useEffect(() => {
     async function initData() {
       try {
@@ -82,44 +66,31 @@ function AdminAttendanceContent() {
         const clsData = await clsRes.json();
         const stData = await stRes.json();
 
-        if (clsData.classes) {
-          setClasses(clsData.classes);
-        }
-
-        const map = new Map<string, Student>();
-        const detailMap: Record<string, any> = {};
+        if (clsData.classes) setClasses(clsData.classes);
         if (stData.students) {
-          stData.students.forEach((s: Student) => {
-            map.set(s.id, s);
-            detailMap[s.id] = s;
-          });
+          const map = new Map<string, Student>();
+          stData.students.forEach((s: Student) => map.set(s.id, s));
+          setStudentsMap(map);
         }
-        setStudentsMap(map);
-        setStudentDetailMap(detailMap);
       } catch (err) {
         console.error('Lỗi khi tải dữ liệu khởi tạo:', err);
-        showToast('Không thể tải danh mục lớp hoặc học viên', 'error');
+        showToast('Không thể nạp danh mục lớp hoặc học viên', 'error');
       }
     }
     initData();
   }, []);
 
-  // 2. Nạp danh sách Ca học (`slots`) theo `date` và `classId`
+  // 2. Nạp ca học theo ngày
   useEffect(() => {
     async function loadSlots() {
       if (!selectedDate) return;
       setLoadingSlots(true);
       try {
-        let url = `/api/schedule?date=${selectedDate}`;
-        if (selectedClassId && selectedClassId !== 'ALL') {
-          url += `&classId=${selectedClassId}`;
-        }
-        const res = await fetch(url);
+        const res = await fetch(`/api/schedule?date=${selectedDate}`);
         const data = await res.json();
         const loadedSlots: ScheduleSlot[] = data.slots || [];
         setSlots(loadedSlots);
 
-        // Tự động chọn ca đầu tiên khả dụng nếu có
         if (loadedSlots.length > 0) {
           const currentExists = loadedSlots.some(s => s.id === selectedSlotId);
           if (!currentExists) {
@@ -130,16 +101,41 @@ function AdminAttendanceContent() {
           setRecords([]);
         }
       } catch (err) {
-        console.error('Lỗi khi tải danh sách ca học:', err);
-        showToast('Lỗi khi tải ca học', 'error');
+        console.error('Lỗi nạp ca học:', err);
+        showToast('Lỗi khi tải danh sách ca học', 'error');
       } finally {
         setLoadingSlots(false);
       }
     }
     loadSlots();
-  }, [selectedDate, selectedClassId]);
+  }, [selectedDate]);
 
-  // 3. Nạp dữ liệu sổ điểm danh cho Ca học đang chọn
+  // Lọc slots hiển thị theo 3 ca hoặc tất cả
+  const filteredSlots = useMemo(() => {
+    if (selectedShiftPreset === 'ALL') return slots;
+    if (selectedShiftPreset === 'shift_afternoon') {
+      return slots.filter(s => s.startTime.startsWith('14') || s.startTime.startsWith('13') || s.startTime.startsWith('15'));
+    }
+    if (selectedShiftPreset === 'shift_evening') {
+      return slots.filter(s => s.startTime.startsWith('18') || s.startTime.startsWith('17') || s.startTime.startsWith('19'));
+    }
+    if (selectedShiftPreset === 'shift_night') {
+      return slots.filter(s => s.startTime.startsWith('21') || s.startTime.startsWith('20') || s.startTime.startsWith('22'));
+    }
+    return slots;
+  }, [slots, selectedShiftPreset]);
+
+  // Tự chọn ca đầu tiên của filter nếu selectedSlotId không nằm trong filter
+  useEffect(() => {
+    if (filteredSlots.length > 0) {
+      const exists = filteredSlots.some(s => s.id === selectedSlotId);
+      if (!exists) {
+        setSelectedSlotId(filteredSlots[0].id);
+      }
+    }
+  }, [filteredSlots]);
+
+  // 3. Nạp danh sách điểm danh cho Ca học đang chọn
   useEffect(() => {
     if (!selectedSlotId) {
       setRecords([]);
@@ -152,41 +148,38 @@ function AdminAttendanceContent() {
     async function loadSlotAttendance(slot: ScheduleSlot) {
       setLoadingAttendance(true);
       try {
-        const res = await fetch(`/api/attendance?slotId=${selectedSlotId}`);
-        const data = await res.json();
-        const existingRecords: AttendanceRecord[] = data.records || [];
+        const attRes = await fetch(`/api/attendance?slotId=${slot.id}`);
+        const attData = await attRes.json();
+        const existingRecords: AttendanceRecord[] = attData.records || [];
 
-        // Lấy thông tin lớp học của slot này để lấy studentIds chuẩn
-        const clsRes = await fetch(`/api/classes?id=${slot.classId}`);
-        const clsData = await clsRes.json();
-        const targetClass: ClassEntity = clsData.class;
-        const rosterStudentIds: string[] = targetClass?.studentIds || [];
+        const cls = classes.find(c => c.id === slot.classId);
+        const studentIds: string[] = cls?.studentIds || [];
 
-        // Hợp nhất danh sách học viên trong lớp + các bản ghi điểm danh bù ngoài ca (nếu có)
-        const allStudentIds = new Set<string>([...rosterStudentIds]);
-        existingRecords.forEach(r => allStudentIds.add(r.studentId));
+        const existingMap = new Map<string, AttendanceRecord>();
+        existingRecords.forEach(r => existingMap.set(r.studentId, r));
 
-        const mergedRecords: ExtendedAttendanceRecord[] = Array.from(allStudentIds).map((stId, idx) => {
+        const allStudentIds = Array.from(new Set([...studentIds, ...Array.from(existingMap.keys())]));
+
+        const mergedRecords: ExtendedAttendanceRecord[] = allStudentIds.map(stId => {
           const student = studentsMap.get(stId);
-          const found = existingRecords.find(r => r.studentId === stId);
+          const existing = existingMap.get(stId);
 
-          if (found) {
+          if (existing) {
             return {
-              ...found,
+              ...existing,
               studentName: student?.name || `Học viên ${stId}`,
               studentPhone: student?.phone || '-',
             };
           }
 
-          // Tạo record mới nháp nếu chưa được điểm danh
           return {
-            id: `ATT_NEW_${selectedSlotId}_${stId}`,
-            scheduleSlotId: selectedSlotId,
+            id: `ATT_NEW_${slot.id}_${stId}`,
+            scheduleSlotId: slot.id,
             classId: slot.classId,
             studentId: stId,
             date: slot.date,
             status: 'Có mặt',
-            checkinTime: slot.startTime ? `${slot.startTime}:00` : '08:00:00',
+            checkinTime: slot.startTime ? `${slot.startTime}:00` : '18:00:00',
             updatedBy: 'ADMIN001',
             updatedAt: new Date().toISOString(),
             method: 'MANUAL',
@@ -197,166 +190,59 @@ function AdminAttendanceContent() {
 
         setRecords(mergedRecords);
       } catch (err) {
-        console.error('Lỗi khi tải chi tiết điểm danh:', err);
-        showToast('Lỗi khi nạp danh sách điểm danh của ca học', 'error');
+        console.error('Lỗi khi nạp điểm danh:', err);
+        showToast('Lỗi khi nạp danh sách học viên của ca học', 'error');
       } finally {
         setLoadingAttendance(false);
       }
     }
 
     loadSlotAttendance(currentSlot);
-  }, [selectedSlotId, slots, studentsMap]);
+  }, [selectedSlotId, slots, classes, studentsMap]);
 
-  // Thống kê nhanh số lượng 5 trạng thái
+  // Đếm nhanh 3 trạng thái
   const counts = useMemo(() => {
     let present = 0;
-    let late = 0;
     let excused = 0;
     let unexcused = 0;
-    let makeup = 0;
 
     records.forEach(r => {
       if (r.status === 'Có mặt') present++;
-      else if (r.status === 'Đi muộn') late++;
-      else if (r.status === 'Vắng có phép') excused++;
+      else if (r.status === 'Vắng có phép' || r.status === 'Điểm danh bù') excused++;
       else if (r.status === 'Vắng không phép') unexcused++;
-      else if (r.status === 'Điểm danh bù') makeup++;
     });
 
-    return { present, late, excused, unexcused, makeup, total: records.length };
+    return { present, excused, unexcused, total: records.length };
   }, [records]);
 
-  // Handler đổi trạng thái cho từng học viên
-  
-  const handleUpdateStudentSessionsFromAttendance = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingAttendanceStudent) return;
-    try {
-      const res = await fetch(`/api/students/${editingAttendanceStudent.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ remainingSessions: editRemainingInput })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        showToast(`Đã cập nhật số buổi của ${editingAttendanceStudent.name} thành ${editRemainingInput} buổi!`);
-        setStudentDetailMap(prev => ({
-          ...prev,
-          [editingAttendanceStudent.id]: {
-            ...prev[editingAttendanceStudent.id],
-            remainingSessions: editRemainingInput
-          }
-        }));
-        setEditingAttendanceStudent(null);
-      } else {
-        alert(data.error || 'Cập nhật thất bại');
-      }
-    } catch (e: any) {
-      alert(e.message || 'Lỗi mạng');
-    }
-  };
-
-  const handleStatusChange = (index: number, newStatus: AttendanceStatus) => {
+  // 1-Click Action lưu ngay lập tức
+  const handleSingleClickStatus = async (index: number, newStatus: AttendanceStatus) => {
     const updated = [...records];
     const rec = updated[index];
+    const oldStatus = rec.status;
     rec.status = newStatus;
-
-    const currentSlot = slots.find(s => s.id === selectedSlotId);
-    const now = new Date();
-    const nowTimeStr = now.toTimeString().split(' ')[0]; // HH:mm:ss
-
-    if (newStatus === 'Có mặt') {
-      if (!rec.checkinTime) {
-        rec.checkinTime = currentSlot?.startTime ? `${currentSlot.startTime}:00` : nowTimeStr;
-      }
-    } else if (newStatus === 'Đi muộn') {
-      rec.checkinTime = nowTimeStr;
-    } else if (newStatus === 'Điểm danh bù') {
-      if (!rec.checkinTime) {
-        rec.checkinTime = nowTimeStr;
-      }
-      // Mở modal nếu chưa có thông tin bù
-      if (!rec.originalSlotId) {
-        openMakeupModalForStudent(rec.studentId);
-      }
-    } else {
-      // Vắng có phép hoặc Vắng không phép -> xóa checkinTime
-      rec.checkinTime = undefined;
-    }
-
     setRecords(updated);
-  };
+    setSavingId(rec.studentId);
 
-  // Handler cập nhật giờ Check-in thủ công
-  const handleCheckinTimeChange = (index: number, val: string) => {
-    const updated = [...records];
-    updated[index].checkinTime = val;
-    setRecords(updated);
-  };
-
-  // Handler lấy giờ hiện tại
-  const handleSetCurrentTime = (index: number) => {
-    const now = new Date();
-    const timeStr = now.toTimeString().split(' ')[0];
-    const updated = [...records];
-    updated[index].checkinTime = timeStr;
-    if (updated[index].status === 'Vắng có phép' || updated[index].status === 'Vắng không phép') {
-      updated[index].status = 'Có mặt';
-    }
-    setRecords(updated);
-  };
-
-  // Handler cập nhật ghi chú
-  const handleNoteChange = (index: number, note: string) => {
-    const updated = [...records];
-    updated[index].note = note;
-    setRecords(updated);
-  };
-
-  // Đánh dấu tất cả Có mặt
-  const handleMarkAllPresent = () => {
-    const currentSlot = slots.find(s => s.id === selectedSlotId);
-    const defaultTime = currentSlot?.startTime ? `${currentSlot.startTime}:00` : '08:00:00';
-    const updated = records.map(r => ({
-      ...r,
-      status: 'Có mặt' as AttendanceStatus,
-      checkinTime: r.checkinTime || defaultTime,
-    }));
-    setRecords(updated);
-    showToast(`Đã đánh dấu ${updated.length} học viên "Có mặt"`);
-  };
-
-  // Lưu sổ điểm danh (POST batch)
-  const handleSaveAttendance = async () => {
-    if (!selectedSlotId || records.length === 0) {
-      showToast('Không có dữ liệu điểm danh để lưu', 'error');
-      return;
-    }
-
-    setSaving(true);
     try {
-      // Chuẩn hóa records trước khi gửi
-      const cleanedRecords: AttendanceRecord[] = records.map(r => ({
-        id: r.id.startsWith('ATT_NEW_') ? `ATT_${Date.now()}_${Math.random().toString(36).substring(2, 6)}` : r.id,
-        scheduleSlotId: r.scheduleSlotId,
-        classId: r.classId,
-        studentId: r.studentId,
-        date: r.date,
-        status: r.status,
-        checkinTime: r.checkinTime || undefined,
-        note: r.note || undefined,
-        originalSlotId: r.originalSlotId || undefined,
-        makeupReason: r.makeupReason || undefined,
-        method: r.method || 'MANUAL',
+      const recordToSave: AttendanceRecord = {
+        id: rec.id.startsWith('ATT_NEW_') ? `ATT_${Date.now()}_${Math.random().toString(36).substring(2, 6)}` : rec.id,
+        scheduleSlotId: rec.scheduleSlotId,
+        classId: rec.classId,
+        studentId: rec.studentId,
+        date: rec.date,
+        status: newStatus,
+        checkinTime: newStatus === 'Có mặt' ? (rec.checkinTime || '18:00:00') : undefined,
+        method: 'MANUAL',
         updatedBy: 'ADMIN001',
         updatedAt: new Date().toISOString(),
-      }));
+      };
 
       const res = await fetch('/api/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          records: cleanedRecords,
+          records: [recordToSave],
           slotId: selectedSlotId,
           updatedBy: 'ADMIN001',
           updaterName: 'Quản trị viên',
@@ -364,686 +250,361 @@ function AdminAttendanceContent() {
         })
       });
 
-      const resData = await res.json();
-      if (res.ok && resData.success) {
-        showToast(`Đã lưu thành công sổ điểm danh (${cleanedRecords.length} học viên)!`);
-        // Đồng bộ lại id bản ghi
-        setRecords(prev => prev.map((item, idx) => ({
-          ...item,
-          id: cleanedRecords[idx].id
-        })));
+      const data = await res.json();
+      if (res.ok && data.success) {
+        rec.id = recordToSave.id;
+        showToast(`Đã lưu: ${rec.studentName} 👉 [${newStatus}]`);
       } else {
-        throw new Error(resData.error || 'Lưu thất bại');
+        rec.status = oldStatus;
+        setRecords([...records]);
+        showToast('Không lưu được trạng thái, thử lại', 'error');
+      }
+    } catch (e: any) {
+      rec.status = oldStatus;
+      setRecords([...records]);
+      showToast(e.message || 'Lỗi mạng khi lưu', 'error');
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  // Cập nhật số buổi
+  const handleUpdateStudentSessions = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+    try {
+      const res = await fetch(`/api/students/${editingStudent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ remainingSessions: editRemainingInput })
+      });
+      if (res.ok) {
+        showToast(`Đã đổi số buổi của ${editingStudent.name} thành ${editRemainingInput}`);
+        const updated = new Map(studentsMap);
+        const st = updated.get(editingStudent.id);
+        if (st) {
+          st.remainingSessions = editRemainingInput;
+          updated.set(editingStudent.id, { ...st });
+          setStudentsMap(updated);
+        }
+        setEditingStudent(null);
+      } else {
+        showToast('Lỗi cập nhật số buổi', 'error');
       }
     } catch (err: any) {
-      console.error('Lỗi lưu sổ điểm danh:', err);
-      showToast(err.message || 'Lỗi khi lưu sổ điểm danh', 'error');
-    } finally {
-      setSaving(false);
+      showToast(err.message || 'Lỗi kết nối', 'error');
     }
-  };
-
-  // Mở Modal Điểm danh bù cho 1 học sinh cụ thể
-  const openMakeupModalForStudent = async (studentId: string) => {
-    setMakeupStudentId(studentId);
-    setMakeupOriginalSlotId('');
-    setMakeupReason('');
-    setIsMakeupModalOpen(true);
-
-    if (studentId) {
-      setLoadingAbsences(true);
-      try {
-        const res = await fetch(`/api/attendance?studentId=${studentId}`);
-        const data = await res.json();
-        const allAtt: AttendanceRecord[] = data.records || [];
-        // Lọc các ca vắng
-        const absences = allAtt.filter(a => a.status === 'Vắng có phép' || a.status === 'Vắng không phép');
-        setMakeupPastAbsences(absences);
-        if (absences.length > 0) {
-          setMakeupOriginalSlotId(absences[0].scheduleSlotId);
-        }
-      } catch (e) {
-        console.error('Lỗi khi nạp lịch sử vắng:', e);
-      } finally {
-        setLoadingAbsences(false);
-      }
-    }
-  };
-
-  // Khi chọn học viên trong Modal
-  const handleSelectStudentInModal = async (sId: string) => {
-    setMakeupStudentId(sId);
-    setMakeupOriginalSlotId('');
-    if (!sId) {
-      setMakeupPastAbsences([]);
-      return;
-    }
-
-    setLoadingAbsences(true);
-    try {
-      const res = await fetch(`/api/attendance?studentId=${sId}`);
-      const data = await res.json();
-      const allAtt: AttendanceRecord[] = data.records || [];
-      const absences = allAtt.filter(a => a.status === 'Vắng có phép' || a.status === 'Vắng không phép');
-      setMakeupPastAbsences(absences);
-      if (absences.length > 0) {
-        setMakeupOriginalSlotId(absences[0].scheduleSlotId);
-      }
-    } catch (e) {
-      console.error('Lỗi nạp lịch sử vắng:', e);
-    } finally {
-      setLoadingAbsences(false);
-    }
-  };
-
-  // Xác nhận lưu Điểm danh bù trong Modal
-  const handleConfirmMakeup = () => {
-    if (!makeupStudentId) {
-      showToast('Vui lòng chọn học viên cần điểm danh bù', 'error');
-      return;
-    }
-
-    const currentSlot = slots.find(s => s.id === selectedSlotId);
-    if (!currentSlot) {
-      showToast('Không xác định được ca học hiện tại', 'error');
-      return;
-    }
-
-    const student = studentsMap.get(makeupStudentId);
-    const existingIndex = records.findIndex(r => r.studentId === makeupStudentId);
-    const nowTimeStr = new Date().toTimeString().split(' ')[0];
-
-    if (existingIndex >= 0) {
-      // Cập nhật học viên đã có trong ca
-      const updated = [...records];
-      updated[existingIndex] = {
-        ...updated[existingIndex],
-        status: 'Điểm danh bù',
-        originalSlotId: makeupOriginalSlotId || 'SCH_MANUAL_MAKEUP',
-        makeupReason: makeupReason || 'Học bù ca vắng',
-        checkinTime: updated[existingIndex].checkinTime || nowTimeStr,
-        method: 'MANUAL',
-      };
-      setRecords(updated);
-    } else {
-      // Thêm học viên ngoài ca vào danh sách ca hiện tại
-      const newMakeupRecord: ExtendedAttendanceRecord = {
-        id: `ATT_NEW_${selectedSlotId}_${makeupStudentId}`,
-        scheduleSlotId: selectedSlotId,
-        classId: currentSlot.classId,
-        studentId: makeupStudentId,
-        date: currentSlot.date,
-        status: 'Điểm danh bù',
-        originalSlotId: makeupOriginalSlotId || 'SCH_MANUAL_MAKEUP',
-        makeupReason: makeupReason || 'Học bù ca vắng ngoài ca',
-        checkinTime: nowTimeStr,
-        updatedBy: 'ADMIN001',
-        updatedAt: new Date().toISOString(),
-        method: 'MANUAL',
-        studentName: student?.name || `Học viên ${makeupStudentId}`,
-        studentPhone: student?.phone || '-',
-      };
-      setRecords([newMakeupRecord, ...records]);
-    }
-
-    setIsMakeupModalOpen(false);
-    showToast(`Đã thiết lập Điểm danh bù cho học viên ${student?.name || makeupStudentId}`);
   };
 
   const currentSlot = slots.find(s => s.id === selectedSlotId);
 
-  // Danh sách học viên gợi ý tìm kiếm trong Modal
-  const filteredStudentsForModal = useMemo(() => {
-    const list = Array.from(studentsMap.values());
-    if (!makeupStudentSearch) return list.slice(0, 30);
-    const q = makeupStudentSearch.toLowerCase();
-    return list.filter(s => s.id.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)).slice(0, 30);
-  }, [studentsMap, makeupStudentSearch]);
-
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
-      <Header 
-        title="Sổ Điểm Danh Toàn Trường" 
-        subtitle="Quản lý chuyên cần, giờ check-in và điểm danh bù cho tất cả các lớp học" 
-      />
+    <RoleGuard allowedRoles={['ADMIN', 'TEACHER']}>
+      <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
+        <Header 
+          title="Sổ Điểm Danh Siêu Tinh Gọn" 
+          subtitle="Thao tác 5 giây - Bấm nút là lưu ngay lập tức - Không rườm rà thủ tục" 
+        />
 
-      <main className="p-6 max-w-7xl mx-auto w-full space-y-6">
-        {/* Toast Alert */}
-        {toastMessage && (
-          <div className={`p-4 rounded-xl shadow-md border flex items-center gap-3 transition-all animate-in fade-in duration-200 ${
-            toastMessage.type === 'success' 
-              ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-              : 'bg-rose-50 text-rose-800 border-rose-200'
-          }`}>
-            {toastMessage.type === 'success' ? <CheckCircle2 size={20} className="text-emerald-600" /> : <AlertCircle size={20} className="text-rose-600" />}
-            <span className="text-sm font-semibold">{toastMessage.text}</span>
+        <main className="p-4 sm:p-6 max-w-6xl mx-auto w-full space-y-5">
+          {/* Toast thông báo nổi */}
+          {toastMessage && (
+            <div className={`p-3.5 rounded-xl shadow-lg border flex items-center gap-3 transition-all animate-in fade-in duration-150 ${
+              toastMessage.type === 'success' 
+                ? 'bg-emerald-50 text-emerald-900 border-emerald-300' 
+                : 'bg-rose-50 text-rose-900 border-rose-300'
+            }`}>
+              {toastMessage.type === 'success' ? <CheckCircle2 size={18} className="text-emerald-600" /> : <AlertCircle size={18} className="text-rose-600" />}
+              <span className="text-xs sm:text-sm font-bold">{toastMessage.text}</span>
+            </div>
+          )}
+
+          {/* KHỐI 1: BỘ CHỌN NGÀY & 3 CA TO RÕ BẢN LỚN (FLAPPY BIRD VIBE) */}
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-slate-200 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Calendar size={20} className="text-indigo-600" />
+                <span className="font-extrabold text-sm sm:text-base text-slate-900 uppercase tracking-tight">Chọn ngày:</span>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={e => setSelectedDate(e.target.value)}
+                  className="bg-indigo-50 border-2 border-indigo-200 rounded-xl px-3 py-1.5 font-bold text-indigo-900 text-sm focus:outline-indigo-600 cursor-pointer"
+                />
+              </div>
+
+              {currentSlot && (
+                <div className="text-xs font-semibold px-3 py-1 bg-slate-100 border border-slate-200 rounded-lg text-slate-700">
+                  Phòng: <strong className="text-indigo-600">{currentSlot.roomId}</strong> • Môn: <strong className="text-slate-900">{currentSlot.subject}</strong>
+                </div>
+              )}
+            </div>
+
+            {/* 3 NÚT CA TO RÕ */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              {SHIFT_OPTIONS.map(shift => {
+                const isSelected = selectedShiftPreset === shift.id;
+                return (
+                  <button
+                    key={shift.id}
+                    type="button"
+                    onClick={() => setSelectedShiftPreset(isSelected ? 'ALL' : shift.id)}
+                    className={`p-3.5 rounded-xl border-2 text-left font-sans transition-all cursor-pointer flex flex-col justify-between ${
+                      isSelected
+                        ? 'border-indigo-600 bg-indigo-600 text-white shadow-md scale-[1.01]'
+                        : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 text-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-base sm:text-lg font-black tracking-tight">{shift.name}</span>
+                      <Clock size={16} className={isSelected ? 'text-indigo-200' : 'text-slate-400'} />
+                    </div>
+                    <div className={`text-xs font-bold mt-1 ${isSelected ? 'text-indigo-100' : 'text-slate-500'}`}>
+                      {shift.time}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Nếu có nhiều slot trong ngày/ca đã lọc */}
+            {filteredSlots.length > 0 && (
+              <div className="pt-2 border-t border-slate-100 flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-slate-500">Lớp cụ thể:</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {filteredSlots.map(s => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setSelectedSlotId(s.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                        selectedSlotId === s.id
+                          ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {s.subject} ({s.classId}) - {s.startTime}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* KHỐI 2: THỐNG KÊ 3 SỐ CHỈ SỐ TO RÕ (KHÔNG CÓ ĐI MUỘN NỮA) */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-emerald-50 border-2 border-emerald-200 p-3 sm:p-4 rounded-2xl text-center shadow-xs">
+              <div className="text-xs font-extrabold text-emerald-800 uppercase tracking-wider">🟢 Có mặt</div>
+              <div className="text-2xl sm:text-3xl font-black text-emerald-700 mt-1">{counts.present}</div>
+            </div>
+            <div className="bg-amber-50 border-2 border-amber-200 p-3 sm:p-4 rounded-2xl text-center shadow-xs">
+              <div className="text-xs font-extrabold text-amber-800 uppercase tracking-wider">🟡 Nghỉ phép</div>
+              <div className="text-2xl sm:text-3xl font-black text-amber-700 mt-1">{counts.excused}</div>
+            </div>
+            <div className="bg-rose-50 border-2 border-rose-300 p-3 sm:p-4 rounded-2xl text-center shadow-xs">
+              <div className="text-xs font-extrabold text-rose-800 uppercase tracking-wider">🔴 Không phép (Cần chăm sóc)</div>
+              <div className="text-2xl sm:text-3xl font-black text-rose-700 mt-1">{counts.unexcused}</div>
+            </div>
+          </div>
+
+          {/* KHỐI 3: DANH SÁCH BẢNG DỌC TINH GIẢN VỚI 3 NÚT BẤM TO BẢN (1-CLICK LƯU NGAY) */}
+          <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <div className="font-extrabold text-slate-800 text-sm">
+                Danh sách học viên ({records.length} bạn)
+              </div>
+              <span className="text-[11px] font-bold text-slate-500 bg-white border border-slate-200 px-2.5 py-1 rounded-md">
+                ⚡ Bấm nút là lưu tự động 100%
+              </span>
+            </div>
+
+            {loadingAttendance || loadingSlots ? (
+              <div className="p-12 text-center text-slate-400 text-sm">
+                <RotateCw size={24} className="animate-spin mx-auto mb-2 text-indigo-600" />
+                Đang nạp danh sách học sinh...
+              </div>
+            ) : records.length === 0 ? (
+              <div className="p-12 text-center text-slate-400 text-sm font-medium">
+                {selectedSlotId ? 'Không có học viên trong ca học này.' : 'Không có ca học nào trong ngày hoặc bộ lọc đã chọn.'}
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {records.map((rec, idx) => {
+                  const student = studentsMap.get(rec.studentId);
+                  const remaining = student?.remainingSessions ?? 12;
+                  const isSavingThis = savingId === rec.studentId;
+
+                  return (
+                    <div 
+                      key={rec.id || idx} 
+                      className="p-3.5 sm:p-4 hover:bg-slate-50/80 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3"
+                    >
+                      {/* Cột 1: Thông tin học viên */}
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-6 text-center text-xs font-mono font-bold text-slate-400">
+                          {idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-slate-900 text-sm sm:text-base truncate">
+                              {rec.studentName}
+                            </span>
+                            <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                              {rec.studentId}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-500 font-medium mt-0.5 flex items-center gap-2 flex-wrap">
+                            <span>{student?.gradeLevel || 'Lớp 12'}</span>
+                            <span>•</span>
+                            <span className="font-semibold text-slate-700">
+                              {student?.examBlock === 'KHOI_H' ? 'Khối H' : 'Khối V'}
+                            </span>
+                            <span>•</span>
+                            <span className="text-indigo-600 font-semibold">
+                              {student?.targetUniversity === 'KHAC' ? student?.customUniversity : (student?.targetUniversity || 'HAU')}
+                            </span>
+                            <span>•</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingStudent(student || { id: rec.studentId, name: rec.studentName || '', phone: '', status: 'Đang học', enrolledClassIds: [], createdAt: '' });
+                                setEditRemainingInput(remaining);
+                              }}
+                              className="inline-flex items-center gap-1 font-mono font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded border border-amber-200 text-[11px] cursor-pointer"
+                              title="Bấm để chỉnh số buổi còn lại"
+                            >
+                              <span>Còn {remaining} buổi</span>
+                              <Edit3 size={11} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Cột 2: 3 NÚT BẤM TO BẢN (1-CLICK LƯU NGAY) */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* 1. NÚT CÓ MẶT (XANH LÁ TO BẢN) */}
+                        <button
+                          type="button"
+                          disabled={isSavingThis}
+                          onClick={() => handleSingleClickStatus(idx, 'Có mặt')}
+                          className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer border-2 flex items-center justify-center gap-1.5 shadow-xs ${
+                            rec.status === 'Có mặt'
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-md scale-105 ring-2 ring-emerald-300'
+                              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                          }`}
+                        >
+                          🟢 Có mặt
+                        </button>
+
+                        {/* 2. NÚT NGHỈ PHÉP (VÀNG TO BẢN) */}
+                        <button
+                          type="button"
+                          disabled={isSavingThis}
+                          onClick={() => handleSingleClickStatus(idx, 'Vắng có phép')}
+                          className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer border-2 flex items-center justify-center gap-1.5 shadow-xs ${
+                            rec.status === 'Vắng có phép' || rec.status === 'Điểm danh bù'
+                              ? 'bg-amber-500 text-white border-amber-500 shadow-md scale-105 ring-2 ring-amber-300'
+                              : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
+                          }`}
+                        >
+                          🟡 Nghỉ phép
+                        </button>
+
+                        {/* 3. NÚT KHÔNG PHÉP (ĐỎ TO BẢN) */}
+                        <button
+                          type="button"
+                          disabled={isSavingThis}
+                          onClick={() => handleSingleClickStatus(idx, 'Vắng không phép')}
+                          className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer border-2 flex items-center justify-center gap-1.5 shadow-xs ${
+                            rec.status === 'Vắng không phép'
+                              ? 'bg-rose-600 text-white border-rose-600 shadow-md scale-105 ring-2 ring-rose-300'
+                              : 'bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-200'
+                          }`}
+                        >
+                          🔴 Không phép
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </main>
+
+        {/* Modal Sửa Số Buổi Còn Lại Nhanh */}
+        {editingStudent && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-5 border border-slate-200 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 className="font-bold text-slate-900 text-sm">Chỉnh số buổi còn lại</h3>
+                <button 
+                  onClick={() => setEditingStudent(null)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateStudentSessions} className="mt-4 space-y-4">
+                <div>
+                  <div className="text-xs text-slate-500 font-semibold mb-1">
+                    Học viên: <strong className="text-slate-900">{editingStudent.name}</strong> ({editingStudent.id})
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditRemainingInput(prev => Math.max(0, prev - 1))}
+                      className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 font-black text-slate-700 text-base"
+                    >
+                      -1
+                    </button>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={editRemainingInput}
+                      onChange={e => setEditRemainingInput(parseInt(e.target.value) || 0)}
+                      className="flex-1 p-2 border-2 border-slate-200 rounded-xl font-mono font-black text-center text-lg focus:outline-indigo-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setEditRemainingInput(prev => prev + 1)}
+                      className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 font-black text-slate-700 text-base"
+                    >
+                      +1
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setEditingStudent(null)}
+                    className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-xs"
+                  >
+                    Lưu số buổi
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
-
-        {/* Quick Navigation to Monthly Analytics */}
-        <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-              <BarChart3 size={20} />
-            </div>
-            <div>
-              <h4 className="font-bold text-slate-800 text-sm">Bảng Thống Kê Điểm Danh & Chuyên Cần Theo Tháng</h4>
-              <p className="text-xs text-slate-400">Xem tỷ lệ tham gia (Attendance Rate %), phân tích tổng hợp toàn trường</p>
-            </div>
-          </div>
-          <Link
-            href="/admin/attendance/analytics"
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5"
-          >
-            <span>Xem Bảng Tổng Kết Tháng</span>
-            <span>→</span>
-          </Link>
-        </div>
-
-        {/* Khối Bộ lọc Điều hành (Control Filter Bar) */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-          <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-            <Calendar size={15} /> Bộ Lọc Điều Hành Ca Học
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* 1. Chọn ngày học */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Ngày học:</label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={e => setSelectedDate(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:bg-white focus:outline-indigo-600 transition shadow-2xs"
-              />
-            </div>
-
-            {/* 2. Chọn lớp học */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Lớp học:</label>
-              <select
-                value={selectedClassId}
-                onChange={e => setSelectedClassId(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:bg-white focus:outline-indigo-600 transition shadow-2xs"
-              >
-                <option value="ALL">-- Tất cả các lớp --</option>
-                {classes.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.id} - {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* 3. Chọn ca học */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Ca học cụ thể:</label>
-              <select
-                value={selectedSlotId}
-                onChange={e => setSelectedSlotId(e.target.value)}
-                disabled={loadingSlots || slots.length === 0}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:bg-white focus:outline-indigo-600 transition shadow-2xs disabled:opacity-50"
-              >
-                {slots.length === 0 ? (
-                  <option value="">{loadingSlots ? 'Đang nạp ca...' : 'Không có ca học nào trong ngày này'}</option>
-                ) : (
-                  slots.map(s => (
-                    <option key={s.id} value={s.id}>
-                      [Ca {s.shiftId}] {s.startTime} - {s.endTime} | {s.subject} ({s.classId}) | GV: {s.teacherId}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-          </div>
-
-          {currentSlot && (
-            <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
-              <div className="flex items-center gap-3">
-                <span className="font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-100">
-                  Mã ca: {currentSlot.id}
-                </span>
-                <span>Phòng học: <strong className="text-slate-800">{currentSlot.roomId}</strong></span>
-                <span>Môn học: <strong className="text-slate-800">{currentSlot.subject}</strong></span>
-                <span>Thời gian: <strong className="text-slate-800">{currentSlot.startTime} - {currentSlot.endTime}</strong></span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Thanh Thống kê Nhanh (Summary Metrics Bar) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tổng học viên</div>
-            <div className="text-2xl font-black text-slate-800 mt-1">{counts.total}</div>
-          </div>
-          <div className="bg-emerald-50 border border-emerald-200/80 p-3.5 rounded-xl shadow-2xs">
-            <div className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Có mặt</div>
-            <div className="text-2xl font-black text-emerald-800 mt-1">{counts.present}</div>
-          </div>
-          <div className="bg-amber-50 border border-amber-200/80 p-3.5 rounded-xl shadow-2xs">
-            <div className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Đi muộn</div>
-            <div className="text-2xl font-black text-amber-800 mt-1">{counts.late}</div>
-          </div>
-          <div className="bg-blue-50 border border-blue-200/80 p-3.5 rounded-xl shadow-2xs">
-            <div className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">Vắng có phép</div>
-            <div className="text-2xl font-black text-blue-800 mt-1">{counts.excused}</div>
-          </div>
-          <div className="bg-rose-50 border border-rose-200/80 p-3.5 rounded-xl shadow-2xs">
-            <div className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">Vắng không phép</div>
-            <div className="text-2xl font-black text-rose-800 mt-1">{counts.unexcused}</div>
-          </div>
-          <div className="bg-purple-50 border border-purple-200/80 p-3.5 rounded-xl shadow-2xs">
-            <div className="text-[11px] font-bold text-purple-700 uppercase tracking-wider">Điểm danh bù</div>
-            <div className="text-2xl font-black text-purple-800 mt-1">{counts.makeup}</div>
-          </div>
-        </div>
-
-        {/* Thanh Công cụ Tiện ích (Actions Bar) */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={handleMarkAllPresent}
-              disabled={records.length === 0}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-2xs disabled:opacity-50"
-            >
-              <Check size={16} /> Đánh dấu tất cả Có mặt
-            </button>
-            <button
-              onClick={() => openMakeupModalForStudent('')}
-              disabled={!selectedSlotId}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition shadow-2xs disabled:opacity-50"
-            >
-              <PlusCircle size={16} /> + Điểm danh bù
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleSaveAttendance}
-              disabled={saving || records.length === 0}
-              className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-md disabled:opacity-50"
-            >
-              {saving ? (
-                <>
-                  <RotateCw size={18} className="animate-spin" /> Đang lưu...
-                </>
-              ) : (
-                <>
-                  <Save size={18} /> Lưu Sổ Điểm Danh
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Bảng Dữ liệu Điểm danh - Phong cách Sổ Ký Họa Điểm Danh Atelier Studio */}
-        <section className="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between bg-slate-50/70">
-            <div>
-              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <UserCheck size={17} className="text-slate-700" />
-                Sổ Điểm Danh Học Viên Theo Ca Xưởng
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {currentSlot ? `Ca ${currentSlot.shiftId} (${currentSlot.startTime} - ${currentSlot.endTime}) • ${currentSlot.subject} • Lớp ${currentSlot.classId} • Phòng ${currentSlot.roomId}` : 'Vui lòng chọn ca học để đối soát'}
-              </p>
-            </div>
-            <span className="text-xs font-mono font-bold px-3 py-1 bg-white border border-slate-200/80 text-slate-700 rounded-lg shadow-2xs">
-              {records.length} Học viên
-            </span>
-          </div>
-
-          {loadingAttendance ? (
-            <div className="p-12 text-center text-slate-400 text-xs">
-              <RotateCw size={20} className="animate-spin mx-auto mb-2 text-slate-600" />
-              Đang đồng bộ sổ điểm danh ca xưởng...
-            </div>
-          ) : records.length === 0 ? (
-            <div className="p-12 text-center text-slate-400 text-xs">
-              {selectedSlotId ? 'Không có học viên nào trong danh sách ca học này.' : 'Vui lòng chọn ca học để hiển thị sổ điểm danh.'}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50/90 text-slate-600 uppercase font-bold border-b border-slate-200/80 text-[11px] tracking-wider">
-                  <tr>
-                    <th className="px-3 py-3.5 w-12 text-center">STT</th>
-                    <th className="px-4 py-3.5 w-52">Mã HV & Họ Tên</th>
-                    <th className="px-3 py-3.5 w-24">Lớp Mấy</th>
-                    <th className="px-3 py-3.5 w-24">Khối Thi</th>
-                    <th className="px-4 py-3.5 w-44">Trường ĐH Mục Tiêu</th>
-                    <th className="px-3 py-3.5 w-28 text-center">Nghỉ (Cần Bù)</th>
-                    <th className="px-3 py-3.5 w-32 text-center">Số Buổi Còn</th>
-                    <th className="px-4 py-3.5 text-center sm:text-left">Trạng Thái Buổi Học (1-Click)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-sans">
-                  {records.map((rec, idx) => {
-                    const stDetail = studentDetailMap[rec.studentId] || studentsMap.get(rec.studentId);
-                    const remaining = stDetail?.remainingSessions ?? stDetail?.totalSessionsInMonth ?? 12;
-                    const absentCount = stDetail?.absentSessionsInMonth ?? 0;
-                    return (
-                      <tr key={rec.id || idx} className="hover:bg-slate-50/70 transition-colors">
-                        {/* 1. STT */}
-                        <td className="px-3 py-3 text-slate-400 font-mono text-center">{idx + 1}</td>
-
-                        {/* 2. Mã HV & Họ tên */}
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="font-bold text-slate-900 text-xs sm:text-[13px]">{rec.studentName}</div>
-                          <div className="font-mono text-[11px] font-semibold text-slate-500 mt-0.5">{rec.studentId}</div>
-                        </td>
-
-                        {/* 3. Lớp mấy */}
-                        <td className="px-3 py-3 font-medium text-slate-700 whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-semibold border border-slate-200/60">
-                            {stDetail?.gradeLevel || 'Lớp 12'}
-                          </span>
-                        </td>
-
-                        {/* 4. Khối thi */}
-                        <td className="px-3 py-3 whitespace-nowrap">
-                          <span className={`px-2 py-0.5 rounded font-bold text-[10px] border ${
-                            stDetail?.examBlock === 'KHOI_H'
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : 'bg-slate-100 text-slate-700 border-slate-200'
-                          }`}>
-                            {stDetail?.examBlock === 'KHOI_H' ? 'Khối H' : 'Khối V'}
-                          </span>
-                        </td>
-
-                        {/* 5. Trường ĐH */}
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="font-bold text-slate-800 text-xs">
-                            {stDetail?.targetUniversity === 'KHAC' ? (stDetail?.customUniversity || 'Trường khác') : (stDetail?.targetUniversity || 'HAU')}
-                          </div>
-                          {stDetail?.homeTown && (
-                            <div className="text-[10px] text-slate-400 font-normal">{stDetail.homeTown}</div>
-                          )}
-                        </td>
-
-                        {/* 6. Nghỉ cần bù */}
-                        <td className="px-3 py-3 text-center whitespace-nowrap">
-                          <span className={`font-mono text-xs font-bold px-2 py-0.5 rounded ${
-                            absentCount > 0 
-                              ? 'bg-rose-50 text-rose-800 border border-rose-200/80 font-bold' 
-                              : 'text-slate-400'
-                          }`}>
-                            {absentCount} buổi
-                          </span>
-                        </td>
-
-                        {/* 7. Số buổi còn lại */}
-                        <td className="px-3 py-3 text-center whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingAttendanceStudent(stDetail || { id: rec.studentId, name: rec.studentName, remainingSessions: remaining });
-                              setEditRemainingInput(remaining);
-                            }}
-                            className={`px-2.5 py-1 rounded-lg font-mono font-bold text-xs border inline-flex items-center gap-1.5 cursor-pointer transition-all hover:ring-1 hover:ring-slate-400 ${
-                              remaining >= 4
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200/80'
-                                : remaining > 0
-                                ? 'bg-amber-50 text-amber-800 border-amber-200/80'
-                                : 'bg-rose-50 text-rose-800 border-rose-200/80 animate-pulse'
-                            }`}
-                            title="Bấm để tùy chỉnh thủ công số buổi còn lại"
-                          >
-                            <span>{remaining} buổi</span>
-                            <Edit3 size={11} className="opacity-50" />
-                          </button>
-                        </td>
-
-                        {/* 8. 3 Nút 1-Click trạng thái chuẩn atelier */}
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(idx, 'Có mặt')}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
-                                rec.status === 'Có mặt'
-                                  ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
-                                  : 'bg-emerald-50/70 hover:bg-emerald-100 text-emerald-900 border-emerald-200/80'
-                              }`}
-                            >
-                              🟢 Có mặt
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(idx, 'Vắng không phép')}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
-                                rec.status === 'Vắng không phép'
-                                  ? 'bg-rose-700 text-white border-rose-700 shadow-2xs'
-                                  : 'bg-rose-50/70 hover:bg-rose-100 text-rose-900 border-rose-200/80'
-                              }`}
-                            >
-                              🔴 Vắng
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(idx, 'Vắng có phép')}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
-                                rec.status === 'Vắng có phép' || rec.status === 'Điểm danh bù'
-                                  ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
-                                  : 'bg-amber-50/70 hover:bg-amber-100 text-amber-900 border-amber-200/80'
-                              }`}
-                            >
-                              🟡 Nghỉ phép / Bù
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      </main>
-
-      {/* Modal Sửa Số Buổi Còn Lại Cho Học Viên Từ Sổ Điểm Danh */}
-      {editingAttendanceStudent && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700">
-                  <Edit3 size={15} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 text-sm">Điều Chỉnh Số Buổi Còn Lại</h3>
-                  <p className="text-[11px] text-slate-500">{editingAttendanceStudent.name} ({editingAttendanceStudent.id})</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setEditingAttendanceStudent(null)}
-                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleUpdateStudentSessionsFromAttendance} className="p-5 space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Số buổi học còn lại trong gói:
-                </label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditRemainingInput(prev => Math.max(0, prev - 1))}
-                    className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition-colors"
-                  >
-                    -1
-                  </button>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    required
-                    value={editRemainingInput}
-                    onChange={e => setEditRemainingInput(parseInt(e.target.value) || 0)}
-                    className="flex-1 p-2 border border-slate-200 rounded-lg font-mono font-bold text-center text-sm focus:outline-slate-800"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setEditRemainingInput(prev => prev + 1)}
-                    className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition-colors"
-                  >
-                    +1
-                  </button>
-                </div>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Đồng bộ tức thì sang cơ sở dữ liệu hồ sơ học sinh.
-                </p>
-              </div>
-
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingAttendanceStudent(null)}
-                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition-colors"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-xs shadow-2xs transition-colors"
-                >
-                  Cập nhật ngay
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Điểm danh bù (Makeup Attendance Modal dùng createPortal) */}
-      <Modal isOpen={isMakeupModalOpen} onClose={() => setIsMakeupModalOpen(false)}>
-        <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
-          <div className="px-6 py-4 bg-purple-50/70 border-b border-purple-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <PlusCircle className="text-purple-600" size={20} />
-              <h3 className="font-bold text-slate-900 text-base">Ghi Nhận Điểm Danh Bù</h3>
-            </div>
-            <button 
-              onClick={() => setIsMakeupModalOpen(false)}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-purple-100"
-            >
-              <X size={18} />
-            </button>
-          </div>
-
-          <div className="p-6 space-y-4">
-            {/* 1. Chọn học viên */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">1. Chọn học viên:</label>
-              <input
-                type="text"
-                value={makeupStudentSearch}
-                onChange={e => setMakeupStudentSearch(e.target.value)}
-                placeholder="Tìm mã hoặc họ tên học viên..."
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs mb-2 focus:outline-purple-600"
-              />
-              <select
-                value={makeupStudentId}
-                onChange={e => handleSelectStudentInModal(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:outline-purple-600"
-              >
-                <option value="">-- Chọn học viên --</option>
-                {filteredStudentsForModal.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.id} - {s.name} ({s.phone})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* 2. Chọn ca học gốc bị vắng */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                2. Ca học gốc bị vắng (cần bù):
-              </label>
-              {loadingAbsences ? (
-                <div className="text-xs text-slate-400 py-2">Đang tải lịch sử vắng...</div>
-              ) : makeupPastAbsences.length > 0 ? (
-                <select
-                  value={makeupOriginalSlotId}
-                  onChange={e => setMakeupOriginalSlotId(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:outline-purple-600"
-                >
-                  <option value="">-- Chọn ca học đã vắng --</option>
-                  {makeupPastAbsences.map(a => (
-                    <option key={a.id} value={a.scheduleSlotId}>
-                      [{a.date}] Ca {a.scheduleSlotId} - {a.classId} ({a.status})
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <div>
-                  <input
-                    type="text"
-                    value={makeupOriginalSlotId}
-                    onChange={e => setMakeupOriginalSlotId(e.target.value)}
-                    placeholder="Nhập mã ca gốc (vd: SCH0012) hoặc để trống..."
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-purple-600"
-                  />
-                  <p className="text-[11px] text-amber-600 mt-1">
-                    * Học viên chưa có lịch sử vắng tự động, bạn có thể tự nhập mã ca gốc.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* 3. Lý do học bù */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">3. Lý do học bù:</label>
-              <textarea
-                value={makeupReason}
-                onChange={e => setMakeupReason(e.target.value)}
-                placeholder="VD: Bị ốm có đơn phép, Trùng lịch thi đại học, Đổi ca sang lớp song song..."
-                rows={2}
-                className="w-full border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-purple-600"
-              />
-            </div>
-
-            <div className="p-3 bg-purple-50 rounded-xl text-xs text-purple-800 border border-purple-100 flex items-start gap-2">
-              <Info size={16} className="text-purple-600 flex-shrink-0 mt-0.5" />
-              <div>
-                Ca hiện tại tiếp nhận học bù: <strong>{currentSlot?.id}</strong> (Lớp {currentSlot?.classId} ngày {currentSlot?.date}).
-              </div>
-            </div>
-          </div>
-
-          <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
-            <button
-              onClick={() => setIsMakeupModalOpen(false)}
-              className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800"
-            >
-              Hủy
-            </button>
-            <button
-              onClick={handleConfirmMakeup}
-              disabled={!makeupStudentId}
-              className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-md transition disabled:opacity-50"
-            >
-              Xác nhận Điểm danh bù
-            </button>
-          </div>
-        </div>
-      </Modal>
-    </div>
+      </div>
+    </RoleGuard>
   );
 }
 
 export default function AdminAttendancePage() {
   return (
-    <RoleGuard allowedRoles={['ADMIN']}>
-      <Suspense fallback={<div className="p-8 text-center text-sm text-slate-500">Đang tải trang Sổ Điểm danh Toàn trường...</div>}>
-        <AdminAttendanceContent />
-      </Suspense>
-    </RoleGuard>
+    <Suspense fallback={<div className="p-8 text-center text-slate-500 text-sm">Đang nạp sổ điểm danh...</div>}>
+      <AttendanceContent />
+    </Suspense>
   );
 }
