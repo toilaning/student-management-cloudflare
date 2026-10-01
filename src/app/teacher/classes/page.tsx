@@ -103,7 +103,7 @@ export default function TeacherClassesPage() {
 
   return (
     <RoleGuard allowedRoles={['TEACHER', 'ADMIN']}>
-      <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
+      <div className="flex-1 flex flex-col min-h-screen bg-slate-50/70 font-sans text-slate-800">
         <Header 
           title="Thời Khóa Biểu & Quản Lý Ca Dạy" 
           subtitle={`Giảng viên: ${currentUser?.name || ''} (${currentUser?.id || ''}) - Kỳ đào tạo Tháng 09/2026`} 

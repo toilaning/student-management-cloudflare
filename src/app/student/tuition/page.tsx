@@ -192,7 +192,7 @@ export default function StudentTuitionPage() {
 
   return (
     <RoleGuard allowedRoles={['STUDENT', 'ADMIN']}>
-      <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
+      <div className="flex-1 flex flex-col min-h-screen bg-slate-50/70 font-sans text-slate-800">
         <Header 
           title="Học Phí, Gói Buổi Học & Thanh Toán VietQR" 
           subtitle={`Tra cứu công nợ, tự chọn gói buổi học linh hoạt và quét mã VietQR tự động cho học viên ${currentUser?.name || ''}`} 
@@ -341,7 +341,7 @@ export default function StudentTuitionPage() {
           </div>
 
           {/* Section 2: Invoice & Purchase History */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+          <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h3 className="font-bold text-slate-800 text-sm">Lịch Sử Gói Đã Mua & Phiếu Thu Học Phí</h3>

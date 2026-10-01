@@ -197,7 +197,7 @@ export default function StudentClassesPage() {
 
   return (
     <RoleGuard allowedRoles={['STUDENT', 'ADMIN']}>
-      <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
+      <div className="flex-1 flex flex-col min-h-screen bg-slate-50/70 font-sans text-slate-800">
         <Header
           title="Chọn Ca Học Trực Quan (Schedule Box Picker)"
           subtitle="Hệ thống đăng ký và đổi ca học theo Box lịch trực quan cho kỳ Tháng 09/2026"
@@ -268,26 +268,26 @@ export default function StudentClassesPage() {
               let badgeStatus = null;
 
               if (isEnrolled) {
-                // 🟦 XANH DƯƠNG: Ca bạn đang học
-                cardBgBorder = 'bg-blue-50/40 border-2 border-blue-400 ring-2 ring-blue-400/20 shadow-md';
+                // Ca học viên đang học
+                cardBgBorder = 'bg-white border-2 border-indigo-600 shadow-xs ring-1 ring-indigo-500/20';
                 badgeStatus = (
-                  <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-blue-600 text-white shadow-2xs flex items-center gap-1 shrink-0">
-                    <Check size={12} /> Ca bạn đang học
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-indigo-600 text-white shadow-2xs flex items-center gap-1 shrink-0">
+                    <Check size={12} /> Ca của bạn
                   </span>
                 );
               } else if (isFull) {
-                // ⬛ XÁM: Đã đủ chỗ
-                cardBgBorder = 'bg-slate-50 border-2 border-slate-300 opacity-75';
+                // Đủ chỗ
+                cardBgBorder = 'bg-slate-50/80 border border-slate-200/80 opacity-75';
                 badgeStatus = (
-                  <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-slate-600 text-white shadow-2xs shrink-0">
-                    Hết chỗ
+                  <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-slate-200 text-slate-700 shrink-0">
+                    Đủ sĩ số
                   </span>
                 );
               } else {
-                // 🟩 XANH LÁ: Còn chỗ
-                cardBgBorder = 'bg-emerald-50/30 border-2 border-emerald-400 hover:border-emerald-500 hover:shadow-md';
+                // Còn chỗ
+                cardBgBorder = 'bg-white border border-slate-200/90 hover:border-slate-300 shadow-2xs';
                 badgeStatus = (
-                  <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-emerald-600 text-white shadow-2xs shrink-0">
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0">
                     Còn chỗ ({maxCapacity - currentStudents})
                   </span>
                 );
@@ -296,7 +296,7 @@ export default function StudentClassesPage() {
               return (
                 <div
                   key={cls.id}
-                  className={`rounded-2xl p-5 shadow-xs transition-all flex flex-col justify-between ${cardBgBorder}`}
+                  className={`rounded-xl p-5 transition-all flex flex-col justify-between ${cardBgBorder}`}
                 >
                   <div className="space-y-3.5">
                     {/* Header Box */}
@@ -347,10 +347,12 @@ export default function StudentClassesPage() {
                               href={cls.meetingLink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 text-[11px] font-bold underline"
-                              title="Vào phòng học online"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 font-semibold text-[11px] transition-colors"
+                              title="Vào phòng xưởng Discord"
                             >
-                              <Video size={12} /> Vào học
+                              <Video size={11} className="text-indigo-600" />
+                              <span>Vào Discord</span>
+                              <ExternalLink size={10} className="shrink-0" />
                             </a>
                           )}
                         </div>

@@ -15,6 +15,10 @@ import {
   AlertCircle,
   CheckCircle2,
   Headphones,
+  GraduationCap,
+  Target,
+  Sparkles,
+  School,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -182,7 +186,7 @@ export default function StudentDashboardPage() {
 
   return (
     <RoleGuard allowedRoles={['STUDENT', 'ADMIN']}>
-      <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
+      <div className="flex-1 flex flex-col min-h-screen bg-slate-50/70 font-sans text-slate-800">
         <Header
           title={`Góc Học Tập: ${currentUser?.name || ''}`}
           subtitle={`Mã học viên: ${currentUser?.id || ''} • Theo dõi tiến độ & chuyên cần cá nhân`}
@@ -201,51 +205,110 @@ export default function StudentDashboardPage() {
             </div>
           )}
 
-          {/* Banner Welcome */}
-          <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-6 text-white shadow-md flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+          {/* Banner Welcome & Atelier Target Info */}
+          <section className="bg-white rounded-xl border border-slate-200/80 shadow-2xs p-5 sm:p-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
             <div className="space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider bg-white/20 px-2.5 py-0.5 rounded-full">
-                Học kỳ Tháng 09/2026
-              </span>
-              <h2 className="text-2xl font-bold">Xin chào, {currentUser?.name}!</h2>
-              <p className="text-emerald-100 text-xs">
-                Bạn đang theo học{' '}
-                <strong className="text-white">{student?.enrolledClassIds?.length || 1} lớp</strong> tại trung tâm. Hãy
-                kiểm tra thời khóa biểu và hoàn thành đúng hạn nhé.
-              </p>
-            </div>
-          </div>
-
-          {/* Metric Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Tỉ lệ chuyên cần</span>
-                <span className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
-                  <CheckCircle2 size={20} />
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-mono font-bold uppercase tracking-wider bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-md border border-slate-200/70">
+                  Mã HV: {currentUser?.id || '26xxx'}
+                </span>
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/80 flex items-center gap-1">
+                  <GraduationCap size={13} />
+                  Mục tiêu: {student?.targetUniversity === 'KHAC' ? (student?.customUniversity || 'Đại học kiến trúc') : (student?.targetUniversity || 'HAU')}
+                </span>
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/80">
+                  {student?.examBlock === 'KHOI_H' ? 'Khối H (Văn, Vẽ 1, Vẽ 2)' : 'Khối V (Toán, Lý, Vẽ MT1)'}
                 </span>
               </div>
-              <div className="mt-3 text-2xl font-bold text-emerald-600">{attendanceRate}%</div>
-              <p className="text-xs text-slate-400 mt-1">
-                Có mặt {presentCount} / {attendance.length} buổi
+              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
+                Xin chào, {currentUser?.name}!
+              </h2>
+              <p className="text-slate-500 text-xs">
+                Bạn đang sinh hoạt tại xưởng vẽ với <strong className="text-slate-800">{student?.enrolledClassIds?.length || 1} lớp học trực tuyến</strong>. Phòng học Discord 100% online luôn sẵn sàng trước mỗi ca 15 phút.
               </p>
             </div>
 
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Số buổi vắng</span>
-                <span className="p-2 bg-amber-50 text-amber-600 rounded-lg">
-                  <Clock size={20} />
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 text-right">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Số buổi còn lại</span>
+                <span className="text-2xl font-black font-mono text-emerald-700">
+                  {student?.remainingSessions ?? 12}
                 </span>
+                <span className="text-xs text-slate-400 font-medium ml-1">buổi</span>
               </div>
-              <div className="mt-3 text-2xl font-bold text-amber-600">{absentCount} Buổi</div>
-              <p className="text-xs text-slate-400 mt-1">Mức cảnh báo tối đa: 3 buổi</p>
+            </div>
+          </section>
+
+          {/* Metric Cards - Atelier Progress */}
+          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">Chuyên cần xưởng</span>
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700">
+                  <CheckCircle2 size={14} />
+                </div>
+              </div>
+              <div className="mt-3 flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-700 tracking-tight">{attendanceRate}%</span>
+              </div>
+              <div className="mt-2 text-[11px] text-slate-500 font-medium">
+                Có mặt {presentCount} / {attendance.length} buổi học
+              </div>
             </div>
 
-          </div>
+            <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">Số buổi vắng</span>
+                <div className="w-7 h-7 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700">
+                  <Clock size={14} />
+                </div>
+              </div>
+              <div className="mt-3 flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-extrabold font-mono text-amber-700 tracking-tight">{absentCount}</span>
+                <span className="text-xs text-slate-400 font-medium">buổi vắng</span>
+              </div>
+              <div className="mt-2 text-[11px] text-slate-500 font-medium">
+                Ngưỡng cảnh báo rèn luyện: 3 buổi
+              </div>
+            </div>
+
+            <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">Buổi đã tích lũy</span>
+                <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700">
+                  <FileCheck size={14} />
+                </div>
+              </div>
+              <div className="mt-3 flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-extrabold font-mono text-indigo-700 tracking-tight">{attendedSessions}</span>
+                <span className="text-xs text-slate-400 font-medium">buổi hoàn thành</span>
+              </div>
+              <div className="mt-2 text-[11px] text-slate-500 font-medium">
+                Điểm danh thực tế qua ca học
+              </div>
+            </div>
+
+            <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">Số dư số buổi</span>
+                <div className="w-7 h-7 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-700">
+                  <Sparkles size={14} />
+                </div>
+              </div>
+              <div className="mt-3 flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-extrabold font-mono text-purple-700 tracking-tight">
+                  {student?.remainingSessions ?? 12}
+                </span>
+                <span className="text-xs text-slate-400 font-medium">buổi khả dụng</span>
+              </div>
+              <div className="mt-2 text-[11px] text-slate-500 font-medium">
+                Tự động trừ 1 khi hoàn thành ca học
+              </div>
+            </div>
+          </section>
 
           {/* Học phí (Số buổi) & Hoá đơn — tách riêng khỏi khối thống kê điểm danh */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+          <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs p-5 space-y-4">
             <div className="flex items-center gap-2">
               <Receipt className="text-emerald-600" size={20} />
               <h2 className="font-bold text-slate-800 text-base">Học phí & Hoá đơn</h2>
@@ -284,7 +347,7 @@ export default function StudentDashboardPage() {
 
           {/* Lịch học & Đơn từ */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-xs p-5 space-y-4">
+            <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200/80 shadow-2xs p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <CalendarDays className="text-emerald-600" size={20} />
@@ -382,7 +445,7 @@ export default function StudentDashboardPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 space-y-4 flex flex-col">
+            <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs p-5 space-y-4 flex flex-col">
               <div className="flex items-center justify-between">
                 <h2 className="font-bold text-slate-800 text-base">Trạng thái đơn từ</h2>
                 <Link href="/student/requests" className="text-xs font-semibold text-emerald-600 hover:text-emerald-800">

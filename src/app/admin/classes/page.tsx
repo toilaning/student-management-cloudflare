@@ -328,7 +328,7 @@ export default function AdminClassesPage() {
     .slice(0, 10);
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
+    <div className="flex-1 flex flex-col min-h-screen bg-slate-50/70 font-sans text-slate-800">
       <Header 
         title="Quản lý Lớp học & Lịch đào tạo" 
         subtitle="Quản lý thời khóa biểu custom, thứ học và tùy chọn chạy xuyên suốt" 
@@ -347,36 +347,36 @@ export default function AdminClassesPage() {
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-          <div className="relative w-full sm:w-80">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <section className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs">
+          <div className="relative w-full sm:w-96">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Tìm theo tên lớp, GV, môn, phòng..."
+              placeholder="Tìm kiếm theo mã lớp, môn học, giảng viên, phòng Discord..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-indigo-600"
+              className="w-full pl-9 pr-4 py-2 bg-slate-50/70 border border-slate-200 rounded-lg text-xs focus:bg-white focus:outline-slate-800 transition-colors"
             />
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
             <div className="text-xs text-slate-500 font-medium">
-              Tổng cộng: <span className="font-bold text-slate-800">{classes.length}</span> lớp học
+              Sĩ số xưởng: <span className="font-bold font-mono text-slate-900">{classes.length}</span> lớp học trực tuyến
             </div>
             <button
               onClick={(e) => {
-                            e.stopPropagation();
+                e.stopPropagation();
                 setNewClassFormData(prev => ({
                   ...prev,
                   teacherId: prev.teacherId || teachers[0]?.id || ''
                 }));
                 setShowAddClassModal(true);
               }}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0"
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer shrink-0"
             >
-              <Plus size={15} /> Thêm Lớp Học Mới
+              <Plus size={14} /> Khởi tạo lớp học mới
             </button>
           </div>
-        </div>
+        </section>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {paginatedClasses.map(cls => {
@@ -388,72 +388,85 @@ export default function AdminClassesPage() {
               <div 
                 key={cls.id} 
                 onClick={() => openClassStudentsModal(cls)}
-                className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 hover:border-indigo-500 hover:shadow-md transition-all space-y-4 flex flex-col justify-between cursor-pointer group"
+                className="bg-white rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-400/80 hover:shadow-xs transition-all p-5 flex flex-col justify-between cursor-pointer group relative"
                 title="Bấm vào lớp để xem danh sách học viên"
               >
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div>
+                <div className="space-y-3.5">
+                  {/* Card Header: Code, Recurring badge, Status */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200/80">
                           {cls.code} • {cls.id}
                         </span>
                         {isRecurringClass && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-0.5">
-                            <RefreshCw size={10} className="shrink-0" /> Chạy xuyên suốt
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100/70 text-slate-600 border border-slate-200 flex items-center gap-0.5">
+                            <RefreshCw size={9} className="shrink-0 text-slate-500" /> Chạy định kỳ
                           </span>
                         )}
                       </div>
-                      <h3 className="font-bold text-slate-800 text-base mt-1.5 line-clamp-1">{cls.name}</h3>
+                      <h3 className="font-bold text-slate-900 text-base group-hover:text-indigo-950 transition-colors line-clamp-1">{cls.name}</h3>
+                      <div className="text-[11px] text-slate-500 font-medium">{cls.subject || 'Đồ án kiến trúc / Mỹ thuật'}</div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
-                        {cls.status}
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                        {cls.status || 'Đang mở'}
                       </span>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDeleteClass(cls); }}
                         title="Xóa lớp học"
-                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
                       >
-                        <Trash2 size={15} />
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </div>
 
+                  {/* Ca học & Lịch tuần - Atelier Blueprint strip */}
                   <div className="space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-3">
-                    {/* Khung giờ & Thứ học trực quan */}
-                    <div className="flex items-center justify-between bg-amber-50/60 p-2 rounded-lg border border-amber-100">
-                      <span className="text-amber-900 font-bold flex items-center gap-1">
-                        <Clock size={13} className="text-amber-600" /> {classStartTime} - {classEndTime}
+                    <div className="flex items-center justify-between bg-slate-50/90 p-2.5 rounded-lg border border-slate-200/70">
+                      <span className="text-slate-800 font-bold font-mono text-[11px] flex items-center gap-1.5">
+                        <Clock size={13} className="text-slate-500" /> {classStartTime} – {classEndTime}
                       </span>
-                      <span className="text-amber-800 font-semibold bg-white/80 px-2 py-0.5 rounded text-[11px] border border-amber-200">
+                      <span className="text-slate-700 font-medium bg-white px-2 py-0.5 rounded text-[11px] border border-slate-200/80 shadow-2xs">
                         Thứ {formatScheduleDays(cls.scheduleDays)}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 flex items-center gap-1.5"><UserCheck size={14} /> Giảng viên:</span>
+                    {/* Giảng viên phụ trách */}
+                    <div className="flex items-center justify-between py-0.5">
+                      <span className="text-slate-400 flex items-center gap-1.5 text-[11px] font-medium"><UserCheck size={13} /> Giảng viên:</span>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-slate-800 truncate max-w-[140px]">{teacherMap[cls.teacherId] || cls.teacherId}</span>
+                        <span className="font-bold text-slate-800 truncate max-w-[140px] text-xs">{teacherMap[cls.teacherId] || cls.teacherId}</span>
                         <span className="text-[10px] text-slate-400 font-mono">({cls.teacherId})</span>
                         <button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setChangingTeacherClass(cls);
                             setNewTeacherId(cls.teacherId);
                           }}
                           title="Đổi giáo viên phụ trách"
-                          className="p-1 text-indigo-600 hover:bg-indigo-50 rounded transition ml-1"
+                          className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors ml-0.5"
                         >
-                          <Edit3 size={13} />
+                          <Edit3 size={12} />
                         </button>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 flex items-center gap-1.5"><Users size={14} /> Sĩ số hiện tại:</span>
-                      <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{(cls.studentIds || []).length} học viên</span>
+
+                    {/* Sĩ số xưởng vẽ */}
+                    <div className="flex items-center justify-between py-0.5">
+                      <span className="text-slate-400 flex items-center gap-1.5 text-[11px] font-medium"><Users size={13} /> Sĩ số atelier:</span>
+                      <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs border border-slate-200/60">
+                        {(cls.studentIds || []).length} học viên
+                      </span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 flex items-center gap-1.5"><Video size={14} className="text-emerald-600" /> Lớp học Online:</span>
+
+                    {/* Phòng học Online 100% Discord Room */}
+                    <div className="flex items-center justify-between py-1 border-t border-slate-100/80">
+                      <span className="text-slate-500 flex items-center gap-1.5 text-[11px] font-medium">
+                        <Video size={13} className="text-indigo-600" />
+                        <span>Phòng xưởng Discord:</span>
+                      </span>
                       <div className="flex items-center gap-1">
                         {cls.meetingLink ? (
                           <a 
@@ -461,20 +474,23 @@ export default function AdminClassesPage() {
                             target="_blank" 
                             rel="noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                          className="font-bold text-emerald-600 hover:text-emerald-700 underline text-xs inline-flex items-center gap-1 whitespace-nowrap truncate max-w-[150px]"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50/90 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/80 font-semibold text-[11px] transition-colors max-w-[150px] truncate"
+                            title={cls.meetingLink}
                           >
-                            Phòng học online <ExternalLink size={11} className="shrink-0" />
+                            <span>Vào Discord</span>
+                            <ExternalLink size={10} className="shrink-0 text-indigo-500" />
                           </a>
                         ) : (
                           <span className="text-slate-400 italic text-[11px]">Chưa gắn link</span>
                         )}
                         <button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setEditingMeetClass(cls);
-                            setMeetLinkInput(cls.meetingLink || `https://meet.google.com/${cls.id.toLowerCase()}`);
+                            setMeetLinkInput(cls.meetingLink || `https://discord.gg/${cls.id.toLowerCase()}`);
                           }}
-                          title="Đổi link Phòng học online"
-                          className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded ml-1"
+                          title="Cấu hình Link Phòng Discord"
+                          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors ml-0.5"
                         >
                           <Edit3 size={12} />
                         </button>
@@ -484,12 +500,14 @@ export default function AdminClassesPage() {
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
+                {/* Footer Actions */}
+                <div className="pt-3 border-t border-slate-100 flex items-center gap-2 mt-3">
                   <button
                     onClick={(e) => { e.stopPropagation(); openClassStudentsModal(cls); }}
-                    className="flex-1 py-2 bg-indigo-50 group-hover:bg-indigo-600 group-hover:text-white text-indigo-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap truncate min-w-0 shadow-2xs"
+                    className="flex-1 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap truncate min-w-0 shadow-2xs"
                   >
-                    <Users size={14} className="shrink-0" /> <span className="truncate">Quản lý học viên ({(cls.studentIds || []).length})</span>
+                    <Users size={13} className="shrink-0 text-slate-300" /> 
+                    <span className="truncate">Quản lý ({ (cls.studentIds || []).length })</span>
                   </button>
                   <button
                     onClick={(e) => {
@@ -505,10 +523,10 @@ export default function AdminClassesPage() {
                       setQuickScheduleDays(cls.scheduleDays && cls.scheduleDays.length > 0 ? cls.scheduleDays : [2, 4, 6]);
                       setQuickScheduleOverwrite(false);
                     }}
-                    className="px-2.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer"
-                    title="Lên lịch học nhanh cho lớp này"
+                    className="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer"
+                    title="Lên lịch học định kỳ cho lớp"
                   >
-                    <Calendar size={14} className="text-emerald-600" /> Lên lịch
+                    <Calendar size={13} className="text-slate-500" /> Lịch
                   </button>
                   <button
                     onClick={(e) => {
@@ -516,10 +534,10 @@ export default function AdminClassesPage() {
                       setChangingTeacherClass(cls);
                       setNewTeacherId(cls.teacherId);
                     }}
-                    className="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center gap-1 whitespace-nowrap shrink-0"
+                    className="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
                     title="Đổi giáo viên phụ trách"
                   >
-                    <Edit3 size={14} /> Đổi GV
+                    <Edit3 size={13} className="text-slate-500" /> Đổi GV
                   </button>
                 </div>
               </div>
@@ -548,7 +566,7 @@ export default function AdminClassesPage() {
       {/* Modal Thêm Lớp Học Mới */}
       {showAddClassModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-xl shadow-xl max-w-xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-200/90 animate-in fade-in zoom-in-95 duration-150">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
@@ -772,7 +790,7 @@ export default function AdminClassesPage() {
                   <Video size={18} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-800 text-base">Cấu hình Link Phòng học online</h3>
+                  <h3 className="font-bold text-slate-800 text-base">Cấu hình Link Phòng Discord 100% Online</h3>
                   <p className="text-xs text-slate-500">Lớp: <strong className="text-slate-800">{editingMeetClass.name}</strong> ({editingMeetClass.id})</p>
                 </div>
               </div>
@@ -786,7 +804,7 @@ export default function AdminClassesPage() {
 
             <form onSubmit={handleSaveMeetLink} className="p-5 space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 mb-1.5">Link phòng học online *</label>
+                <label className="block font-bold text-slate-700 mb-1.5">Link phòng xưởng trực tuyến (Discord / Meet) *</label>
                 <input
                   type="url"
                   required
@@ -798,7 +816,7 @@ export default function AdminClassesPage() {
               </div>
 
               <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-[11px] leading-relaxed">
-                💡 Toàn bộ lớp học là 100% Online. Link phòng học online này sẽ được cập nhật tự động đến thời khóa biểu của Giảng viên và Học viên trong lớp.
+                🎙️ Không gian học 100% Online Discord: Link phòng xưởng sẽ tự động đồng bộ sang thời khóa biểu và giao diện tham gia trực tiếp của Giảng viên và Học viên.
               </div>
 
               <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
@@ -813,7 +831,7 @@ export default function AdminClassesPage() {
                   type="submit"
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-xs cursor-pointer"
                 >
-                  Cập nhật Link Phòng học online
+                  Cập nhật Phòng Discord
                 </button>
               </div>
             </form>

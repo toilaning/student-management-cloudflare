@@ -465,7 +465,7 @@ export default function AdminTuitionPage() {
 
   return (
     <RoleGuard allowedRoles={['ADMIN']}>
-      <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
+      <div className="flex-1 flex flex-col min-h-screen bg-slate-50/70 font-sans text-slate-800">
         <Header 
           title="Quản lý Học phí & Công nợ" 
           subtitle="Theo dõi nguồn thu học phí, cấu hình VietQR động và quản lý hóa đơn" 
@@ -485,34 +485,61 @@ export default function AdminTuitionPage() {
             </div>
           )}
 
-          {/* Metric Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tổng phải thu</span>
-              <div className="text-2xl font-bold text-slate-800 mt-2 flex items-baseline gap-1 whitespace-nowrap">
-                <span>{totalAmount.toLocaleString('vi-VN')}</span> <span className="text-xs text-slate-400 font-medium">VNĐ</span>
+          {/* Metric Cards - Atelier Architectural Accounting Strip */}
+          <section className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">Tổng Công Nợ Phải Thu</span>
+                <span className="text-xs font-mono font-bold text-slate-400">#HĐ: {invoices.length}</span>
               </div>
-              <p className="text-xs text-slate-400 mt-1 whitespace-nowrap">Tính theo tất cả hóa đơn học phí</p>
+              <div className="mt-3 flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 tracking-tight">
+                  {totalAmount.toLocaleString('vi-VN')}
+                </span>
+                <span className="text-xs text-slate-400 font-medium">VNĐ</span>
+              </div>
+              <div className="mt-2 text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                Gồm học phí tháng & các gói buổi học đã xuất
+              </div>
             </div>
 
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Đã thu thực tế</span>
-              <div className="text-2xl font-bold text-emerald-600 mt-2 flex items-baseline gap-1 whitespace-nowrap">
-                <span>{totalPaid.toLocaleString('vi-VN')}</span> <span className="text-xs text-slate-400 font-medium">VNĐ</span>
+            <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">Đã Thu Thực Tế (Gạch Nợ)</span>
+                <span className="text-xs font-mono font-bold text-emerald-700">
+                  {((totalPaid / (totalAmount || 1)) * 100).toFixed(0)}%
+                </span>
               </div>
-              <p className="text-xs text-emerald-700 font-medium mt-1 whitespace-nowrap">
-                Đạt {((totalPaid / (totalAmount || 1)) * 100).toFixed(1)}% chỉ tiêu
-              </p>
+              <div className="mt-3 flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-700 tracking-tight">
+                  {totalPaid.toLocaleString('vi-VN')}
+                </span>
+                <span className="text-xs text-slate-400 font-medium">VNĐ</span>
+              </div>
+              <div className="mt-2 text-[11px] text-emerald-700 font-medium flex items-center gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Đã đối soát khớp VietQR Napas247
+              </div>
             </div>
 
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Còn nợ / Quá hạn</span>
-              <div className="text-2xl font-bold text-rose-600 mt-2 flex items-baseline gap-1 whitespace-nowrap">
-                <span>{totalDebt.toLocaleString('vi-VN')}</span> <span className="text-xs text-slate-400 font-medium">VNĐ</span>
+            <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">Còn Nợ / Đang Quá Hạn</span>
+                <span className="text-xs font-mono font-bold text-rose-600">Đốc thúc</span>
               </div>
-              <p className="text-xs text-rose-500 font-medium mt-1 whitespace-nowrap">Cần đốc thúc trước kỳ thi kết thúc</p>
+              <div className="mt-3 flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-extrabold font-mono text-rose-700 tracking-tight">
+                  {totalDebt.toLocaleString('vi-VN')}
+                </span>
+                <span className="text-xs text-slate-400 font-medium">VNĐ</span>
+              </div>
+              <div className="mt-2 text-[11px] text-rose-600 font-medium flex items-center gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                Cần gửi thông báo nhắc lịch học phí
+              </div>
             </div>
-          </div>
+          </section>
 
           {/* Filter Bar & Action Buttons */}
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
@@ -729,14 +756,14 @@ export default function AdminTuitionPage() {
                       <td className="px-3 sm:px-4 py-2.5 sm:py-3 text-rose-600 font-semibold font-mono whitespace-nowrap">{inv.remainingAmount.toLocaleString('vi-VN')} đ</td>
                       <td className="px-3 sm:px-4 py-2.5 sm:py-3 text-slate-500 whitespace-nowrap">{inv.dueDate}</td>
                       <td className="px-3 sm:px-4 py-2.5 sm:py-3 whitespace-nowrap">
-                        <span className={`px-2 py-0.5 rounded-full font-semibold text-[10px] whitespace-nowrap inline-flex ${
+                        <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] whitespace-nowrap inline-flex border ${
                           inv.status === 'Đã nộp'
-                            ? 'bg-emerald-100 text-emerald-800'
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                             : inv.status === 'Miễn giảm'
-                            ? 'bg-blue-100 text-blue-800'
+                            ? 'bg-blue-50 text-blue-800 border-blue-200'
                             : inv.status === 'Quá hạn'
-                            ? 'bg-rose-100 text-rose-800'
-                            : 'bg-amber-100 text-amber-800'
+                            ? 'bg-rose-50 text-rose-800 border-rose-200'
+                            : 'bg-amber-50 text-amber-800 border-amber-200'
                         }`}>
                           {inv.status}
                         </span>

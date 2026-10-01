@@ -52,53 +52,85 @@ export default function TeacherDashboardPage() {
 
   return (
     <RoleGuard allowedRoles={['TEACHER', 'ADMIN']}>
-      <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
+      <div className="flex-1 flex flex-col min-h-screen bg-slate-50/70 font-sans text-slate-800">
         <Header 
           title={`Không gian Giảng viên: ${currentUser?.name || ""}`} 
           subtitle={`Mã giáo viên: ${currentUser?.id || ""} • Chuyên môn đào tạo & Quản lý lớp học`} 
         />
 
         <main className="p-6 max-w-7xl mx-auto w-full space-y-6">
-          {/* Metric Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+          {/* Metric Cards - Giảng viên Atelier Studio */}
+          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Lớp phụ trách</span>
-                <span className="p-2 bg-blue-50 text-blue-600 rounded-lg"><BookOpen size={20} /></span>
+                <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">Lớp xưởng phụ trách</span>
+                <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+                  <BookOpen size={14} />
+                </div>
               </div>
-              <div className="mt-3 text-2xl font-bold text-slate-800">{classes.length} Lớp</div>
-              <p className="text-xs text-slate-400 mt-1">Đang triển khai trong kỳ 09/2026</p>
+              <div className="mt-3 flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 tracking-tight">{classes.length}</span>
+                <span className="text-xs text-slate-400 font-medium">lớp trực tuyến</span>
+              </div>
+              <div className="mt-2 text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                Kỳ đào tạo 100% Online Discord
+              </div>
             </div>
 
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+            <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Tiết dạy đã hoàn thành</span>
-                <span className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><CheckCircle2 size={20} /></span>
+                <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">Ca dạy hoàn thành</span>
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700">
+                  <CheckCircle2 size={14} />
+                </div>
               </div>
-              <div className="mt-3 text-2xl font-bold text-slate-800">{completedSlots} / {slots.length} Tiết</div>
-              <p className="text-xs text-slate-400 mt-1">Tiến độ giảng dạy tháng 09/2026</p>
+              <div className="mt-3 flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-700 tracking-tight">{completedSlots}</span>
+                <span className="text-xs text-slate-400 font-medium">/ {slots.length} ca</span>
+              </div>
+              <div className="mt-2 text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Tiến độ giảng dạy theo lịch phân công
+              </div>
             </div>
 
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+            <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Yêu cầu từ học viên</span>
-                <span className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Inbox size={20} /></span>
+                <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">Đơn từ học viên</span>
+                <div className="w-7 h-7 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700">
+                  <Inbox size={14} />
+                </div>
               </div>
-              <div className="mt-3 text-2xl font-bold text-amber-600">{pendingRequests} Chờ duyệt</div>
-              <p className="text-xs text-slate-400 mt-1">Đơn xin nghỉ & đổi lịch học</p>
+              <div className="mt-3 flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-extrabold font-mono text-amber-700 tracking-tight">{pendingRequests}</span>
+                <span className="text-xs text-slate-400 font-medium">chờ xem xét</span>
+              </div>
+              <div className="mt-2 text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                Đơn xin nghỉ & đổi ca học viên
+              </div>
             </div>
 
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+            <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Thù lao ước tính T9</span>
-                <span className="p-2 bg-purple-50 text-purple-600 rounded-lg"><Clock size={20} /></span>
+                <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">Thù lao tính theo ca</span>
+                <div className="w-7 h-7 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-700">
+                  <Clock size={14} />
+                </div>
               </div>
-              <div className="mt-3 text-2xl font-bold text-slate-800">
-                {payroll ? `${(payroll.netSalary / 1000000).toFixed(1)}M đ` : '0 đ'}
+              <div className="mt-3 flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-extrabold font-mono text-purple-700 tracking-tight">
+                  {payroll ? `${(payroll.netSalary / 1000000).toFixed(1)}M` : '0'}
+                </span>
+                <span className="text-xs text-slate-400 font-medium">VNĐ</span>
               </div>
-              <p className="text-xs text-slate-400 mt-1">Dựa trên {payroll?.completedSlots || 0} ca dạy thực tế</p>
+              <div className="mt-2 text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                Tính tự động theo số ca dạy hoàn thành
+              </div>
             </div>
-          </div>
+          </section>
 
           
           {/* Live Attendance Tracking */}
@@ -108,7 +140,7 @@ export default function TeacherDashboardPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Lịch dạy gần nhất */}
-            <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-xs p-6 space-y-4">
+            <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200/80 shadow-2xs p-5 sm:p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-base font-bold text-slate-800">Lịch Dạy Sắp Tới (Tháng 09/2026)</h3>
@@ -167,7 +199,7 @@ export default function TeacherDashboardPage() {
             </div>
 
             {/* Đơn từ gần đây */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-6 space-y-4 flex flex-col">
+            <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs p-5 sm:p-6 space-y-4 flex flex-col">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-base font-bold text-slate-800">Yêu cầu từ học viên</h3>

@@ -113,7 +113,7 @@ export default function TeacherSchedulePage() {
 
   return (
     <RoleGuard allowedRoles={['TEACHER', 'ADMIN']}>
-      <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
+      <div className="flex-1 flex flex-col min-h-screen bg-slate-50/70 font-sans text-slate-800">
         <Header 
           title="Lịch Dạy & Box Ca Học Giảng Viên" 
           subtitle={`Lịch giảng dạy chi tiết của Thầy/Cô ${currentUser?.name || ''} (${currentUser?.id || ''}) - Tháng 09/2026`} 
@@ -133,7 +133,7 @@ export default function TeacherSchedulePage() {
           )}
 
           {/* Banner Thống kê */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <div className="text-sm font-semibold text-slate-800">
                 Tổng số buổi dạy được phân công: <strong className="text-blue-600 text-base font-bold">{slots.length}</strong> buổi
@@ -163,7 +163,7 @@ export default function TeacherSchedulePage() {
             </div>
 
             {/* Bộ chọn ngày */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
+            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex flex-wrap items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
                   <button

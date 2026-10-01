@@ -146,14 +146,14 @@ export default function StudentSchedulePage() {
 
   return (
     <RoleGuard allowedRoles={['STUDENT', 'ADMIN']}>
-      <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
+      <div className="flex-1 flex flex-col min-h-screen bg-slate-50/70 font-sans text-slate-800">
         <Header
           title="Thời Khóa Biểu & Box Lịch Học Viên"
           subtitle={`Lịch học chi tiết của ${currentUser?.name || ''} (${currentUser?.id || ''}) - xem theo tuần (Thứ 2 -> CN)`}
         />
 
         <main className="p-6 max-w-7xl mx-auto w-full space-y-6">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <div className="text-sm font-semibold text-slate-800">
                 Tổng số buổi học trong kỳ: <strong className="text-emerald-600 text-base font-bold">{slots.length}</strong> buổi
@@ -171,7 +171,7 @@ export default function StudentSchedulePage() {
           </div>
 
           {/* Bộ điều hướng tuần */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
                 <button
@@ -208,7 +208,7 @@ export default function StudentSchedulePage() {
           {loading ? (
             <div className="p-12 text-center text-slate-400 text-sm">Đang tải lịch học...</div>
           ) : (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-x-auto">
+            <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-x-auto">
               <div className="min-w-[980px]">
                 {/* Header 7 cột ngày + trục giờ dọc */}
                 <div className="flex">

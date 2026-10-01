@@ -87,10 +87,15 @@ function AdminAttendanceContent() {
         }
 
         const map = new Map<string, Student>();
+        const detailMap: Record<string, any> = {};
         if (stData.students) {
-          stData.students.forEach((s: Student) => map.set(s.id, s));
+          stData.students.forEach((s: Student) => {
+            map.set(s.id, s);
+            detailMap[s.id] = s;
+          });
         }
         setStudentsMap(map);
+        setStudentDetailMap(detailMap);
       } catch (err) {
         console.error('Lỗi khi tải dữ liệu khởi tạo:', err);
         showToast('Không thể tải danh mục lớp hoặc học viên', 'error');
@@ -672,112 +677,134 @@ function AdminAttendanceContent() {
           </div>
         </div>
 
-        {/* Bảng Dữ liệu Điểm danh (Attendance Table) */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        {/* Bảng Dữ liệu Điểm danh - Phong cách Sổ Ký Họa Điểm Danh Atelier Studio */}
+        <section className="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between bg-slate-50/70">
             <div>
-              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                <UserCheck size={18} className="text-indigo-600" />
-                Danh Sách Học Viên Trong Ca Học
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <UserCheck size={17} className="text-slate-700" />
+                Sổ Điểm Danh Học Viên Theo Ca Xưởng
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                {currentSlot ? `Ca ${currentSlot.shiftId} (${currentSlot.startTime} - ${currentSlot.endTime}) | ${currentSlot.subject} | Lớp ${currentSlot.classId}` : 'Chưa chọn ca học'}
+                {currentSlot ? `Ca ${currentSlot.shiftId} (${currentSlot.startTime} - ${currentSlot.endTime}) • ${currentSlot.subject} • Lớp ${currentSlot.classId} • Phòng ${currentSlot.roomId}` : 'Vui lòng chọn ca học để đối soát'}
               </p>
             </div>
-            <span className="text-xs font-bold px-3 py-1 bg-slate-200/70 text-slate-700 rounded-full">
+            <span className="text-xs font-mono font-bold px-3 py-1 bg-white border border-slate-200/80 text-slate-700 rounded-lg shadow-2xs">
               {records.length} Học viên
             </span>
           </div>
 
           {loadingAttendance ? (
-            <div className="p-12 text-center text-slate-400 text-sm">
-              <RotateCw size={24} className="animate-spin mx-auto mb-2 text-indigo-600" />
-              Đang tải dữ liệu điểm danh...
+            <div className="p-12 text-center text-slate-400 text-xs">
+              <RotateCw size={20} className="animate-spin mx-auto mb-2 text-slate-600" />
+              Đang đồng bộ sổ điểm danh ca xưởng...
             </div>
           ) : records.length === 0 ? (
-            <div className="p-12 text-center text-slate-400 text-sm">
-              {selectedSlotId ? 'Không có học viên nào trong ca học này.' : 'Vui lòng chọn ca học để hiển thị sổ điểm danh.'}
+            <div className="p-12 text-center text-slate-400 text-xs">
+              {selectedSlotId ? 'Không có học viên nào trong danh sách ca học này.' : 'Vui lòng chọn ca học để hiển thị sổ điểm danh.'}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 uppercase font-bold border-b border-slate-200 text-[11px]">
+                <thead className="bg-slate-50/90 text-slate-600 uppercase font-bold border-b border-slate-200/80 text-[11px] tracking-wider">
                   <tr>
-                    <th className="px-3 py-3 w-12 text-center">STT</th>
-                    <th className="px-4 py-3 w-48">Mã HV & Họ Tên</th>
-                    <th className="px-3 py-3 w-28">Lớp mấy</th>
-                    <th className="px-3 py-3 w-32">Khối thi</th>
-                    <th className="px-4 py-3 w-44">Trường ĐH mục tiêu</th>
-                    <th className="px-3 py-3 w-28 text-center text-rose-600">Nghỉ (Cần bù)</th>
-                    <th className="px-3 py-3 w-32 text-center text-indigo-700">Số buổi còn</th>
-                    <th className="px-4 py-3">Trạng thái buổi học (1-Click)</th>
+                    <th className="px-3 py-3.5 w-12 text-center">STT</th>
+                    <th className="px-4 py-3.5 w-52">Mã HV & Họ Tên</th>
+                    <th className="px-3 py-3.5 w-24">Lớp Mấy</th>
+                    <th className="px-3 py-3.5 w-24">Khối Thi</th>
+                    <th className="px-4 py-3.5 w-44">Trường ĐH Mục Tiêu</th>
+                    <th className="px-3 py-3.5 w-28 text-center">Nghỉ (Cần Bù)</th>
+                    <th className="px-3 py-3.5 w-32 text-center">Số Buổi Còn</th>
+                    <th className="px-4 py-3.5 text-center sm:text-left">Trạng Thái Buổi Học (1-Click)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 font-sans">
                   {records.map((rec, idx) => {
-                    const stDetail = studentDetailMap[rec.studentId];
-                    const remaining = stDetail?.remainingSessions ?? 12;
+                    const stDetail = studentDetailMap[rec.studentId] || studentsMap.get(rec.studentId);
+                    const remaining = stDetail?.remainingSessions ?? stDetail?.totalSessionsInMonth ?? 12;
                     const absentCount = stDetail?.absentSessionsInMonth ?? 0;
                     return (
-                      <tr key={rec.id || idx} className="hover:bg-slate-50/80 transition">
-                        <td className="px-3 py-3 text-slate-400 font-semibold text-center">{idx + 1}</td>
-                        <td className="px-4 py-3">
-                          <div className="font-bold text-slate-800 text-xs sm:text-[13px]">{rec.studentName}</div>
-                          <div className="font-mono text-[11px] font-semibold text-indigo-600">{rec.studentId}</div>
+                      <tr key={rec.id || idx} className="hover:bg-slate-50/70 transition-colors">
+                        {/* 1. STT */}
+                        <td className="px-3 py-3 text-slate-400 font-mono text-center">{idx + 1}</td>
+
+                        {/* 2. Mã HV & Họ tên */}
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="font-bold text-slate-900 text-xs sm:text-[13px]">{rec.studentName}</div>
+                          <div className="font-mono text-[11px] font-semibold text-slate-500 mt-0.5">{rec.studentId}</div>
                         </td>
-                        <td className="px-3 py-3 font-semibold text-slate-700">
-                          {stDetail?.gradeLevel || 'Lớp 12'}
+
+                        {/* 3. Lớp mấy */}
+                        <td className="px-3 py-3 font-medium text-slate-700 whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-semibold border border-slate-200/60">
+                            {stDetail?.gradeLevel || 'Lớp 12'}
+                          </span>
                         </td>
-                        <td className="px-3 py-3">
-                          <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200">
+
+                        {/* 4. Khối thi */}
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded font-bold text-[10px] border ${
+                            stDetail?.examBlock === 'KHOI_H'
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
+                          }`}>
                             {stDetail?.examBlock === 'KHOI_H' ? 'Khối H' : 'Khối V'}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+
+                        {/* 5. Trường ĐH */}
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <div className="font-bold text-slate-800 text-xs">
                             {stDetail?.targetUniversity === 'KHAC' ? (stDetail?.customUniversity || 'Trường khác') : (stDetail?.targetUniversity || 'HAU')}
                           </div>
-                          {stDetail?.homeTown && <div className="text-[10px] text-slate-400">{stDetail.homeTown}</div>}
+                          {stDetail?.homeTown && (
+                            <div className="text-[10px] text-slate-400 font-normal">{stDetail.homeTown}</div>
+                          )}
                         </td>
-                        <td className="px-3 py-3 text-center">
-                          <span className={`font-bold px-2 py-0.5 rounded ${
-                            absentCount > 0 ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200' : 'text-slate-400'
+
+                        {/* 6. Nghỉ cần bù */}
+                        <td className="px-3 py-3 text-center whitespace-nowrap">
+                          <span className={`font-mono text-xs font-bold px-2 py-0.5 rounded ${
+                            absentCount > 0 
+                              ? 'bg-rose-50 text-rose-800 border border-rose-200/80 font-bold' 
+                              : 'text-slate-400'
                           }`}>
                             {absentCount} buổi
                           </span>
                         </td>
-                        <td className="px-3 py-3 text-center">
+
+                        {/* 7. Số buổi còn lại */}
+                        <td className="px-3 py-3 text-center whitespace-nowrap">
                           <button
                             type="button"
                             onClick={() => {
-                              if (stDetail) {
-                                setEditingAttendanceStudent(stDetail);
-                                setEditRemainingInput(stDetail.remainingSessions ?? 12);
-                              }
+                              setEditingAttendanceStudent(stDetail || { id: rec.studentId, name: rec.studentName, remainingSessions: remaining });
+                              setEditRemainingInput(remaining);
                             }}
-                            className={`px-2.5 py-1 rounded-lg font-bold text-xs border inline-flex items-center gap-1 cursor-pointer transition hover:opacity-80 ${
-                              remaining >= 3
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            className={`px-2.5 py-1 rounded-lg font-mono font-bold text-xs border inline-flex items-center gap-1.5 cursor-pointer transition-all hover:ring-1 hover:ring-slate-400 ${
+                              remaining >= 4
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200/80'
                                 : remaining > 0
-                                ? 'bg-amber-50 text-amber-800 border-amber-200'
-                                : 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
+                                ? 'bg-amber-50 text-amber-800 border-amber-200/80'
+                                : 'bg-rose-50 text-rose-800 border-rose-200/80 animate-pulse'
                             }`}
                             title="Bấm để tùy chỉnh thủ công số buổi còn lại"
                           >
                             <span>{remaining} buổi</span>
-                            <Edit3 size={11} className="opacity-60" />
+                            <Edit3 size={11} className="opacity-50" />
                           </button>
                         </td>
-                        <td className="px-4 py-3">
-                          {/* 3 Nút Trạng Thái Chuẩn Mr. Thuyết */}
+
+                        {/* 8. 3 Nút 1-Click trạng thái chuẩn atelier */}
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <button
                               type="button"
                               onClick={() => handleStatusChange(idx, 'Có mặt')}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer border ${
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
                                 rec.status === 'Có mặt'
-                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                                  : 'bg-emerald-50/60 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                                  ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
+                                  : 'bg-emerald-50/70 hover:bg-emerald-100 text-emerald-900 border-emerald-200/80'
                               }`}
                             >
                               🟢 Có mặt
@@ -785,10 +812,10 @@ function AdminAttendanceContent() {
                             <button
                               type="button"
                               onClick={() => handleStatusChange(idx, 'Vắng không phép')}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer border ${
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
                                 rec.status === 'Vắng không phép'
-                                  ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                                  : 'bg-rose-50/60 hover:bg-rose-100 text-rose-800 border-rose-200'
+                                  ? 'bg-rose-700 text-white border-rose-700 shadow-2xs'
+                                  : 'bg-rose-50/70 hover:bg-rose-100 text-rose-900 border-rose-200/80'
                               }`}
                             >
                               🔴 Vắng
@@ -796,10 +823,10 @@ function AdminAttendanceContent() {
                             <button
                               type="button"
                               onClick={() => handleStatusChange(idx, 'Vắng có phép')}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer border ${
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
                                 rec.status === 'Vắng có phép' || rec.status === 'Điểm danh bù'
-                                  ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
-                                  : 'bg-amber-50/60 hover:bg-amber-100 text-amber-900 border-amber-200'
+                                  ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
+                                  : 'bg-amber-50/70 hover:bg-amber-100 text-amber-900 border-amber-200/80'
                               }`}
                             >
                               🟡 Nghỉ phép / Bù
@@ -813,8 +840,85 @@ function AdminAttendanceContent() {
               </table>
             </div>
           )}
-        </div>
+        </section>
       </main>
+
+      {/* Modal Sửa Số Buổi Còn Lại Cho Học Viên Từ Sổ Điểm Danh */}
+      {editingAttendanceStudent && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700">
+                  <Edit3 size={15} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Điều Chỉnh Số Buổi Còn Lại</h3>
+                  <p className="text-[11px] text-slate-500">{editingAttendanceStudent.name} ({editingAttendanceStudent.id})</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingAttendanceStudent(null)}
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateStudentSessionsFromAttendance} className="p-5 space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Số buổi học còn lại trong gói:
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditRemainingInput(prev => Math.max(0, prev - 1))}
+                    className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition-colors"
+                  >
+                    -1
+                  </button>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    required
+                    value={editRemainingInput}
+                    onChange={e => setEditRemainingInput(parseInt(e.target.value) || 0)}
+                    className="flex-1 p-2 border border-slate-200 rounded-lg font-mono font-bold text-center text-sm focus:outline-slate-800"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setEditRemainingInput(prev => prev + 1)}
+                    className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition-colors"
+                  >
+                    +1
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Đồng bộ tức thì sang cơ sở dữ liệu hồ sơ học sinh.
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingAttendanceStudent(null)}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-xs shadow-2xs transition-colors"
+                >
+                  Cập nhật ngay
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal Điểm danh bù (Makeup Attendance Modal dùng createPortal) */}
       <Modal isOpen={isMakeupModalOpen} onClose={() => setIsMakeupModalOpen(false)}>
@@ -935,9 +1039,6 @@ function AdminAttendanceContent() {
 }
 
 export default function AdminAttendancePage() {
-  const [editingAttendanceStudent, setEditingAttendanceStudent] = useState<any>(null);
-  const [editRemainingInput, setEditRemainingInput] = useState<number>(12);
-  const [studentDetailMap, setStudentDetailMap] = useState<Record<string, any>>({});
   return (
     <RoleGuard allowedRoles={['ADMIN']}>
       <Suspense fallback={<div className="p-8 text-center text-sm text-slate-500">Đang tải trang Sổ Điểm danh Toàn trường...</div>}>
