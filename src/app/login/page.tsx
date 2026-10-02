@@ -103,7 +103,7 @@ export default function LoginPage() {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-slate-900">
-                Atelier Kiến Trúc • Mỹ Thuật
+                Luyện Thi Vẽ Kiến Trúc • Mỹ Thuật
               </h1>
               <p className="text-xs text-slate-500 font-medium mt-1">
                 Thuyết Studio — Cổng thông tin học viên & đào tạo
@@ -225,7 +225,7 @@ export default function LoginPage() {
           <div className="text-center pt-1 border-t border-slate-100">
             <div className="inline-flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
               <Palette size={13} className="text-amber-500" />
-              <span>Không gian Luyện Thi Vẽ & Đồ Họa Atelier</span>
+              <span>Trung Tâm Luyện Thi Trực Tuyến</span>
             </div>
           </div>
 

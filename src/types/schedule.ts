@@ -36,7 +36,7 @@ export interface ScheduleConflict {
   conflictingSlot: ScheduleSlot;
 }
 
-export type RequestType = 'XIN_NGHI' | 'DOI_LICH';
+export type RequestType = 'XIN_NGHI';
 export type RequestStatus = 'CHỜ_DUYỆT' | 'ĐÃ_DUYỆT' | 'TỪ_CHỐI';
 
 export interface ClassRequest {

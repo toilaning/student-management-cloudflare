@@ -4,8 +4,8 @@ import { AppProvider } from '@/context/AppContext';
 import { Sidebar } from '@/components/common/Sidebar';
 
 export const metadata: Metadata = {
-  title: 'Hệ Thống Quản Lý Đào Tạo & Học Viên Local',
-  description: 'Clean Architecture Next.js Local In-Memory Student Management System',
+  title: 'Quản Lý Luyện Thi Kiến Trúc & Mỹ Thuật',
+  description: 'Hệ Thống Quản Lý Luyện Thi Kiến Trúc & Mỹ Thuật',
 };
 
 export default function RootLayout({

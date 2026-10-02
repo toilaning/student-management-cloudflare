@@ -173,7 +173,7 @@ export const NotificationDropdown: React.FC = () => {
           </div>
 
           <div className="p-3 bg-slate-50 border-t border-slate-100 text-center text-[11px] text-slate-500">
-            Hệ thống đào tạo EduLocal Online
+            Hệ thống Quản lý Luyện thi
           </div>
         </div>
       )}

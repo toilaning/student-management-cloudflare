@@ -28,8 +28,6 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-
-    // 1. Thao tác duyệt thủ công (nếu vẫn cần hỗ trợ tương thích ngược)
     if (body.action === 'DECIDE') {
       const existing = await repo.getRequestById(body.requestId);
       if (!existing) {
@@ -57,70 +55,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, request: updated });
     }
 
-    // 2. Tạo đơn / Chuyển ca tự động 100% không cần duyệt theo feedback Mr. Thuyết
+    // Tạo đơn mới
     const all = await repo.getAllRequests();
     const newId = `REQ${(all.length + 1).toString().padStart(3, '0')}`;
-    
-    // Nếu là Đổi ca (DOI_LICH) hoặc có targetScheduleSlotId: Tự động ĐÃ_DUYỆT ngay lập tức
-    const isShiftChange = body.type === 'DOI_LICH' || Boolean(body.targetScheduleSlotId);
-    const initialStatus = isShiftChange ? 'ĐÃ_DUYỆT' : (body.status || 'CHỜ_DUYỆT');
-
     const newRequest: ClassRequest = {
       id: newId,
       studentId: body.studentId,
       classId: body.classId,
       scheduleSlotId: body.scheduleSlotId,
       targetScheduleSlotId: body.targetScheduleSlotId || undefined,
-      type: isShiftChange ? 'DOI_LICH' : (body.type || 'XIN_NGHI'),
-      reason: body.reason || (isShiftChange ? 'Học viên chủ động đổi ca học' : 'Xin nghỉ học'),
-      status: initialStatus,
-      reviewedBy: isShiftChange ? 'AUTO_SYSTEM' : undefined,
-      reviewNote: isShiftChange ? 'Hệ thống tự động chuyển lịch sang ca mới theo cấu hình' : undefined,
+      type: body.type,
+      reason: body.reason,
+      status: 'CHỜ_DUYỆT',
       createdAt: new Date().toISOString(),
     };
-
-    // Thực hiện logic chuyển slot học viên nếu đổi ca:
-    // Gỡ khỏi lớp/slot cũ và thêm vào lớp/slot mới nếu targetScheduleSlotId khác classId hoặc khác slot
-    if (isShiftChange && body.targetScheduleSlotId) {
-      try {
-        const targetSlot = await repo.getScheduleSlotById(body.targetScheduleSlotId);
-        const originalSlot = await repo.getScheduleSlotById(body.scheduleSlotId);
-
-        if (targetSlot && originalSlot && targetSlot.classId !== originalSlot.classId) {
-          // Nếu đổi sang ca thuộc lớp khác:
-          const oldClass = await repo.getClassById(originalSlot.classId);
-          const newClass = await repo.getClassById(targetSlot.classId);
-
-          if (oldClass && newClass) {
-            oldClass.studentIds = (oldClass.studentIds || []).filter(id => id !== body.studentId);
-            await repo.updateClass(oldClass);
-
-            if (!newClass.studentIds.includes(body.studentId)) {
-              newClass.studentIds.push(body.studentId);
-              await repo.updateClass(newClass);
-            }
-          }
-        }
-      } catch (errSlot) {
-        console.warn('Lỗi tự động hoán đổi slot học sinh:', errSlot);
-      }
-    }
-
     const saved = await repo.createRequest(newRequest);
 
     await repo.addAuditLog({
       userId: body.studentId,
-      userName: `Học viên ${body.studentId}`,
+      userName: `Sinh viên ${body.studentId}`,
       userRole: 'STUDENT',
-      action: isShiftChange ? 'SCHEDULE_CHANGE' : 'CREATE',
+      action: 'CREATE',
       targetResource: 'REQUEST',
       targetId: newId,
-      details: isShiftChange 
-        ? `Học viên ${body.studentId} tự động đổi ca từ ca [${body.scheduleSlotId}] sang ca [${body.targetScheduleSlotId}] thành công.`
-        : `Gửi đơn xin nghỉ học lớp ${body.classId}`,
+      details: `Gửi đơn ${body.type === 'XIN_NGHI' ? 'xin nghỉ học' : 'đề xuất đổi lịch'} lớp ${body.classId}`,
     });
 
-    return NextResponse.json({ success: true, request: saved, autoApproved: isShiftChange });
+    return NextResponse.json({ success: true, request: saved });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
