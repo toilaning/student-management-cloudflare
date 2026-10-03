@@ -511,6 +511,14 @@ export default function TeacherSchedulePage() {
                                             qua đêm
                                           </Badge>
                                         )}
+                                        {slot.checkinTime && (
+                                          <Badge
+                                            tone={slot.checkinStatus === 'Đi muộn' ? 'warning' : 'success'}
+                                            className="text-[9px] py-0 px-1.5"
+                                          >
+                                            Vào {slot.checkinTime}
+                                          </Badge>
+                                        )}
                                       </div>
                                       <span className="text-[10px] font-mono font-bold text-primary-ink whitespace-nowrap">
                                         {formatTimeHM(slot.startTime)} – {formatTimeHM(slot.endTime)}

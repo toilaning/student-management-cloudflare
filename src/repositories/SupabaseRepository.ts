@@ -225,6 +225,11 @@ function mapScheduleSlotFromDb(row: any): ScheduleSlot {
     topic: row.topic || undefined,
     meetingLink: row.meeting_link || undefined,
     status: row.status,
+    checkinTime: row.checkin_time || undefined,
+    checkoutTime: row.checkout_time || undefined,
+    checkinStatus: row.checkin_status || undefined,
+    checkinMethod: row.checkin_method || undefined,
+    checkinNote: row.checkin_note || undefined,
   };
 }
 
@@ -242,6 +247,11 @@ function mapScheduleSlotToDb(slot: ScheduleSlot): any {
     topic: slot.topic || null,
     meeting_link: slot.meetingLink || null,
     status: slot.status,
+    checkin_time: slot.checkinTime || null,
+    checkout_time: slot.checkoutTime || null,
+    checkin_status: slot.checkinStatus || null,
+    checkin_method: slot.checkinMethod || null,
+    checkin_note: slot.checkinNote || null,
     updated_at: new Date().toISOString(),
   };
 }

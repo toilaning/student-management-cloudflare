@@ -231,6 +231,16 @@ export function generateSeedData() {
         const slotId = `SCH${slotCounter.toString().padStart(4, '0')}`;
         slotCounter++;
 
+        const isDone = day <= 19;
+        // Ca đã qua: giáo viên đã tự chấm công. Vài ca muộn để sổ lương có dữ liệu đối chiếu.
+        const isLate = isDone && slotCounter % 11 === 0;
+        const lateMinutes = isLate ? 7 : 0;
+        const [startH, startM] = shift.startTime.split(':').map(Number);
+        const [endH, endM] = shift.endTime.split(':').map(Number);
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        const checkinTime = pad(startH) + ':' + pad(startM + lateMinutes);
+        const checkoutTime = pad(endH) + ':' + pad(endM);
+
         scheduleSlots.push({
           id: slotId,
           classId: cls.id,
@@ -242,7 +252,11 @@ export function generateSeedData() {
           endTime: shift.endTime,
           subject: cls.subject,
           topic: `Buổi ${slotCounter % 15 + 1}: Lý thuyết & Thực hành chuyên đề ${cls.subject}`,
-          status: day <= 19 ? 'Đã hoàn thành' : 'Đã lên lịch',
+          status: isDone ? 'Đã hoàn thành' : 'Đã lên lịch',
+          checkinTime: isDone ? checkinTime : undefined,
+          checkoutTime: isDone ? checkoutTime : undefined,
+          checkinStatus: isDone ? (isLate ? 'Đi muộn' : 'Đúng giờ') : 'Chưa chấm công',
+          checkinMethod: isDone ? 'TEACHER_SELF' : undefined,
         });
       }
     });

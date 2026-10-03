@@ -13,7 +13,10 @@ export interface TeacherTimesheetSummary {
   teacherId: string;
   teacherName: string;
   month: string;
-  totalSessions: number;
+  totalSessions: number;        // Số ca dùng để tính lương (đã chấm công, hoặc ca đã dạy)
+  scheduledSessions?: number;   // Tổng số ca được xếp trong tháng
+  checkedInSessions?: number;   // Số ca giáo viên đã chấm công
+  lateSessions?: number;        // Số ca đi muộn
   ratePerSession: number;
   totalEarnings: number;
   status: 'CHƯA_CHỐT' | 'ĐÃ_CHỐT' | 'ĐÃ_CHI';
@@ -28,5 +31,6 @@ export interface LedgerMonthlySummary {
   netProfit: number;
   invoicesCount: number;
   teacherSessionsCount: number;
+  teacherScheduledCount?: number; // Tổng ca xếp lịch (để đối chiếu với ca đã chấm)
   expenses: ManualExpense[];
 }

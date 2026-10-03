@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Header } from '@/components/common/Header';
 import { RoleGuard } from '@/components/common/RoleGuard';
 import { LiveSessionTracker } from '@/components/attendance/LiveSessionTracker';
+import { TeacherCheckinCard } from '@/components/attendance/TeacherCheckinCard';
 import { useApp } from '@/context/AppContext';
 import { StatCard, Card, CardHeader, Badge, Button, EmptyState } from '@/components/ui';
 import { BookOpen, CheckCircle2, Inbox, Clock, CalendarDays, ArrowRight, Headphones } from 'lucide-react';
@@ -104,6 +105,9 @@ export default function TeacherDashboardPage() {
               attendancePathPrefix="/teacher/attendance"
             />
           </div>
+
+          {/* Chấm công ca dạy hôm nay */}
+          <TeacherCheckinCard teacherId={currentUser?.id} />
 
           {/* Grid Lịch dạy & Yêu cầu */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

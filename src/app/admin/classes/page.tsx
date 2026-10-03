@@ -6,6 +6,14 @@ import { RoleGuard } from '@/components/common/RoleGuard';
 import { ClassEntity } from '@/types/classroom';
 import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
+import { TIME_SHIFTS } from '@/types/schedule';
+import { timeToMinutes, formatTimeHM } from '@/utils/date';
+import {
+  minuteToPercent,
+  buildTimelineTicks,
+  TIMELINE_START_MINUTES,
+  TIMELINE_END_MINUTES,
+} from '@/components/schedule/Timeline';
 import {
   Card,
   Button,
@@ -33,6 +41,17 @@ import {
   RotateCw,
   Sparkles,
 } from 'lucide-react';
+
+/** Nhãn thứ trong tuần theo quy ước dữ liệu: 2..7 = Thứ 2..Thứ 7, 8 = Chủ nhật. */
+const WEEK_DAY_OPTIONS: { value: number; label: string; short: string }[] = [
+  { value: 2, label: 'Thứ 2', short: 'T2' },
+  { value: 3, label: 'Thứ 3', short: 'T3' },
+  { value: 4, label: 'Thứ 4', short: 'T4' },
+  { value: 5, label: 'Thứ 5', short: 'T5' },
+  { value: 6, label: 'Thứ 6', short: 'T6' },
+  { value: 7, label: 'Thứ 7', short: 'T7' },
+  { value: 8, label: 'Chủ nhật', short: 'CN' },
+];
 
 export default function AdminClassesPage() {
   const toast = useToast();
@@ -374,6 +393,37 @@ export default function AdminClassesPage() {
     )
     .slice(0, 10);
 
+  // ---- Xem trước lịch dạy trong ô tạo lớp ----
+  const hourTicks = buildTimelineTicks().filter((t) => t.minutes % 60 === 0);
+  const previewStartMin = Math.max(timeToMinutes(newClassFormData.startTime || '00:00'), TIMELINE_START_MINUTES);
+  const previewEndMin = Math.min(timeToMinutes(newClassFormData.endTime || '00:00'), TIMELINE_END_MINUTES);
+  const previewValid = previewEndMin > previewStartMin;
+  const previewLeftPercent = minuteToPercent(previewStartMin);
+  const previewWidthPercent = previewValid ? minuteToPercent(previewEndMin) - previewLeftPercent : 0;
+  const previewDurationHours = previewValid
+    ? ((previewEndMin - previewStartMin) / 60).toFixed(1).replace(/\.0$/, '')
+    : '0';
+  const previewSessionsPerMonth = newClassFormData.scheduleDays.length * 4;
+
+  /** Bật/tắt một thứ trong lịch học, luôn giữ tối thiểu một thứ. */
+  const toggleScheduleDay = (day: number) => {
+    const selected = newClassFormData.scheduleDays.includes(day);
+    let updated = [...newClassFormData.scheduleDays];
+    if (selected) {
+      if (updated.length <= 1) return;
+      updated = updated.filter((d) => d !== day);
+    } else {
+      updated.push(day);
+      updated.sort((a, b) => a - b);
+    }
+    setNewClassFormData({ ...newClassFormData, scheduleDays: updated });
+  };
+
+  /** Áp một ca mẫu (Ca 1..Ca 5) vào khung giờ của lớp. */
+  const applyShiftPreset = (startTime: string, endTime: string) => {
+    setNewClassFormData({ ...newClassFormData, startTime, endTime });
+  };
+
   return (
     <RoleGuard allowedRoles={['ADMIN']}>
       <div className="flex-1 flex flex-col min-h-screen">
@@ -496,7 +546,7 @@ export default function AdminClassesPage() {
                           {classStartTime} – {classEndTime}
                         </span>
                         <span className="font-medium text-foreground bg-card px-2 py-0.5 rounded-pill border border-line">
-                          Thứ {formatScheduleDays(cls.scheduleDays)}
+                          {formatScheduleDays(cls.scheduleDays)}
                         </span>
                       </div>
 
@@ -706,11 +756,45 @@ export default function AdminClassesPage() {
               </Field>
             </div>
 
-            {/* Cấu hình khung giờ học */}
-            <div className="p-3.5 bg-muted rounded-card border border-line space-y-3">
-              <span className="font-semibold text-foreground text-xs flex items-center gap-1.5">
-                <Clock size={14} className="text-muted-foreground" /> Khung giờ học của lớp:
-              </span>
+            {/* Lịch học: chọn ca mẫu, khung giờ, thứ trong tuần và xem trước */}
+            <div className="rounded-card border border-line bg-muted/50 p-4 space-y-4">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="font-semibold text-foreground text-[13px] flex items-center gap-1.5">
+                  <Calendar size={15} className="text-primary" /> Lịch học của lớp
+                </span>
+                <Badge tone="primary">
+                  {previewDurationHours} giờ/ca • {previewSessionsPerMonth} ca/tháng
+                </Badge>
+              </div>
+
+              {/* Ca mẫu */}
+              <div className="space-y-1.5">
+                <span className="text-[12px] font-medium text-muted-foreground">Chọn ca mẫu</span>
+                <div className="flex flex-wrap gap-2">
+                  {TIME_SHIFTS.map((shift) => {
+                    const isActive =
+                      newClassFormData.startTime === shift.startTime &&
+                      newClassFormData.endTime === shift.endTime;
+                    return (
+                      <button
+                        type="button"
+                        key={shift.id}
+                        onClick={() => applyShiftPreset(shift.startTime, shift.endTime)}
+                        className={
+                          'h-10 px-3.5 rounded-pill text-[12px] font-semibold border transition cursor-pointer tabular ' +
+                          (isActive
+                            ? 'bg-primary text-white border-primary shadow-primary'
+                            : 'bg-card text-muted-foreground border-line hover:text-foreground hover:bg-muted')
+                        }
+                      >
+                        {shift.startTime} – {shift.endTime}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Khung giờ chi tiết */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Giờ bắt đầu" required>
                   <Input
@@ -731,42 +815,100 @@ export default function AdminClassesPage() {
                   />
                 </Field>
               </div>
-            </div>
 
-            {/* Thứ học trong tuần */}
-            <Field label="Lịch học trong tuần">
-              <div className="flex flex-wrap gap-2 pt-1">
-                {[2, 3, 4, 5, 6, 7, 8].map((day) => {
-                  const isSelected = newClassFormData.scheduleDays.includes(day);
-                  const label = day === 8 ? 'Chủ nhật' : 'Thứ ' + day;
-                  return (
-                    <button
-                      type="button"
-                      key={day}
-                      onClick={() => {
-                        let updated = [...newClassFormData.scheduleDays];
-                        if (isSelected) {
-                          if (updated.length > 1) {
-                            updated = updated.filter((d) => d !== day);
-                          }
-                        } else {
-                          updated.push(day);
-                          updated.sort((a, b) => a - b);
+              {/* Thứ trong tuần */}
+              <div className="space-y-1.5">
+                <span className="text-[12px] font-medium text-muted-foreground">Học vào các thứ</span>
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                  {WEEK_DAY_OPTIONS.map((day) => {
+                    const isSelected = newClassFormData.scheduleDays.includes(day.value);
+                    return (
+                      <button
+                        type="button"
+                        key={day.value}
+                        onClick={() => toggleScheduleDay(day.value)}
+                        title={day.label}
+                        className={
+                          'h-11 rounded-field text-[13px] font-semibold border transition cursor-pointer ' +
+                          (isSelected
+                            ? 'bg-primary text-white border-primary shadow-primary'
+                            : 'bg-card text-muted-foreground border-line hover:text-foreground hover:bg-muted')
                         }
-                        setNewClassFormData({ ...newClassFormData, scheduleDays: updated });
-                      }}
-                      className={'px-3 py-1.5 rounded-pill text-xs font-semibold transition cursor-pointer border ' + (
-                        isSelected
-                          ? 'bg-primary text-white border-primary shadow-primary'
-                          : 'bg-card text-muted-foreground border-line hover:text-foreground hover:bg-muted'
-                      )}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
+                      >
+                        {day.short}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </Field>
+
+              {/* Xem trước: dải tuần + trục giờ */}
+              <div className="rounded-field bg-card border border-line p-3 space-y-3">
+                <div className="flex gap-1.5">
+                  {WEEK_DAY_OPTIONS.map((day) => {
+                    const isSelected = newClassFormData.scheduleDays.includes(day.value);
+                    return (
+                      <div
+                        key={day.value}
+                        className={
+                          'flex-1 rounded-field border px-1 py-2 text-center transition ' +
+                          (isSelected ? 'bg-primary-soft border-primary/40' : 'bg-muted/60 border-line')
+                        }
+                      >
+                        <div
+                          className={
+                            'text-[11px] font-bold ' +
+                            (isSelected ? 'text-primary-ink' : 'text-subtle-foreground')
+                          }
+                        >
+                          {day.short}
+                        </div>
+                        <div
+                          className={
+                            'text-[10px] font-mono mt-0.5 tabular ' +
+                            (isSelected ? 'text-primary-ink' : 'text-subtle-foreground')
+                          }
+                        >
+                          {isSelected ? formatTimeHM(newClassFormData.startTime) : '—'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="space-y-1">
+                  <div className="relative h-8 rounded-field bg-muted overflow-hidden border border-line">
+                    {previewValid && (
+                      <div
+                        className="absolute top-1 bottom-1 rounded-field bg-primary-soft border border-primary/40 flex items-center justify-center overflow-hidden"
+                        style={{ left: previewLeftPercent + '%', width: previewWidthPercent + '%' }}
+                      >
+                        <span className="text-[10px] font-mono font-bold text-primary-ink whitespace-nowrap tabular">
+                          {formatTimeHM(newClassFormData.startTime)} – {formatTimeHM(newClassFormData.endTime)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="relative h-4">
+                    {hourTicks.map((t) => (
+                      <span
+                        key={t.minutes}
+                        className="absolute text-[10px] font-mono text-subtle-foreground -translate-x-1/2 tabular"
+                        style={{ left: minuteToPercent(t.minutes) + '%' }}
+                      >
+                        {t.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {!previewValid && (
+                  <p className="text-[12px] text-warning font-medium">
+                    Giờ kết thúc phải sau giờ bắt đầu.
+                  </p>
+                )}
+              </div>
+            </div>
 
             <Field label="Liên kết phòng học trực tuyến (Discord / Meet)">
               <Input
@@ -1079,9 +1221,67 @@ export default function AdminClassesPage() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Thứ học:</span>
                 <span className="font-semibold text-foreground">
-                  Thứ {formatScheduleDays(quickScheduleDays)}
+                  {formatScheduleDays(quickScheduleDays)}
                 </span>
               </div>
+            </div>
+
+            {/* Xem trước: dải tuần theo thứ đã chọn */}
+            <div className="flex gap-1.5">
+              {WEEK_DAY_OPTIONS.map((day) => {
+                const isSelected = quickScheduleDays.includes(day.value);
+                return (
+                  <div
+                    key={day.value}
+                    className={
+                      'flex-1 rounded-field border px-1 py-2 text-center transition ' +
+                      (isSelected ? 'bg-primary-soft border-primary/40' : 'bg-muted/60 border-line')
+                    }
+                  >
+                    <div
+                      className={
+                        'text-[11px] font-bold ' +
+                        (isSelected ? 'text-primary-ink' : 'text-subtle-foreground')
+                      }
+                    >
+                      {day.short}
+                    </div>
+                    <div
+                      className={
+                        'text-[10px] font-mono mt-0.5 tabular ' +
+                        (isSelected ? 'text-primary-ink' : 'text-subtle-foreground')
+                      }
+                    >
+                      {isSelected ? quickScheduleStartTime : '—'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {TIME_SHIFTS.map((shift) => {
+                const isActive =
+                  quickScheduleStartTime === shift.startTime && quickScheduleEndTime === shift.endTime;
+                return (
+                  <button
+                    type="button"
+                    key={shift.id}
+                    onClick={() => {
+                      setQuickScheduleStartTime(shift.startTime);
+                      setQuickScheduleEndTime(shift.endTime);
+                    }}
+                    className={
+                      'h-10 px-3.5 rounded-pill text-[12px] font-semibold border transition cursor-pointer tabular ' +
+                      (isActive
+                        ? 'bg-primary text-white border-primary shadow-primary'
+                        : 'bg-card text-muted-foreground border-line hover:text-foreground hover:bg-muted')
+                    }
+                  >
+                    {shift.startTime} – {shift.endTime}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -1205,4 +1405,3 @@ export default function AdminClassesPage() {
     </RoleGuard>
   );
 }
-

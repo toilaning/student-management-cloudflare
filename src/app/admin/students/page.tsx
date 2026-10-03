@@ -33,11 +33,22 @@ import {
   FolderKanban,
 } from 'lucide-react';
 
-const STATUS_OPTIONS: { value: 'Đang học' | 'Tạm dừng' | 'Đã nghỉ học' | 'ALL'; label: string }[] = [
+const STATUS_OPTIONS: { value: Student['status'] | 'ALL'; label: string }[] = [
   { value: 'Đang học', label: 'Đang học' },
-  { value: 'Tạm dừng', label: 'Tạm nghỉ' },
+  { value: 'Tạm dừng', label: 'Tạm dừng' },
+  { value: 'Bảo lưu', label: 'Bảo lưu' },
   { value: 'Đã nghỉ học', label: 'Đã nghỉ' },
+  { value: 'Đã tốt nghiệp', label: 'Tốt nghiệp' },
   { value: 'ALL', label: 'Tất cả' },
+];
+
+/** Danh sách trạng thái học viên dùng cho nút chọn nhanh và bộ lọc. */
+const STUDENT_STATUSES: Student['status'][] = [
+  'Đang học',
+  'Tạm dừng',
+  'Bảo lưu',
+  'Đã nghỉ học',
+  'Đã tốt nghiệp',
 ];
 
 const TARGET_UNI_FILTERS = [
@@ -56,7 +67,9 @@ const TARGET_UNI_FILTERS = [
   { id: 'KHAC', label: 'Trường khác' },
 ];
 
-function getStatusTone(status: Student['status']): 'neutral' | 'success' | 'warning' | 'danger' | 'info' {
+function getStatusTone(
+  status: Student['status']
+): 'neutral' | 'primary' | 'success' | 'warning' | 'danger' | 'info' {
   switch (status) {
     case 'Đang học':
       return 'success';
@@ -66,6 +79,8 @@ function getStatusTone(status: Student['status']): 'neutral' | 'success' | 'warn
       return 'danger';
     case 'Bảo lưu':
       return 'info';
+    case 'Đã tốt nghiệp':
+      return 'primary';
     default:
       return 'neutral';
   }
@@ -81,7 +96,7 @@ export default function AdminStudentsPage() {
   const toast = useToast();
 
   const [students, setStudents] = useState<Student[]>([]);
-  const [statusTab, setStatusTab] = useState<'ALL' | 'Đang học' | 'Tạm dừng' | 'Đã nghỉ học'>('Đang học');
+  const [statusTab, setStatusTab] = useState<Student['status'] | 'ALL'>('Đang học');
   const [targetUniFilter, setTargetUniFilter] = useState<string>('ALL');
   const [quickActionId, setQuickActionId] = useState<string>('');
   const [editingSessionStudent, setEditingSessionStudent] = useState<Student | null>(null);
@@ -97,6 +112,9 @@ export default function AdminStudentsPage() {
 
   // Modal / Sheet gán lớp cho học viên
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+
+  // Sheet đổi trạng thái học viên
+  const [statusStudent, setStatusStudent] = useState<Student | null>(null);
 
   // Modal / Sheet xoá học viên
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
@@ -190,7 +208,7 @@ export default function AdminStudentsPage() {
     }
   };
 
-  const handleQuickStatusChange = async (targetStatus: 'Tạm dừng' | 'Đã nghỉ học') => {
+  const handleQuickStatusChange = async (targetStatus: Student['status']) => {
     if (!quickActionId.trim()) {
       toast.error('Vui lòng nhập mã học viên cần thao tác');
       return;
@@ -593,17 +611,14 @@ Lưu ý: Vui lòng đăng nhập và đổi mật khẩu trong lần đầu sử
           <Badge tone={getStatusTone(st.status)} dot>
             {st.status}
           </Badge>
-          <select
-            value={st.status}
-            onChange={(e) => handleRowStatusChange(st, e.target.value as Student['status'])}
-            title="Đổi trạng thái"
-            className="h-7 px-2 bg-muted border border-line rounded-field text-[12px] text-foreground cursor-pointer focus:outline-none focus:border-primary"
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-muted-foreground hover:text-primary px-2 h-8"
+            onClick={() => setStatusStudent(st)}
           >
-            <option value="Đang học">Đang học</option>
-            <option value="Tạm dừng">Tạm dừng</option>
-            <option value="Đã nghỉ học">Đã nghỉ học</option>
-            <option value="Bảo lưu">Bảo lưu</option>
-          </select>
+            Đổi
+          </Button>
         </div>
       ),
     },
@@ -660,22 +675,19 @@ Lưu ý: Vui lòng đăng nhập và đổi mật khẩu trong lần đầu sử
             </div>
 
             <div className="flex items-center gap-2.5 w-full md:w-auto justify-end">
-              <Button
-                variant="secondary"
-                size="sm"
-                loading={isUpdatingStatus}
-                onClick={() => handleQuickStatusChange('Tạm dừng')}
-              >
-                Tạm nghỉ
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                loading={isUpdatingStatus}
-                onClick={() => handleQuickStatusChange('Đã nghỉ học')}
-              >
-                Dừng học
-              </Button>
+              <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                {STUDENT_STATUSES.map((s) => (
+                  <Button
+                    key={s}
+                    variant={s === 'Đã nghỉ học' ? 'danger' : 'secondary'}
+                    size="sm"
+                    loading={isUpdatingStatus}
+                    onClick={() => handleQuickStatusChange(s)}
+                  >
+                    {s}
+                  </Button>
+                ))}
+              </div>
             </div>
           </Card>
 
@@ -779,9 +791,16 @@ Lưu ý: Vui lòng đăng nhập và đổi mật khẩu trong lần đầu sử
                         )}
                       </div>
                     </div>
-                    <Badge tone={getStatusTone(st.status)} dot>
-                      {st.status}
-                    </Badge>
+                    <button
+                      type="button"
+                      onClick={() => setStatusStudent(st)}
+                      title="Đổi trạng thái"
+                      className="cursor-pointer"
+                    >
+                      <Badge tone={getStatusTone(st.status)} dot>
+                        {st.status}
+                      </Badge>
+                    </button>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
@@ -844,7 +863,50 @@ Lưu ý: Vui lòng đăng nhập và đổi mật khẩu trong lần đầu sử
           />
         </main>
 
-        {/* Sheet Điều Chỉnh Số Buổi Còn Lại */}
+        {/* Sheet Đổi Trạng Thái Học Viên */}
+        <Sheet
+          isOpen={!!statusStudent}
+          onClose={() => setStatusStudent(null)}
+          title="Trạng thái học tập"
+          description={
+            statusStudent ? statusStudent.name + ' (' + statusStudent.id + ')' : undefined
+          }
+          size="sm"
+        >
+          {statusStudent && (
+            <div className="space-y-2.5 pt-1">
+              <p className="text-[13px] text-muted-foreground">
+                Chọn trạng thái mới cho học viên. Thay đổi được lưu ngay.
+              </p>
+              {STUDENT_STATUSES.map((s) => {
+                const active = statusStudent.status === s;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    disabled={active || isUpdatingStatus}
+                    onClick={async () => {
+                      await handleRowStatusChange(statusStudent, s);
+                      setStatusStudent(null);
+                    }}
+                    className={
+                      'w-full h-12 px-4 rounded-field border text-sm font-semibold flex items-center justify-between transition-colors cursor-pointer disabled:cursor-default ' +
+                      (active
+                        ? 'bg-primary-soft border-primary/40 text-primary-ink'
+                        : 'bg-card border-line hover:bg-muted text-foreground')
+                    }
+                  >
+                    <span>{s}</span>
+                    <Badge tone={getStatusTone(s)} dot>
+                      {active ? 'Hiện tại' : 'Chọn'}
+                    </Badge>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </Sheet>
+
         <Sheet
           isOpen={!!editingSessionStudent}
           onClose={() => setEditingSessionStudent(null)}

@@ -112,6 +112,11 @@ CREATE TABLE IF NOT EXISTS schedule_slots (
     topic TEXT,
     meeting_link TEXT,
     status VARCHAR(50) NOT NULL DEFAULT 'Đã lên lịch' CHECK (status IN ('Đã lên lịch', 'Đã hoàn thành', 'Đã hủy', 'Đổi lịch')),
+    checkin_time VARCHAR(10),
+    checkout_time VARCHAR(10),
+    checkin_status VARCHAR(30) CHECK (checkin_status IS NULL OR checkin_status IN ('Chưa chấm công', 'Đúng giờ', 'Đi muộn')),
+    checkin_method VARCHAR(30) CHECK (checkin_method IS NULL OR checkin_method IN ('TEACHER_SELF', 'ADMIN', 'SYSTEM')),
+    checkin_note TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -259,4 +264,3 @@ ALTER TABLE tuition_invoices DISABLE ROW LEVEL SECURITY;
 ALTER TABLE teacher_payroll_periods DISABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs DISABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications DISABLE ROW LEVEL SECURITY;
-

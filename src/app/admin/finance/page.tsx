@@ -12,8 +12,11 @@ import {
   TrendingDown,
   Plus,
   Trash2,
+  Clock,
+  UserCheck,
 } from 'lucide-react';
 import { ManualExpense, TeacherTimesheetSummary, LedgerMonthlySummary } from '@/types/ledger';
+import { ScheduleSlot } from '@/types/schedule';
 import { Card, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -50,6 +53,13 @@ export default function AdminFinanceLedgerPage() {
   const [expenseToDelete, setExpenseToDelete] = useState<ManualExpense | null>(null);
   const [deletingExpense, setDeletingExpense] = useState(false);
 
+  // Sheet chấm công bù cho giáo viên
+  const [makeupTeacher, setMakeupTeacher] = useState<TeacherTimesheetSummary | null>(null);
+  const [makeupSlots, setMakeupSlots] = useState<ScheduleSlot[]>([]);
+  const [makeupLoading, setMakeupLoading] = useState(false);
+  const [makeupBusyId, setMakeupBusyId] = useState<string | null>(null);
+  const [makeupForm, setMakeupForm] = useState<Record<string, { checkinTime: string; checkoutTime: string }>>({});
+
   const loadFinanceData = async () => {
     try {
       setLoading(true);
@@ -72,6 +82,59 @@ export default function AdminFinanceLedgerPage() {
   useEffect(() => {
     loadFinanceData();
   }, [selectedMonth]);
+
+  const openMakeupSheet = async (tc: TeacherTimesheetSummary) => {
+    setMakeupTeacher(tc);
+    setMakeupSlots([]);
+    setMakeupForm({});
+    setMakeupLoading(true);
+    try {
+      const res = await fetch(
+        '/api/teacher-checkin?teacherId=' + encodeURIComponent(tc.teacherId) + '&month=' + selectedMonth
+      );
+      const data = await res.json();
+      const slots: ScheduleSlot[] = (data.slots || []).filter((s: ScheduleSlot) => s.status !== 'Đã hủy');
+      setMakeupSlots(slots);
+      const form: Record<string, { checkinTime: string; checkoutTime: string }> = {};
+      slots.forEach((s) => {
+        form[s.id] = { checkinTime: s.checkinTime || '', checkoutTime: s.checkoutTime || '' };
+      });
+      setMakeupForm(form);
+    } catch {
+      toast.error('Không tải được sổ chấm công của giáo viên');
+    } finally {
+      setMakeupLoading(false);
+    }
+  };
+
+  const saveMakeupSlot = async (slot: ScheduleSlot) => {
+    const form = makeupForm[slot.id] || { checkinTime: '', checkoutTime: '' };
+    setMakeupBusyId(slot.id);
+    try {
+      const res = await fetch('/api/teacher-checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'ADMIN_SET',
+          slotId: slot.id,
+          checkinTime: form.checkinTime,
+          checkoutTime: form.checkoutTime,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const updated: ScheduleSlot = data.slot;
+        setMakeupSlots((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+        toast.success('Đã lưu chấm công ca ' + slot.id);
+      } else {
+        toast.error(data.error || 'Lưu chấm công thất bại');
+      }
+    } catch {
+      toast.error('Lỗi mạng, bạn thử lại nhé');
+    } finally {
+      setMakeupBusyId(null);
+    }
+  };
 
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,9 +214,21 @@ export default function AdminFinanceLedgerPage() {
     },
     {
       key: 'sessions',
-      header: 'Số ca đã dạy',
+      header: 'Ca đã chấm / đã xếp',
       align: 'center',
-      render: (tc) => <span className="font-bold text-foreground tabular">{tc.totalSessions} ca</span>,
+      render: (tc) => (
+        <div className="inline-flex items-center gap-2 justify-center">
+          <span className="font-bold text-foreground tabular">{tc.checkedInSessions ?? 0}</span>
+          <span className="text-muted-foreground tabular">/ {tc.scheduledSessions ?? tc.totalSessions}</span>
+          {(tc.lateSessions ?? 0) > 0 && <Badge tone="warning">{tc.lateSessions} muộn</Badge>}
+        </div>
+      ),
+    },
+    {
+      key: 'paid',
+      header: 'Ca tính lương',
+      align: 'center',
+      render: (tc) => <span className="font-semibold text-foreground tabular">{tc.totalSessions} ca</span>,
     },
     {
       key: 'rate',
@@ -180,6 +255,21 @@ export default function AdminFinanceLedgerPage() {
         const text = tc.status === 'ĐÃ_CHI' ? 'Đã chi' : tc.status === 'ĐÃ_CHỐT' ? 'Đã chốt' : 'Chưa chốt chi';
         return <Badge tone={tone} dot>{text}</Badge>;
       },
+    },
+    {
+      key: 'actions',
+      header: 'Chấm công',
+      align: 'right',
+      render: (tc) => (
+        <Button
+          size="sm"
+          variant="secondary"
+          icon={<UserCheck size={14} />}
+          onClick={() => openMakeupSheet(tc)}
+        >
+          Chấm công bù
+        </Button>
+      ),
     },
   ];
 
@@ -509,6 +599,121 @@ export default function AdminFinanceLedgerPage() {
         </Sheet>
 
         {/* Sheet xác nhận xóa khoản chi */}
+        {/* Sheet chấm công bù cho giáo viên */}
+        <Sheet
+          isOpen={Boolean(makeupTeacher)}
+          onClose={() => setMakeupTeacher(null)}
+          title="Chấm công bù"
+          description={
+            makeupTeacher
+              ? makeupTeacher.teacherName + ' • ' + monthLabel
+              : undefined
+          }
+          size="lg"
+          footer={
+            <div className="flex items-center justify-end gap-2 w-full">
+              <Button variant="secondary" onClick={() => setMakeupTeacher(null)}>
+                Đóng
+              </Button>
+            </div>
+          }
+        >
+          {makeupLoading ? (
+            <div className="space-y-2.5">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-16 rounded-card bg-muted animate-pulse" />
+              ))}
+            </div>
+          ) : makeupSlots.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              Tháng này giáo viên chưa có ca dạy nào.
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {makeupSlots.map((slot) => {
+                const form = makeupForm[slot.id] || { checkinTime: '', checkoutTime: '' };
+                const changed =
+                  form.checkinTime !== (slot.checkinTime || '') ||
+                  form.checkoutTime !== (slot.checkoutTime || '');
+                const invalidCheckout = !!form.checkoutTime && !form.checkinTime;
+                return (
+                  <div
+                    key={slot.id}
+                    className="p-3.5 rounded-card border border-line bg-card space-y-2.5"
+                  >
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-foreground text-sm">{slot.classId}</span>
+                          <span className="text-[12px] text-muted-foreground tabular">{slot.date}</span>
+                          <span className="text-[12px] text-muted-foreground tabular inline-flex items-center gap-1">
+                            <Clock size={12} /> {slot.startTime} - {slot.endTime}
+                          </span>
+                        </div>
+                        {slot.subject && (
+                          <p className="text-[12px] text-muted-foreground truncate mt-0.5">{slot.subject}</p>
+                        )}
+                      </div>
+                      <Badge tone={slot.checkinStatus === 'Đi muộn' ? 'warning' : slot.checkinTime ? 'success' : 'neutral'} dot>
+                        {slot.checkinStatus || 'Chưa chấm công'}
+                      </Badge>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-end gap-2.5">
+                      <div className="flex-1">
+                        <label className="block text-[12px] font-semibold text-muted-foreground mb-1">
+                          Giờ vào
+                        </label>
+                        <Input
+                          type="time"
+                          value={form.checkinTime}
+                          onChange={(e) =>
+                            setMakeupForm((prev) => ({
+                              ...prev,
+                              [slot.id]: { ...form, checkinTime: e.target.value },
+                            }))
+                          }
+                          className="font-mono"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-[12px] font-semibold text-muted-foreground mb-1">
+                          Giờ ra
+                        </label>
+                        <Input
+                          type="time"
+                          value={form.checkoutTime}
+                          onChange={(e) =>
+                            setMakeupForm((prev) => ({
+                              ...prev,
+                              [slot.id]: { ...form, checkoutTime: e.target.value },
+                            }))
+                          }
+                          className="font-mono"
+                        />
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={changed ? 'primary' : 'secondary'}
+                        disabled={!changed || invalidCheckout}
+                        loading={makeupBusyId === slot.id}
+                        onClick={() => saveMakeupSlot(slot)}
+                      >
+                        Lưu
+                      </Button>
+                    </div>
+                    {invalidCheckout && (
+                      <p className="text-[12px] text-warning font-medium">
+                        Cần nhập giờ vào trước khi ghi giờ ra.
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Sheet>
+
         <Sheet
           isOpen={Boolean(expenseToDelete)}
           onClose={() => setExpenseToDelete(null)}
