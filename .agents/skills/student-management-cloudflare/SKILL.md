@@ -95,11 +95,12 @@ Bảng dưới là nguồn sự thật cho phạm vi tính năng. Khi thêm tín
 | 4 | Giáo viên & phân công | admin | teachers, assignments | TODO |
 | 5 | Môn học & thời khóa biểu | admin, teacher | subjects, timetable | TODO |
 | 6 | Điểm số & học bạ | teacher, student, parent | grades, terms | TODO |
-| 7 | Điểm danh | teacher | attendance | TODO |
+| 7 | Điểm danh học sinh | admin, teacher | attendance, schedule_slots | done |
 | 8 | Học phí & thanh toán | admin, parent | invoices, payments | TODO |
 | 9 | Thông báo | admin, teacher | notifications | TODO |
 | 10 | Báo cáo & dashboard | admin | view tổng hợp | TODO |
-| 11 | Audit log | admin | audit_logs | TODO |
+| 11 | Audit log | admin | audit_logs | done |
+| 12 | Chấm công giáo viên theo ca | teacher, admin | schedule_slots (checkin_time, checkout_time, checkin_status, checkin_method, checkin_note) | done |
 
 Đổi `TODO` thành `in-progress` hoặc `done` khi làm. Giữ đúng thứ tự ưu tiên triển khai.
 
@@ -158,4 +159,3 @@ Chi tiết từng quy trình: [references/feature-workflow.md](references/featur
 1. Cập nhật bảng Core Feature Registry hoặc Core Stack.
 2. Thêm chi tiết vào reference tương ứng, không nhồi vào SKILL.md.
 3. Thêm một dòng vào Quy ước nếu có ràng buộc mới.
-
