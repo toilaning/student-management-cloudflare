@@ -214,7 +214,12 @@ export async function POST(request: Request) {
     const userRole = updatedBy.startsWith('ADMIN') ? 'ADMIN' : (body.userRole || 'ADMIN');
 
     if (Array.isArray(body.records)) {
-      const saved = await repo.saveAttendanceBatch(body.records);
+      // Bỏ qua các dòng chỉ để hiển thị trên sổ (học viên chưa được điểm danh).
+      // Chỉ lưu những dòng có trạng thái thật, tránh ghi placeholder vào DB.
+      const realRecords = (body.records as AttendanceRecord[]).filter(
+        (r) => r && String(r.status) !== 'Chưa điểm danh'
+      );
+      const saved = await repo.saveAttendanceBatch(realRecords);
       await repo.addAuditLog({
         userId: updatedBy,
         userName: updaterName,

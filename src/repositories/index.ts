@@ -1,6 +1,5 @@
 import { IRepository } from "./IRepository";
 import { LocalRepository } from "./LocalRepository";
-import { GoogleAppsScriptRepository } from "./GoogleAppsScriptRepository";
 import { SupabaseRepository } from "./SupabaseRepository";
 import { getSupabaseAdminClient } from "../lib/supabase";
 
@@ -15,10 +14,6 @@ export function getRepository(): IRepository {
     return SupabaseRepository.getInstance();
   }
 
-  if (dataSource === "gas") {
-    return GoogleAppsScriptRepository.getInstance();
-  }
-
   return LocalRepository.getInstance();
 }
 
@@ -26,5 +21,4 @@ export const repo = getRepository();
 
 export * from "./IRepository";
 export * from "./LocalRepository";
-export * from "./GoogleAppsScriptRepository";
 export * from "./SupabaseRepository";

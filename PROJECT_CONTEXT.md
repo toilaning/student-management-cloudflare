@@ -66,7 +66,6 @@ src/
 │   ├── IRepository.ts          # interface chuẩn (hợp đồng dữ liệu)
 │   ├── SupabaseRepository.ts   # impl production (Supabase)
 │   ├── LocalRepository.ts      # impl in-memory (test offline)
-│   ├── GoogleAppsScriptRepository.ts  # impl legacy GAS
 │   └── index.ts                # chọn impl theo DATA_SOURCE
 ├── services/               # Business logic
 │   ├── AuthService · StudentService · ConflictEngine · BulkScheduleService
@@ -79,7 +78,7 @@ src/
 
 tests/                      # 19 test files (node:test)
 discord-bot/src/            # bot: api.js, commands/, events/, cron/, config.js
-scripts/seed-gas.ts         # seed dữ liệu từ Google Apps Script
+scripts/new-migration.sh    # tạo file migration Supabase
 supabase/                   # schema.sql, seed.sql, migrations/ (SQL cũ đã dồn vào archive/)
 docs/archive/               # 19 SPEC files cũ (đặc tả tính năng, giữ làm lịch sử)
 ```
@@ -88,10 +87,9 @@ docs/archive/               # 19 SPEC files cũ (đặc tả tính năng, giữ 
 
 ## 4. Kiến trúc dữ liệu (Repository Pattern)
 
-- **Có 3 implementation của `IRepository`**, chọn qua env `DATA_SOURCE`:
+- **Có 2 implementation của `IRepository`**, chọn qua env `DATA_SOURCE`:
   - `supabase` → `SupabaseRepository` (production, Supabase Cloud)
   - `local` → `LocalRepository` (in-memory, test/offline)
-  - Legacy: `GoogleAppsScriptRepository`
 - **Thêm/sửa field dữ liệu** thường phải sync 3 nơi: `types/`, `IRepository.ts`, `SupabaseRepository.ts` (+ `LocalRepository.ts` nếu test dùng).
 - Có **2-way sync** user↔student↔teacher ở DB level (Postgres trigger).
 

@@ -464,6 +464,31 @@ function mapNotificationToDb(notif: Omit<AppNotification, 'id' | 'createdAt'> & 
   };
 }
 
+function mapSessionPackageFromDb(row: any): SessionPackage {
+  return {
+    id: row.id,
+    name: row.name,
+    sessionCount: Number(row.session_count) || 0,
+    price: Number(row.price) || 0,
+    isActive: row.is_active !== undefined ? Boolean(row.is_active) : true,
+    description: row.description || undefined,
+    createdAt: row.created_at || undefined,
+    updatedAt: row.updated_at || undefined,
+  };
+}
+
+function mapSessionPackageToDb(pkg: SessionPackage): any {
+  return {
+    id: pkg.id,
+    name: pkg.name,
+    session_count: pkg.sessionCount,
+    price: pkg.price,
+    description: pkg.description || null,
+    is_active: pkg.isActive,
+    updated_at: new Date().toISOString(),
+  };
+}
+
 // ============================================================================
 // SUPABASE REPOSITORY IMPLEMENTATION
 // ============================================================================
@@ -1640,23 +1665,78 @@ export class SupabaseRepository implements IRepository {
 
   // Session Packages
   public async getAllSessionPackages(): Promise<SessionPackage[]> {
-    return localRepo.getAllSessionPackages();
+    const client = this.getClient();
+    if (!client) return localRepo.getAllSessionPackages();
+    try {
+      const { data, error } = await client
+        .from('session_packages')
+        .select('*')
+        .order('session_count', { ascending: true });
+      if (error || !data || data.length === 0) return localRepo.getAllSessionPackages();
+      return data.map(mapSessionPackageFromDb);
+    } catch {
+      return localRepo.getAllSessionPackages();
+    }
   }
 
   public async getSessionPackageById(id: string): Promise<SessionPackage | null> {
-    return localRepo.getSessionPackageById(id);
+    const client = this.getClient();
+    if (!client) return localRepo.getSessionPackageById(id);
+    try {
+      const { data, error } = await client.from('session_packages').select('*').eq('id', id).maybeSingle();
+      if (error || !data) return localRepo.getSessionPackageById(id);
+      return mapSessionPackageFromDb(data);
+    } catch {
+      return localRepo.getSessionPackageById(id);
+    }
   }
 
   public async createSessionPackage(pkg: SessionPackage): Promise<SessionPackage> {
-    return localRepo.createSessionPackage(pkg);
+    const client = this.getClient();
+    if (!client) return localRepo.createSessionPackage(pkg);
+    try {
+      const { error } = await client.from('session_packages').insert(mapSessionPackageToDb(pkg));
+      if (error) {
+        if (this.fallbackToLocalOnFailure) return localRepo.createSessionPackage(pkg);
+        throw new Error(error.message);
+      }
+      return pkg;
+    } catch (err) {
+      if (this.fallbackToLocalOnFailure) return localRepo.createSessionPackage(pkg);
+      throw err;
+    }
   }
 
   public async updateSessionPackage(pkg: SessionPackage): Promise<SessionPackage> {
-    return localRepo.updateSessionPackage(pkg);
+    const client = this.getClient();
+    if (!client) return localRepo.updateSessionPackage(pkg);
+    try {
+      const { error } = await client.from('session_packages').update(mapSessionPackageToDb(pkg)).eq('id', pkg.id);
+      if (error) {
+        if (this.fallbackToLocalOnFailure) return localRepo.updateSessionPackage(pkg);
+        throw new Error(error.message);
+      }
+      return pkg;
+    } catch (err) {
+      if (this.fallbackToLocalOnFailure) return localRepo.updateSessionPackage(pkg);
+      throw err;
+    }
   }
 
   public async deleteSessionPackage(id: string): Promise<boolean> {
-    return localRepo.deleteSessionPackage(id);
+    const client = this.getClient();
+    if (!client) return localRepo.deleteSessionPackage(id);
+    try {
+      const { error } = await client.from('session_packages').delete().eq('id', id);
+      if (error) {
+        if (this.fallbackToLocalOnFailure) return localRepo.deleteSessionPackage(id);
+        throw new Error(error.message);
+      }
+      return true;
+    } catch (err) {
+      if (this.fallbackToLocalOnFailure) return localRepo.deleteSessionPackage(id);
+      throw err;
+    }
   }
 
   public async getAllTuitionInvoices(): Promise<TuitionInvoice[]> {
