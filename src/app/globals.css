@@ -1,16 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Design tokens — hệ thống thiết kế chung cho cả 3 cổng Admin / Giáo viên / Học sinh.
+  Màu lưu dạng kênh RGB (cách nhau bằng dấu cách) để Tailwind áp được độ mờ: bg-primary/10.
+*/
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --primary: 124 92 252;
+  --primary-hover: 106 71 232;
+  --primary-soft: 238 234 255;
+  --primary-ink: 62 39 173;
+
+  --background: 245 244 251;
+  --surface: 255 255 255;
+  --card: 255 255 255;
+
+  --foreground: 22 22 42;
+  --muted: 241 240 247;
+  --muted-foreground: 138 138 163;
+  --subtle-foreground: 176 176 194;
+  --border: 236 235 243;
+  --border-strong: 222 220 235;
+
+  --success: 34 197 94;
+  --success-soft: 232 249 239;
+  --warning: 245 158 11;
+  --warning-soft: 254 244 229;
+  --danger: 239 68 68;
+  --danger-soft: 253 236 236;
+  --info: 59 130 246;
+  --info-soft: 233 241 254;
+}
+
+* {
+  border-color: rgb(var(--border));
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: rgb(var(--foreground));
+  background: rgb(var(--background));
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   margin: 0;
   padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--primary));
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--border-strong)) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgb(var(--border-strong));
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@layer components {
+  .animate-in-up {
+    animation: inUp 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .animate-in-fade {
+    animation: inFade 200ms ease-out both;
+  }
+  .animate-in-sheet {
+    animation: inSheet 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+@keyframes inUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes inFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes inSheet {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in-up,
+  .animate-in-fade,
+  .animate-in-sheet {
+    animation: none;
+  }
 }

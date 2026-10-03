@@ -3,6 +3,7 @@
 import React from 'react';
 import { ScheduleSlot } from '@/types/schedule';
 import { timeToMinutes } from '@/utils/date';
+import { cn } from '@/lib/cn';
 
 /** Khung giờ cố định của trục timeline: 06:00 -> 23:00, bước 30 phút => 35 cột tick.
  * Bao trùm mọi ca học (Ca 1: 08:00 -> Ca 5: 20:30) không bị clipping. */
@@ -68,15 +69,17 @@ export interface TimelineSlotRenderProps {
 export function HorizontalTimelineAxis({ className = '' }: { className?: string }) {
   const ticks = buildTimelineTicks();
   return (
-    <div className={`relative ${className}`}>
+    <div className={cn('relative', className)}>
       {ticks.map(t => (
         <div
           key={t.minutes}
           className="absolute top-0 bottom-0 -translate-x-1/2"
           style={{ left: `${minuteToPercent(t.minutes)}%` }}
         >
-          <div className="h-1.5 w-px bg-slate-200" />
-          <span className="text-[9px] font-mono font-semibold text-slate-400 whitespace-nowrap -ml-2">{t.label}</span>
+          <div className="h-1.5 w-px bg-line-strong" />
+          <span className="text-[9px] font-mono font-semibold text-muted-foreground whitespace-nowrap -ml-2 tabular">
+            {t.label}
+          </span>
         </div>
       ))}
     </div>
@@ -91,7 +94,7 @@ export function TimelineGridLines() {
       {ticks.map(t => (
         <div
           key={t.minutes}
-          className="absolute top-0 bottom-0 w-px bg-slate-100"
+          className="absolute top-0 bottom-0 w-px bg-line/40"
           style={{ left: `${minuteToPercent(t.minutes)}%` }}
         />
       ))}

@@ -4,185 +4,125 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
-import { 
-  LayoutDashboard, 
-  CalendarDays, 
-  Users, 
-  BookOpen, 
-  Coins, 
-  FileCheck, 
-  History, 
-  CreditCard,
-  Inbox,
-  Settings,
-  UserCheck,
-  Receipt,
-  KeyRound,
-  HelpCircle,
-  Compass,
-  X
-} from 'lucide-react';
+import { Compass, X } from 'lucide-react';
+import { cn } from '@/lib/cn';
+import { Avatar } from '@/components/ui/Avatar';
+import { NAV_GROUPS, PORTAL_META, findActiveNav } from './navConfig';
 
 export const Sidebar: React.FC = () => {
   const pathname = usePathname();
   const { currentUser, isMobileMenuOpen, setIsMobileMenuOpen } = useApp();
 
-  // Ẩn hoàn toàn Sidebar trên trang Đăng nhập hoặc khi chưa có currentUser
-  if (pathname === '/login' || !currentUser) {
-    return null;
-  }
+  if (pathname === '/login' || !currentUser) return null;
 
   const role = currentUser.role;
-
-  const adminNav = [
-    { label: 'Tổng quan', href: '/admin/dashboard', icon: LayoutDashboard },
-    { label: 'Lịch học trung tâm', href: '/admin/calendar', icon: CalendarDays },
-    { label: 'Sổ Điểm danh Toàn trường', href: '/admin/attendance', icon: UserCheck },
-    { label: 'Duyệt đơn & Đổi ca', href: '/admin/requests', icon: Inbox },
-    { label: 'Quản lý Lớp học', href: '/admin/classes', icon: BookOpen },
-    { label: 'Đội ngũ Giáo viên', href: '/admin/teachers', icon: UserCheck },
-    { label: 'Danh sách Học viên', href: '/admin/students', icon: Users },
-    { label: 'Sổ Thu - Chi & Công nợ', href: '/admin/finance', icon: Coins },
-    { label: 'Công nợ & Học phí', href: '/admin/tuition', icon: Receipt },
-    { label: 'Tài khoản & Mật khẩu', href: '/admin/accounts', icon: KeyRound },
-    { label: 'Nhật ký Hệ thống', href: '/admin/audit', icon: History },
-    { label: 'Hướng dẫn tích hợp', href: '/admin/guides', icon: HelpCircle },
-  ];
-
-  const teacherNav = [
-    { label: 'Bàn làm việc', href: '/teacher/dashboard', icon: LayoutDashboard },
-    { label: 'Lịch dạy của tôi', href: '/teacher/schedule', icon: CalendarDays },
-    { label: 'Lớp học phụ trách', href: '/teacher/classes', icon: BookOpen },
-    { label: 'Sổ Điểm danh', href: '/teacher/attendance', icon: FileCheck },
-    { label: 'Duyệt đơn xin nghỉ/đổi ca', href: '/teacher/requests', icon: Inbox },
-  ];
-
-  const studentNav = [
-    { label: 'Góc học tập', href: '/student/dashboard', icon: LayoutDashboard },
-    { label: 'Thời khóa biểu', href: '/student/schedule', icon: CalendarDays },
-    { label: 'Đăng ký Lớp học', href: '/student/classes', icon: BookOpen },
-    { label: 'Lịch sử Chuyên cần', href: '/student/attendance', icon: FileCheck },
-    { label: 'Đơn xin nghỉ / Đổi ca', href: '/student/requests', icon: Inbox },
-    { label: 'Học phí & Thanh toán', href: '/student/tuition', icon: CreditCard },
-    { label: 'Cài đặt / Hồ sơ', href: '/student/settings', icon: Settings },
-  ];
-
-  let currentNav = adminNav;
-  let portalTitle = 'Cổng Quản Trị Hệ Thống';
-  let portalRoleTag = 'Quản trị viên';
-  let roleBadgeClass = 'bg-slate-100 text-slate-800 border-slate-200';
-
-  if (role === 'TEACHER') {
-    currentNav = teacherNav;
-    portalTitle = 'Bàn Làm Việc Giảng Viên';
-    portalRoleTag = 'Thầy Cô Giảng Dạy';
-    roleBadgeClass = 'bg-amber-50 text-amber-800 border-amber-200';
-  } else if (role === 'STUDENT') {
-    currentNav = studentNav;
-    portalTitle = 'Góc Học Tập Xưởng Vẽ';
-    portalRoleTag = 'Học Viên Xưởng';
-    roleBadgeClass = 'bg-emerald-50 text-emerald-800 border-emerald-200';
-  }
+  const groups = NAV_GROUPS[role];
+  const meta = PORTAL_META[role];
+  const active = findActiveNav(groups, pathname);
 
   return (
     <>
-      {/* Backdrop for Mobile */}
       {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-40 md:hidden transition-opacity"
+        <div
+          className="fixed inset-0 bg-foreground/40 backdrop-blur-[2px] z-nav md:hidden animate-in-fade"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
-      {/* Sidebar Drawer */}
-      <aside className={`
-        fixed md:static top-0 bottom-0 left-0 z-50 w-64 bg-white border-r border-slate-200/80 flex flex-col shrink-0 min-h-screen transition-transform duration-300 ease-in-out
-        ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}
-      `}>
-        {/* Brand */}
-        <div className="h-16 px-4 border-b border-slate-200/80 flex items-center justify-between bg-slate-50/40">
-          <Link href="/" className="flex items-center gap-2.5 min-w-0" onClick={() => setIsMobileMenuOpen(false)}>
-            <div className="w-9 h-9 rounded-lg bg-slate-900 text-amber-400 border border-slate-800 flex items-center justify-center shrink-0 shadow-xs">
-              <Compass size={20} className="stroke-[2.2]" />
-            </div>
-            <div className="min-w-0">
-              <div className="font-bold text-slate-900 text-sm tracking-tight leading-snug truncate">
-                Luyện Thi Kiến Trúc
-              </div>
-              <div className="text-[10.5px] font-medium text-slate-500 truncate leading-none mt-0.5">
-                Mỹ Thuật • Thuyết Studio
-              </div>
-            </div>
-          </Link>
-          <button 
+      <aside
+        className={cn(
+          'fixed md:static top-0 bottom-0 left-0 z-nav w-[264px] bg-card border-r border-line flex flex-col shrink-0 min-h-screen transition-transform duration-300 ease-out',
+          isMobileMenuOpen ? 'translate-x-0 shadow-pop' : '-translate-x-full md:translate-x-0'
+        )}
+      >
+        {/* Thương hiệu */}
+        <div className="h-16 px-4 flex items-center justify-between shrink-0">
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 min-w-0"
             onClick={() => setIsMobileMenuOpen(false)}
-            className="p-1.5 md:hidden text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+          >
+            <span className="w-9 h-9 rounded-field bg-primary text-white flex items-center justify-center shrink-0 shadow-primary">
+              <Compass size={19} className="stroke-[2.2]" />
+            </span>
+            <span className="min-w-0">
+              <span className="block font-extrabold text-foreground text-[13.5px] tracking-tight leading-tight truncate">
+                Luyện Thi Kiến Trúc
+              </span>
+              <span className="block text-[11px] font-medium text-muted-foreground truncate">
+                Mỹ thuật & Kiến trúc
+              </span>
+            </span>
+          </Link>
+          <button
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="p-1.5 md:hidden text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors cursor-pointer"
             aria-label="Đóng menu"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* User Mini Profile */}
-        <div className="p-3 mx-3 mt-3 rounded-xl border border-slate-200/80 bg-slate-50/70">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-slate-900 text-amber-300 font-mono font-bold text-xs flex items-center justify-center shadow-xs shrink-0">
-              {currentUser.name?.charAt(0) || 'U'}
-            </div>
+        {/* Hồ sơ người dùng */}
+        <div className="px-3 pb-3 shrink-0">
+          <div className="flex items-center gap-2.5 p-2.5 rounded-card bg-primary-soft/60 border border-primary-soft">
+            <Avatar name={currentUser.name} src={currentUser.avatar} size={36} />
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-semibold text-slate-800 truncate leading-snug">{currentUser.name}</div>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="font-mono text-[10px] font-semibold px-1.5 py-0.2 rounded bg-white text-slate-700 border border-slate-200 shadow-2xs">
-                  {currentUser.id}
-                </span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded font-medium border ${roleBadgeClass}`}>
-                  {portalRoleTag}
-                </span>
+              <div className="text-[13px] font-bold text-foreground truncate leading-tight">
+                {currentUser.name}
               </div>
+              <div className="text-[11px] text-primary-ink font-semibold truncate">{meta.tag}</div>
             </div>
           </div>
         </div>
 
-        {/* Nav List */}
-        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
-          <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            {portalTitle}
-          </div>
-          {currentNav.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                  isActive
-                    ? 'border-l-2 border-indigo-600 bg-indigo-50/70 text-indigo-950 font-semibold shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-                }`}
-              >
-                <Icon 
-                  size={18} 
-                  className={`shrink-0 transition-colors ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} 
-                />
-                <span className="truncate whitespace-nowrap">{item.label}</span>
-              </Link>
-            );
-          })}
+        {/* Menu */}
+        <nav className="flex-1 px-3 pb-3 overflow-y-auto no-scrollbar">
+          {groups.map((group) => (
+            <div key={group.title} className="mb-1.5">
+              <div className="px-3 pt-3 pb-1.5 text-[10.5px] font-bold uppercase tracking-wider text-subtle-foreground">
+                {group.title}
+              </div>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = active?.href === item.href;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={cn(
+                        'relative flex items-center gap-2.5 px-3 h-10 rounded-field text-[13px] transition-colors',
+                        isActive
+                          ? 'bg-primary-soft text-primary-ink font-bold'
+                          : 'text-muted-foreground font-medium hover:bg-muted hover:text-foreground'
+                      )}
+                    >
+                      {isActive && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-primary" />
+                      )}
+                      <Icon
+                        size={17}
+                        className={cn('shrink-0', isActive ? 'text-primary' : 'text-subtle-foreground')}
+                      />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
-        {/* Footer Info */}
-        <div className="p-3 border-t border-slate-200/80 bg-slate-50/40 text-[11px] text-slate-500 space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-slate-400">Niên khóa:</span>
-            <span className="font-mono font-medium text-slate-700">2026 - 2027</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-400">Hệ thống:</span>
-            <span className="inline-flex items-center gap-1.5 text-emerald-700 font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              Hoạt động bình thường
+        {/* Chân trang */}
+        <div className="p-3 border-t border-line shrink-0">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-muted-foreground">Niên khoá 2026–2027</span>
+            <span className="inline-flex items-center gap-1.5 text-success font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-success" />
+              Đang hoạt động
             </span>
           </div>
         </div>
