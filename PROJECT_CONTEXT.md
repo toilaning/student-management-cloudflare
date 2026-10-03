@@ -80,8 +80,8 @@ src/
 tests/                      # 19 test files (node:test)
 discord-bot/src/            # bot: api.js, commands/, events/, cron/, config.js
 scripts/seed-gas.ts         # seed dữ liệu từ Google Apps Script
-supabase/                   # 11 SQL scripts (schema, migrations, rebuild master)
-*.md                        # 19 SPEC files (đặc tả tính năng)
+supabase/                   # schema.sql, seed.sql, migrations/ (SQL cũ đã dồn vào archive/)
+docs/archive/               # 19 SPEC files cũ (đặc tả tính năng, giữ làm lịch sử)
 ```
 
 ---
@@ -158,8 +158,8 @@ users/                 route.ts
 | Truy vấn DB X | `src/repositories/SupabaseRepository.ts` (+ `IRepository.ts`) |
 | Kiểu dữ liệu X | `src/types/X.ts` |
 | UI component X | `src/components/<domain>/...` |
-| Schema/migration | `supabase/*.sql` |
-| Đặc tả tính năng | `*_SPEC.md` (tên file = tên tính năng) |
+| Schema/migration | `supabase/schema.sql`, `supabase/migrations/*.sql` |
+| Đặc tả tính năng cũ | `docs/archive/*_SPEC.md` |
 | Test tính năng X | `tests/*X*.test.ts` |
 | Discord bot | `discord-bot/src/...` |
 | State toàn cục | `src/context/AppContext.tsx` |
