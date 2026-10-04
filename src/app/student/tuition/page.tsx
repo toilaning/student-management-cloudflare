@@ -168,7 +168,7 @@ export default function StudentTuitionPage() {
     }
   };
 
-  const handleConfirmMockPayment = async () => {
+  const handleConfirmPayment = async () => {
     if (!selectedInvoice) return;
     setPaymentProcessing(true);
     try {
@@ -510,7 +510,7 @@ export default function StudentTuitionPage() {
                     <Button
                       variant="primary"
                       loading={paymentProcessing}
-                      onClick={handleConfirmMockPayment}
+                      onClick={handleConfirmPayment}
                     >
                       Xác nhận đã chuyển khoản
                     </Button>

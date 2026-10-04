@@ -79,7 +79,7 @@ src/
 tests/                      # 19 test files (node:test)
 discord-bot/src/            # bot: api.js, commands/, events/, cron/, config.js
 scripts/new-migration.sh    # tạo file migration Supabase
-supabase/                   # schema.sql, seed.sql, migrations/ (SQL cũ đã dồn vào archive/)
+supabase/                   # schema.sql, migrations/ (SQL cũ đã dồn vào archive/)
 docs/archive/               # 19 SPEC files cũ (đặc tả tính năng, giữ làm lịch sử)
 ```
 

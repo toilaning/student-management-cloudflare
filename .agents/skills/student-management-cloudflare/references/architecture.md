@@ -24,8 +24,7 @@ lib/
   db/               # truy vấn, types
 supabase/
   migrations/       # migration SQL có timestamp
-  seed.sql
-scripts/            # script tiện ích (migration, seed)
+scripts/            # script tiện ích (migration)
 wrangler.toml       # cấu hình Worker
 .agents/skills/     # skill của dự án
 ```
@@ -64,4 +63,3 @@ Không dùng service role key ở client. Nếu cần quyền cao, chỉ gọi t
 - PR mở vào `main`: chạy lint, test, build, và `wrangler deploy --dry-run`.
 - Deploy production khi merge vào `main` bằng GitHub Actions với `CLOUDFLARE_API_TOKEN`.
 - Migration Supabase chạy qua CLI `supabase db push` trong pipeline hoặc thủ công có kiểm soát.
-

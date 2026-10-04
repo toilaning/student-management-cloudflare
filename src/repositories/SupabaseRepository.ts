@@ -1,19 +1,16 @@
-import { LocalRepository } from './LocalRepository';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { IRepository } from './IRepository';
 import { User } from '@/types/auth';
 import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
 import { Classroom, ClassEntity } from '@/types/classroom';
-import { ScheduleSlot, ClassRequest, TimeShift, TIME_SHIFTS } from '@/types/schedule';
+import { ScheduleSlot, ClassRequest, TimeShift } from '@/types/schedule';
 import { AttendanceRecord } from '@/types/attendance';
 import { TuitionInvoice, PayrollRecord } from '@/types/finance';
 import { SessionPackage } from '@/types/package';
 import { AuditLog } from '@/types/audit';
 import { AppNotification } from '@/types/notification';
 import { getSupabaseAdminClient } from '@/lib/supabase';
-import { localRepo } from './LocalRepository';
-import { generateSeedData } from './seeds/seedData';
 
 // ============================================================================
 // DATA MAPPERS (Database snake_case <-> Application camelCase)
@@ -497,7 +494,6 @@ function mapSessionPackageToDb(pkg: SessionPackage): any {
 export class SupabaseRepository implements IRepository {
   private static instance: SupabaseRepository;
   private client: SupabaseClient | null = null;
-  private fallbackToLocalOnFailure: boolean = true;
 
   private constructor() {
     this.client = getSupabaseAdminClient();
@@ -537,13 +533,11 @@ export class SupabaseRepository implements IRepository {
         .maybeSingle();
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getUserById(id);
         throw new Error(error.message);
       }
 
       return data ? mapUserFromDb(data) : null;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getUserById(id);
       throw err;
     }
   }
@@ -561,13 +555,11 @@ export class SupabaseRepository implements IRepository {
         .maybeSingle();
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getUserByUsername(username);
         throw new Error(error.message);
       }
 
       return data ? mapUserFromDb(data) : null;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getUserByUsername(username);
       throw err;
     }
   }
@@ -575,7 +567,7 @@ export class SupabaseRepository implements IRepository {
   public async authenticate(username: string, passwordHash: string): Promise<User | null> {
     const client = this.getClient();
     if (!client) {
-      return localRepo.authenticate(username, passwordHash);
+      throw new Error('Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local');
     }
 
     try {
@@ -589,14 +581,12 @@ export class SupabaseRepository implements IRepository {
         .maybeSingle();
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.authenticate(username, passwordHash);
         throw new Error(error.message);
       }
 
       if (!data) return null;
       return mapUserFromDb(data);
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.authenticate(username, passwordHash);
       throw err;
     }
   }
@@ -608,12 +598,10 @@ export class SupabaseRepository implements IRepository {
     try {
       const { data, error } = await client.from('users').select('*');
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getAllUsers();
         throw new Error(error.message);
       }
       return (data || []).map(mapUserFromDb);
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getAllUsers();
       throw err;
     }
   }
@@ -626,12 +614,10 @@ export class SupabaseRepository implements IRepository {
       const row = mapUserToDb(user);
       const { error } = await client.from('users').update(row).eq('id', user.id);
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.updateUser(user);
         throw new Error(error.message);
       }
       return user;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.updateUser(user);
       throw err;
     }
   }
@@ -644,12 +630,10 @@ export class SupabaseRepository implements IRepository {
       const row = mapUserToDb(user);
       const { error } = await client.from('users').insert(row);
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.createUser(user);
         throw new Error(error.message);
       }
       return user;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.createUser(user);
       throw err;
     }
   }
@@ -661,12 +645,10 @@ export class SupabaseRepository implements IRepository {
     try {
       const { error } = await client.from('users').delete().eq('id', id);
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.deleteUser(id);
         throw new Error(error.message);
       }
       return true;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.deleteUser(id);
       throw err;
     }
   }
@@ -687,7 +669,6 @@ export class SupabaseRepository implements IRepository {
         .maybeSingle();
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getStudentById(id);
         throw new Error(error.message);
       }
       if (!student) return null;
@@ -700,7 +681,6 @@ export class SupabaseRepository implements IRepository {
       const enrolledClassIds = (classStudents || []).map((cs: any) => cs.class_id);
       return mapStudentFromDb({ ...student, enrolledClassIds });
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getStudentById(id);
       throw err;
     }
   }
@@ -712,7 +692,6 @@ export class SupabaseRepository implements IRepository {
     try {
       const { data: students, error } = await client.from('students').select('*');
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getAllStudents();
         throw new Error(error.message);
       }
 
@@ -727,7 +706,6 @@ export class SupabaseRepository implements IRepository {
         mapStudentFromDb({ ...s, enrolledClassIds: studentMap.get(s.id) || [] })
       );
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getAllStudents();
       throw err;
     }
   }
@@ -745,7 +723,6 @@ export class SupabaseRepository implements IRepository {
         updateErr = retry.error;
       }
       if (updateErr) {
-        if (this.fallbackToLocalOnFailure) return localRepo.updateStudent(student);
         throw new Error(updateErr.message);
       }
 
@@ -760,7 +737,6 @@ export class SupabaseRepository implements IRepository {
 
       return student;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.updateStudent(student);
       throw err;
     }
   }
@@ -778,7 +754,6 @@ export class SupabaseRepository implements IRepository {
         insertErr = retry.error;
       }
       if (insertErr) {
-        if (this.fallbackToLocalOnFailure) return localRepo.createStudent(student);
         throw new Error(insertErr.message);
       }
 
@@ -792,7 +767,6 @@ export class SupabaseRepository implements IRepository {
 
       return student;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.createStudent(student);
       throw err;
     }
   }
@@ -804,12 +778,10 @@ export class SupabaseRepository implements IRepository {
     try {
       const { error } = await client.from('students').delete().eq('id', id);
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.deleteStudent(id);
         throw new Error(error.message);
       }
       return true;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.deleteStudent(id);
       throw err;
     }
   }
@@ -830,7 +802,6 @@ export class SupabaseRepository implements IRepository {
         .maybeSingle();
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getTeacherById(id);
         throw new Error(error.message);
       }
       if (!teacher) return null;
@@ -843,7 +814,6 @@ export class SupabaseRepository implements IRepository {
       const assignedClassIds = (classes || []).map((c: any) => c.id);
       return mapTeacherFromDb({ ...teacher, assignedClassIds });
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getTeacherById(id);
       throw err;
     }
   }
@@ -855,7 +825,6 @@ export class SupabaseRepository implements IRepository {
     try {
       const { data: teachers, error } = await client.from('teachers').select('*');
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getAllTeachers();
         throw new Error(error.message);
       }
 
@@ -870,7 +839,6 @@ export class SupabaseRepository implements IRepository {
         mapTeacherFromDb({ ...t, assignedClassIds: classMap.get(t.id) || [] })
       );
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getAllTeachers();
       throw err;
     }
   }
@@ -883,12 +851,10 @@ export class SupabaseRepository implements IRepository {
       const row = mapTeacherToDb(teacher);
       const { error } = await client.from('teachers').update(row).eq('id', teacher.id);
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.updateTeacher(teacher);
         throw new Error(error.message);
       }
       return teacher;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.updateTeacher(teacher);
       throw err;
     }
   }
@@ -901,12 +867,10 @@ export class SupabaseRepository implements IRepository {
       const row = mapTeacherToDb(teacher);
       const { error } = await client.from('teachers').insert(row);
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.createTeacher(teacher);
         throw new Error(error.message);
       }
       return teacher;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.createTeacher(teacher);
       throw err;
     }
   }
@@ -923,7 +887,6 @@ export class SupabaseRepository implements IRepository {
       // 2. Xóa trong bảng teachers
       const { error } = await client.from('teachers').delete().eq('id', id);
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.deleteTeacher(id);
         throw new Error(error.message);
       }
 
@@ -931,7 +894,6 @@ export class SupabaseRepository implements IRepository {
       await client.from('users').delete().eq('id', id);
       return true;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.deleteTeacher(id);
       throw err;
     }
   }
@@ -947,12 +909,10 @@ export class SupabaseRepository implements IRepository {
     try {
       const { data, error } = await client.from('classrooms').select('*');
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getAllClassrooms();
         throw new Error(error.message);
       }
       return (data || []).map(mapClassroomFromDb);
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getAllClassrooms();
       throw err;
     }
   }
@@ -969,12 +929,10 @@ export class SupabaseRepository implements IRepository {
         .maybeSingle();
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getClassroomById(id);
         throw new Error(error.message);
       }
       return data ? mapClassroomFromDb(data) : null;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getClassroomById(id);
       throw err;
     }
   }
@@ -986,7 +944,6 @@ export class SupabaseRepository implements IRepository {
     try {
       const { data: classes, error } = await client.from('classes').select('*');
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getAllClasses();
         throw new Error(error.message);
       }
 
@@ -1001,7 +958,6 @@ export class SupabaseRepository implements IRepository {
         mapClassFromDb({ ...c, studentIds: classMap.get(c.id) || [] })
       );
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getAllClasses();
       throw err;
     }
   }
@@ -1018,7 +974,6 @@ export class SupabaseRepository implements IRepository {
         .maybeSingle();
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getClassById(id);
         throw new Error(error.message);
       }
       if (!cls) return null;
@@ -1031,7 +986,6 @@ export class SupabaseRepository implements IRepository {
       const studentIds = (classStudents || []).map((cs: any) => cs.student_id);
       return mapClassFromDb({ ...cls, studentIds });
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getClassById(id);
       throw err;
     }
   }
@@ -1047,7 +1001,6 @@ export class SupabaseRepository implements IRepository {
         .eq('teacher_id', teacherId);
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getClassesByTeacherId(teacherId);
         throw new Error(error.message);
       }
 
@@ -1062,7 +1015,6 @@ export class SupabaseRepository implements IRepository {
         mapClassFromDb({ ...c, studentIds: classMap.get(c.id) || [] })
       );
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getClassesByTeacherId(teacherId);
       throw err;
     }
   }
@@ -1078,7 +1030,6 @@ export class SupabaseRepository implements IRepository {
         .eq('student_id', studentId);
 
       if (csErr) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getClassesByStudentId(studentId);
         throw new Error(csErr.message);
       }
 
@@ -1091,7 +1042,6 @@ export class SupabaseRepository implements IRepository {
         .in('id', classIds);
 
       if (clsErr) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getClassesByStudentId(studentId);
         throw new Error(clsErr.message);
       }
 
@@ -1110,7 +1060,6 @@ export class SupabaseRepository implements IRepository {
         mapClassFromDb({ ...c, studentIds: classMap.get(c.id) || [] })
       );
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getClassesByStudentId(studentId);
       throw err;
     }
   }
@@ -1123,7 +1072,6 @@ export class SupabaseRepository implements IRepository {
       const row = mapClassToDb(classEntity);
       const { error: updateErr } = await client.from('classes').update(row).eq('id', classEntity.id);
       if (updateErr) {
-        if (this.fallbackToLocalOnFailure) return localRepo.updateClass(classEntity);
         throw new Error(updateErr.message);
       }
 
@@ -1138,7 +1086,6 @@ export class SupabaseRepository implements IRepository {
 
       return classEntity;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.updateClass(classEntity);
       throw err;
     }
   }
@@ -1146,7 +1093,7 @@ export class SupabaseRepository implements IRepository {
   public async deleteClass(id: string): Promise<boolean> {
     const client = getSupabaseAdminClient();
     if (!client) {
-      return LocalRepository.getInstance().deleteClass(id);
+      throw new Error('Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local');
     }
     const { error } = await client.from('classes').delete().eq('id', id);
     if (error) {
@@ -1164,7 +1111,6 @@ export class SupabaseRepository implements IRepository {
       const row = mapClassToDb(classEntity);
       const { error: insertErr } = await client.from('classes').insert(row);
       if (insertErr) {
-        if (this.fallbackToLocalOnFailure) return localRepo.createClass(classEntity);
         throw new Error(insertErr.message);
       }
 
@@ -1178,7 +1124,6 @@ export class SupabaseRepository implements IRepository {
 
       return classEntity;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.createClass(classEntity);
       throw err;
     }
   }
@@ -1194,12 +1139,10 @@ export class SupabaseRepository implements IRepository {
     try {
       const { data, error } = await client.from('schedule_slots').select('*');
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getAllScheduleSlots();
         throw new Error(error.message);
       }
       return (data || []).map(mapScheduleSlotFromDb);
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getAllScheduleSlots();
       throw err;
     }
   }
@@ -1209,24 +1152,20 @@ export class SupabaseRepository implements IRepository {
   public async getAllTimeShifts(): Promise<TimeShift[]> {
     const client = getSupabaseAdminClient();
     if (!client) {
-      return LocalRepository.getInstance().getAllTimeShifts();
+      throw new Error('Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local');
     }
-    try {
-      const { data, error } = await client.from('time_shifts').select('*').order('id', { ascending: true });
-      if (error || !data || data.length === 0) {
-        return LocalRepository.getInstance().getAllTimeShifts();
-      }
-      return data.map((r: any) => ({
-        id: r.id,
-        name: r.name,
-        startTime: String(r.start_time).substring(0, 5),
-        endTime: String(r.end_time).substring(0, 5),
-        durationHours: Number(r.duration_hours) || 2.0,
-        isActive: r.is_active ?? true
-      }));
-    } catch {
-      return LocalRepository.getInstance().getAllTimeShifts();
+    const { data, error } = await client.from('time_shifts').select('*').order('id', { ascending: true });
+    if (error) {
+      throw new Error(error.message);
     }
+    return (data || []).map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      startTime: String(r.start_time).substring(0, 5),
+      endTime: String(r.end_time).substring(0, 5),
+      durationHours: Number(r.duration_hours) || 2.0,
+      isActive: r.is_active ?? true
+    }));
   }
 
   public async getTimeShiftById(id: number): Promise<TimeShift | null> {
@@ -1236,51 +1175,51 @@ export class SupabaseRepository implements IRepository {
 
   public async createTimeShift(shift: TimeShift): Promise<TimeShift> {
     const client = getSupabaseAdminClient();
-    if (client) {
-      try {
-        await client.from('time_shifts').insert({
-          id: shift.id,
-          name: shift.name,
-          start_time: shift.startTime,
-          end_time: shift.endTime,
-          duration_hours: shift.durationHours || 2.0,
-          is_active: shift.isActive ?? true
-        });
-      } catch (e) {
-        console.warn('Lưu time_shifts vào Supabase thất bại:', e);
-      }
+    if (!client) {
+      throw new Error('Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local');
     }
-    return LocalRepository.getInstance().createTimeShift(shift);
+    const { error } = await client.from('time_shifts').insert({
+      id: shift.id,
+      name: shift.name,
+      start_time: shift.startTime,
+      end_time: shift.endTime,
+      duration_hours: shift.durationHours || 2.0,
+      is_active: shift.isActive ?? true
+    });
+    if (error) {
+      throw new Error(error.message);
+    }
+    return shift;
   }
 
   public async updateTimeShift(shift: TimeShift): Promise<TimeShift> {
     const client = getSupabaseAdminClient();
-    if (client) {
-      try {
-        await client.from('time_shifts').update({
-          name: shift.name,
-          start_time: shift.startTime,
-          end_time: shift.endTime,
-          duration_hours: shift.durationHours || 2.0,
-          is_active: shift.isActive ?? true
-        }).eq('id', shift.id);
-      } catch (e) {
-        console.warn('Cập nhật time_shifts trên Supabase thất bại:', e);
-      }
+    if (!client) {
+      throw new Error('Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local');
     }
-    return LocalRepository.getInstance().updateTimeShift(shift);
+    const { error } = await client.from('time_shifts').update({
+      name: shift.name,
+      start_time: shift.startTime,
+      end_time: shift.endTime,
+      duration_hours: shift.durationHours || 2.0,
+      is_active: shift.isActive ?? true
+    }).eq('id', shift.id);
+    if (error) {
+      throw new Error(error.message);
+    }
+    return shift;
   }
 
   public async deleteTimeShift(id: number): Promise<boolean> {
     const client = getSupabaseAdminClient();
-    if (client) {
-      try {
-        await client.from('time_shifts').delete().eq('id', id);
-      } catch (e) {
-        console.warn('Xóa time_shifts trên Supabase thất bại:', e);
-      }
+    if (!client) {
+      throw new Error('Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local');
     }
-    return LocalRepository.getInstance().deleteTimeShift(id);
+    const { error } = await client.from('time_shifts').delete().eq('id', id);
+    if (error) {
+      throw new Error(error.message);
+    }
+    return true;
   }
 
   public async getScheduleSlotById(id: string): Promise<ScheduleSlot | null> {
@@ -1295,12 +1234,10 @@ export class SupabaseRepository implements IRepository {
         .maybeSingle();
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getScheduleSlotById(id);
         throw new Error(error.message);
       }
       return data ? mapScheduleSlotFromDb(data) : null;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getScheduleSlotById(id);
       throw err;
     }
   }
@@ -1316,12 +1253,10 @@ export class SupabaseRepository implements IRepository {
         .eq('teacher_id', teacherId);
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getScheduleSlotsByTeacherId(teacherId);
         throw new Error(error.message);
       }
       return (data || []).map(mapScheduleSlotFromDb);
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getScheduleSlotsByTeacherId(teacherId);
       throw err;
     }
   }
@@ -1337,12 +1272,10 @@ export class SupabaseRepository implements IRepository {
         .eq('class_id', classId);
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getScheduleSlotsByClassId(classId);
         throw new Error(error.message);
       }
       return (data || []).map(mapScheduleSlotFromDb);
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getScheduleSlotsByClassId(classId);
       throw err;
     }
   }
@@ -1362,12 +1295,10 @@ export class SupabaseRepository implements IRepository {
         .in('class_id', classIds);
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getScheduleSlotsByStudentId(studentId);
         throw new Error(error.message);
       }
       return (data || []).map(mapScheduleSlotFromDb);
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getScheduleSlotsByStudentId(studentId);
       throw err;
     }
   }
@@ -1380,12 +1311,10 @@ export class SupabaseRepository implements IRepository {
       const row = mapScheduleSlotToDb(slot);
       const { error } = await client.from('schedule_slots').insert(row);
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.createScheduleSlot(slot);
         throw new Error(error.message);
       }
       return slot;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.createScheduleSlot(slot);
       throw err;
     }
   }
@@ -1402,12 +1331,10 @@ export class SupabaseRepository implements IRepository {
         .eq('id', slot.id);
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.updateScheduleSlot(slot);
         throw new Error(error.message);
       }
       return slot;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.updateScheduleSlot(slot);
       throw err;
     }
   }
@@ -1427,12 +1354,10 @@ export class SupabaseRepository implements IRepository {
         .eq('schedule_slot_id', slotId);
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getAttendanceBySlotId(slotId);
         throw new Error(error.message);
       }
       return (data || []).map(mapAttendanceRecordFromDb);
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getAttendanceBySlotId(slotId);
       throw err;
     }
   }
@@ -1448,12 +1373,10 @@ export class SupabaseRepository implements IRepository {
         .eq('student_id', studentId);
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getAttendanceByStudentId(studentId);
         throw new Error(error.message);
       }
       return (data || []).map(mapAttendanceRecordFromDb);
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getAttendanceByStudentId(studentId);
       throw err;
     }
   }
@@ -1469,12 +1392,10 @@ export class SupabaseRepository implements IRepository {
         .eq('class_id', classId);
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getAttendanceByClassId(classId);
         throw new Error(error.message);
       }
       return (data || []).map(mapAttendanceRecordFromDb);
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getAttendanceByClassId(classId);
       throw err;
     }
   }
@@ -1499,12 +1420,10 @@ export class SupabaseRepository implements IRepository {
       }
 
       if (res.error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.saveAttendanceRecord(record);
         throw new Error(res.error.message);
       }
       return record;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.saveAttendanceRecord(record);
       throw err;
     }
   }
@@ -1520,12 +1439,10 @@ export class SupabaseRepository implements IRepository {
         .upsert(rows, { onConflict: 'schedule_slot_id,student_id' });
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.saveAttendanceBatch(records);
         throw new Error(error.message);
       }
       return records;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.saveAttendanceBatch(records);
       throw err;
     }
   }
@@ -1541,12 +1458,10 @@ export class SupabaseRepository implements IRepository {
     try {
       const { data, error } = await client.from('class_requests').select('*');
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getAllRequests();
         throw new Error(error.message);
       }
       return (data || []).map(mapClassRequestFromDb);
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getAllRequests();
       throw err;
     }
   }
@@ -1563,12 +1478,10 @@ export class SupabaseRepository implements IRepository {
         .maybeSingle();
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getRequestById(id);
         throw new Error(error.message);
       }
       return data ? mapClassRequestFromDb(data) : null;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getRequestById(id);
       throw err;
     }
   }
@@ -1584,12 +1497,10 @@ export class SupabaseRepository implements IRepository {
         .eq('student_id', studentId);
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getRequestsByStudentId(studentId);
         throw new Error(error.message);
       }
       return (data || []).map(mapClassRequestFromDb);
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getRequestsByStudentId(studentId);
       throw err;
     }
   }
@@ -1609,12 +1520,10 @@ export class SupabaseRepository implements IRepository {
         .in('class_id', classIds);
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getRequestsByTeacherId(teacherId);
         throw new Error(error.message);
       }
       return (data || []).map(mapClassRequestFromDb);
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getRequestsByTeacherId(teacherId);
       throw err;
     }
   }
@@ -1627,12 +1536,10 @@ export class SupabaseRepository implements IRepository {
       const row = mapClassRequestToDb(request);
       const { error } = await client.from('class_requests').insert(row);
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.createRequest(request);
         throw new Error(error.message);
       }
       return request;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.createRequest(request);
       throw err;
     }
   }
@@ -1649,12 +1556,10 @@ export class SupabaseRepository implements IRepository {
         .eq('id', request.id);
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.updateRequest(request);
         throw new Error(error.message);
       }
       return request;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.updateRequest(request);
       throw err;
     }
   }
@@ -1666,77 +1571,65 @@ export class SupabaseRepository implements IRepository {
   // Session Packages
   public async getAllSessionPackages(): Promise<SessionPackage[]> {
     const client = this.getClient();
-    if (!client) return localRepo.getAllSessionPackages();
-    try {
-      const { data, error } = await client
-        .from('session_packages')
-        .select('*')
-        .order('session_count', { ascending: true });
-      if (error || !data || data.length === 0) return localRepo.getAllSessionPackages();
-      return data.map(mapSessionPackageFromDb);
-    } catch {
-      return localRepo.getAllSessionPackages();
+    if (!client) {
+      throw new Error('Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local');
     }
+    const { data, error } = await client
+      .from('session_packages')
+      .select('*')
+      .order('session_count', { ascending: true });
+    if (error) {
+      throw new Error(error.message);
+    }
+    return (data || []).map(mapSessionPackageFromDb);
   }
 
   public async getSessionPackageById(id: string): Promise<SessionPackage | null> {
     const client = this.getClient();
-    if (!client) return localRepo.getSessionPackageById(id);
-    try {
-      const { data, error } = await client.from('session_packages').select('*').eq('id', id).maybeSingle();
-      if (error || !data) return localRepo.getSessionPackageById(id);
-      return mapSessionPackageFromDb(data);
-    } catch {
-      return localRepo.getSessionPackageById(id);
+    if (!client) {
+      throw new Error('Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local');
     }
+    const { data, error } = await client.from('session_packages').select('*').eq('id', id).maybeSingle();
+    if (error) {
+      throw new Error(error.message);
+    }
+    return data ? mapSessionPackageFromDb(data) : null;
   }
 
   public async createSessionPackage(pkg: SessionPackage): Promise<SessionPackage> {
     const client = this.getClient();
-    if (!client) return localRepo.createSessionPackage(pkg);
-    try {
-      const { error } = await client.from('session_packages').insert(mapSessionPackageToDb(pkg));
-      if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.createSessionPackage(pkg);
-        throw new Error(error.message);
-      }
-      return pkg;
-    } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.createSessionPackage(pkg);
-      throw err;
+    if (!client) {
+      throw new Error('Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local');
     }
+    const { error } = await client.from('session_packages').insert(mapSessionPackageToDb(pkg));
+    if (error) {
+      throw new Error(error.message);
+    }
+    return pkg;
   }
 
   public async updateSessionPackage(pkg: SessionPackage): Promise<SessionPackage> {
     const client = this.getClient();
-    if (!client) return localRepo.updateSessionPackage(pkg);
-    try {
-      const { error } = await client.from('session_packages').update(mapSessionPackageToDb(pkg)).eq('id', pkg.id);
-      if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.updateSessionPackage(pkg);
-        throw new Error(error.message);
-      }
-      return pkg;
-    } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.updateSessionPackage(pkg);
-      throw err;
+    if (!client) {
+      throw new Error('Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local');
     }
+    const { error } = await client.from('session_packages').update(mapSessionPackageToDb(pkg)).eq('id', pkg.id);
+    if (error) {
+      throw new Error(error.message);
+    }
+    return pkg;
   }
 
   public async deleteSessionPackage(id: string): Promise<boolean> {
     const client = this.getClient();
-    if (!client) return localRepo.deleteSessionPackage(id);
-    try {
-      const { error } = await client.from('session_packages').delete().eq('id', id);
-      if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.deleteSessionPackage(id);
-        throw new Error(error.message);
-      }
-      return true;
-    } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.deleteSessionPackage(id);
-      throw err;
+    if (!client) {
+      throw new Error('Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local');
     }
+    const { error } = await client.from('session_packages').delete().eq('id', id);
+    if (error) {
+      throw new Error(error.message);
+    }
+    return true;
   }
 
   public async getAllTuitionInvoices(): Promise<TuitionInvoice[]> {
@@ -1746,12 +1639,10 @@ export class SupabaseRepository implements IRepository {
     try {
       const { data, error } = await client.from('tuition_invoices').select('*');
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getAllTuitionInvoices();
         throw new Error(error.message);
       }
       return (data || []).map(mapTuitionInvoiceFromDb);
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getAllTuitionInvoices();
       throw err;
     }
   }
@@ -1767,12 +1658,10 @@ export class SupabaseRepository implements IRepository {
         .eq('student_id', studentId);
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getTuitionInvoicesByStudentId(studentId);
         throw new Error(error.message);
       }
       return (data || []).map(mapTuitionInvoiceFromDb);
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getTuitionInvoicesByStudentId(studentId);
       throw err;
     }
   }
@@ -1789,12 +1678,10 @@ export class SupabaseRepository implements IRepository {
         .maybeSingle();
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getTuitionInvoiceById(id);
         throw new Error(error.message);
       }
       return data ? mapTuitionInvoiceFromDb(data) : null;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getTuitionInvoiceById(id);
       throw err;
     }
   }
@@ -1802,19 +1689,16 @@ export class SupabaseRepository implements IRepository {
   public async createTuitionInvoice(invoice: TuitionInvoice): Promise<TuitionInvoice> {
     const client = this.getClient();
     if (!client) {
-      if (this.fallbackToLocalOnFailure) return localRepo.createTuitionInvoice(invoice);
       throw new Error("Supabase Cloud client is not configured.");
     }
     try {
       const dbRow = mapTuitionInvoiceToDb(invoice);
       const { data, error } = await client.from("tuition_invoices").insert([dbRow]).select().single();
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.createTuitionInvoice(invoice);
         throw new Error(error.message);
       }
       return data ? mapTuitionInvoiceFromDb(data) : invoice;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.createTuitionInvoice(invoice);
       throw err;
     }
   }
@@ -1831,12 +1715,10 @@ export class SupabaseRepository implements IRepository {
         .eq('id', invoice.id);
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.updateTuitionInvoice(invoice);
         throw new Error(error.message);
       }
       return invoice;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.updateTuitionInvoice(invoice);
       throw err;
     }
   }
@@ -1852,12 +1734,10 @@ export class SupabaseRepository implements IRepository {
       }
       const { data, error } = await query;
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getAllPayrollRecords(month);
         throw new Error(error.message);
       }
       return (data || []).map(mapPayrollRecordFromDb);
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getAllPayrollRecords(month);
       throw err;
     }
   }
@@ -1873,12 +1753,10 @@ export class SupabaseRepository implements IRepository {
       }
       const { data, error } = await query.maybeSingle();
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getPayrollByTeacherId(teacherId, month);
         throw new Error(error.message);
       }
       return data ? mapPayrollRecordFromDb(data) : null;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getPayrollByTeacherId(teacherId, month);
       throw err;
     }
   }
@@ -1895,12 +1773,10 @@ export class SupabaseRepository implements IRepository {
         .eq('id', record.id);
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.updatePayrollRecord(record);
         throw new Error(error.message);
       }
       return record;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.updatePayrollRecord(record);
       throw err;
     }
   }
@@ -1916,12 +1792,10 @@ export class SupabaseRepository implements IRepository {
         .upsert(row, { onConflict: 'teacher_id,month' });
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.savePayrollRecord(record);
         throw new Error(error.message);
       }
       return record;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.savePayrollRecord(record);
       throw err;
     }
   }
@@ -1941,12 +1815,10 @@ export class SupabaseRepository implements IRepository {
         .order('timestamp', { ascending: false });
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getAllAuditLogs();
         throw new Error(error.message);
       }
       return (data || []).map(mapAuditLogFromDb);
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getAllAuditLogs();
       throw err;
     }
   }
@@ -1963,12 +1835,10 @@ export class SupabaseRepository implements IRepository {
       const { error } = await client.from('audit_logs').insert(row);
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.addAuditLog(log);
         throw new Error(error.message);
       }
       return fullLog;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.addAuditLog(log);
       throw err;
     }
   }
@@ -1993,12 +1863,10 @@ export class SupabaseRepository implements IRepository {
 
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.getNotifications(userId, role);
         throw new Error(error.message);
       }
       return (data || []).map(mapNotificationFromDb);
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.getNotifications(userId, role);
       throw err;
     }
   }
@@ -2015,12 +1883,10 @@ export class SupabaseRepository implements IRepository {
 
       const { error } = await client.from('notifications').insert(row);
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.addNotification(notification);
         throw new Error(error.message);
       }
       return fullNotif;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.addNotification(notification);
       throw err;
     }
   }
@@ -2036,12 +1902,10 @@ export class SupabaseRepository implements IRepository {
         .eq('id', id);
 
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.markNotificationAsRead(id);
         throw new Error(error.message);
       }
       return true;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.markNotificationAsRead(id);
       throw err;
     }
   }
@@ -2060,97 +1924,44 @@ export class SupabaseRepository implements IRepository {
 
       const { error } = await query;
       if (error) {
-        if (this.fallbackToLocalOnFailure) return localRepo.markAllNotificationsAsRead(userId);
         throw new Error(error.message);
       }
       return true;
     } catch (err) {
-      if (this.fallbackToLocalOnFailure) return localRepo.markAllNotificationsAsRead(userId);
       throw err;
     }
   }
 
   // --------------------------------------------------------------------------
-  // RESET / RE-SEED
+  // XOA DU LIEU (khong chen lai du lieu mau)
   // --------------------------------------------------------------------------
 
   public async resetData(): Promise<void> {
     const client = this.getClient();
     if (!client) {
-      await localRepo.resetData();
-      return;
+      throw new Error('Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local');
     }
 
-    try {
-      const tables = [
-        'audit_logs',
-        'notifications',
-        'attendance_records',
-        'class_requests',
-        'tuition_invoices',
-        'teacher_payroll_periods',
-        'schedule_slots',
-        'class_students',
-        'classes',
-        'students',
-        'teachers',
-        'classrooms',
-        'users',
-      ];
+    const tables = [
+      'audit_logs',
+      'notifications',
+      'attendance_records',
+      'class_requests',
+      'tuition_invoices',
+      'teacher_payroll_periods',
+      'schedule_slots',
+      'class_students',
+      'classes',
+      'students',
+      'teachers',
+      'classrooms',
+      'users',
+    ];
 
-      for (const table of tables) {
-        const { error } = await client.from(table).delete().neq('id', '___PLACEHOLDER___');
-        if (error) {
-          console.warn(`[SupabaseRepository] Warning clearing table ${table}:`, error.message);
-        }
-      }
-
-      const seed = generateSeedData();
-
-      // 1. Users
-      await client.from('users').insert(seed.users.map(mapUserToDb));
-      // 2. Classrooms
-      await client.from('classrooms').insert(seed.classrooms.map(mapClassroomToDb));
-      // 3. Teachers
-      await client.from('teachers').insert(seed.teachers.map(mapTeacherToDb));
-      // 4. Students
-      await client.from('students').insert(seed.students.map(mapStudentToDb));
-      // 5. Classes
-      await client.from('classes').insert(seed.classes.map(mapClassToDb));
-      // 6. Class Students
-      const classStudentsRows: { class_id: string; student_id: string }[] = [];
-      seed.classes.forEach(c => {
-        c.studentIds.forEach(sId => {
-          classStudentsRows.push({ class_id: c.id, student_id: sId });
-        });
-      });
-      for (let i = 0; i < classStudentsRows.length; i += 200) {
-        await client.from('class_students').insert(classStudentsRows.slice(i, i + 200));
-      }
-      // 7. Schedule Slots
-      for (let i = 0; i < seed.scheduleSlots.length; i += 200) {
-        await client.from('schedule_slots').insert(seed.scheduleSlots.slice(i, i + 200).map(mapScheduleSlotToDb));
-      }
-      // 8. Attendance Records
-      for (let i = 0; i < seed.attendanceRecords.length; i += 200) {
-        await client.from('attendance_records').insert(seed.attendanceRecords.slice(i, i + 200).map(mapAttendanceRecordToDb));
-      }
-      // 9. Class Requests
-      await client.from('class_requests').insert(seed.classRequests.map(mapClassRequestToDb));
-      // 10. Tuition Invoices
-      for (let i = 0; i < seed.tuitionInvoices.length; i += 200) {
-        await client.from('tuition_invoices').insert(seed.tuitionInvoices.slice(i, i + 200).map(mapTuitionInvoiceToDb));
-      }
-      // 11. Payroll Records
-      await client.from('teacher_payroll_periods').insert(seed.payrollRecords.map(mapPayrollRecordToDb));
-      // 12. Audit Logs
-      await client.from('audit_logs').insert(seed.auditLogs.map(mapAuditLogToDb));
-    } catch (err: any) {
-      console.error('[SupabaseRepository] resetData error:', err.message);
-      if (this.fallbackToLocalOnFailure) {
-        await localRepo.resetData();
-      } else {
-        throw err;
+    for (const table of tables) {
+      const { error } = await client.from(table).delete().neq('id', '___PLACEHOLDER___');
+      if (error) {
+        throw new Error(`Khong the xoa du lieu bang ${table}: ${error.message}`);
       }
     }
   }

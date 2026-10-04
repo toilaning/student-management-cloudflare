@@ -30,10 +30,11 @@ Biến môi trường chính:
 
 ## Cơ sở dữ liệu
 
-- `supabase/schema.sql` — schema đầy đủ (bảng, index, trigger đồng bộ users/teachers/students).
-- `supabase/seed.sql` — dữ liệu mẫu.
+- `supabase/schema.sql` — schema đầy đủ (bảng, index, trigger đồng bộ users/teachers/students). Chạy file này trên project Supabase mới.
 - `supabase/migrations/` — migration theo ngày.
 - `supabase/archive/` — SQL cũ đã gộp vào `schema.sql`, giữ làm lịch sử.
+
+Không có dữ liệu mẫu trong repo. Sau khi chạy `schema.sql`, tạo tài khoản quản trị đầu tiên bằng câu lệnh SQL hoặc qua Supabase Auth rồi thêm bản ghi vào bảng `users`.
 
 ## Kiểm tra
 
@@ -59,7 +60,7 @@ src/components/     UI dùng chung và theo domain
 src/services/       logic nghiệp vụ
 src/repositories/   truy cập dữ liệu (local / supabase)
 src/types/          kiểu dữ liệu
-supabase/           schema, seed, migrations
+supabase/           schema, migrations
 docs/archive/       đặc tả tính năng cũ
 tests/              test
 ```

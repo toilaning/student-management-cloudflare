@@ -39,18 +39,11 @@ export async function GET(request: Request) {
       daySlots = daySlots.filter(s => s.teacherId === teacherId);
     }
 
-    // Nếu không tìm thấy slot trong ngày này (do dữ liệu seed trong tháng 09/2026),
-    // fallback tìm slot mẫu đại diện gần nhất trong tháng 9/2026 để hiển thị live stats
-        let activeSlot: ScheduleSlot | null = null;
+    let activeSlot: ScheduleSlot | null = null;
 
     if (dateParam) {
-      // Trường hợp truyền dateParam (preview hoặc automated test):
-      if (daySlots.length > 0) {
-        activeSlot = daySlots.find(s => s.status !== "Đã hủy") || null;
-      } else {
-        // Fallback cho test date nếu ngày được chọn rơi vào ngày nghỉ: lấy slot hợp lệ đầu tiên trong tháng
-        activeSlot = slots.find(s => s.status !== "Đã hủy") || null;
-      }
+      // Xem theo một ngày cụ thể: chỉ lấy ca học của đúng ngày đó.
+      activeSlot = daySlots.find(s => s.status !== "Đã hủy") || null;
     } else {
       // Trường hợp chạy thời gian thực trên giao diện Live:
       // CHUẨN XÁC TUYỆT ĐỐI: Chỉ bật "Đang Diễn Ra" khi thời gian hiện tại nằm ĐÚNG trong khung giờ học
