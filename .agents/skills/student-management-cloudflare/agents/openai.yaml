@@ -1,0 +1,5 @@
+interface:
+  display_name: "Student Management (Cloudflare + Supabase)"
+  short_description: "Playbook dự án: Workers, Supabase, GitHub, Sentry"
+  default_prompt: "Áp dụng playbook Student Management Cloudflare cho thay đổi này và xác minh theo checklist."
+

@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(20) NOT NULL CHECK (role IN ('ADMIN', 'TEACHER', 'STUDENT')),
     name VARCHAR(255) NOT NULL,
-    email CITEXT NOT NULL UNIQUE,
+    email CITEXT UNIQUE,
     avatar TEXT,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS classrooms (
 CREATE TABLE IF NOT EXISTS teachers (
     id VARCHAR(50) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
-    email CITEXT NOT NULL,
+    email CITEXT,
     phone VARCHAR(50) NOT NULL,
     specialty VARCHAR(255) NOT NULL,
     hourly_rate NUMERIC(12, 2) NOT NULL DEFAULT 0,
@@ -53,13 +53,28 @@ CREATE INDEX IF NOT EXISTS idx_teachers_status ON teachers(status);
 CREATE TABLE IF NOT EXISTS students (
     id VARCHAR(50) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
-    email CITEXT NOT NULL,
+    email CITEXT,
     phone VARCHAR(50) NOT NULL,
     date_of_birth DATE NOT NULL,
     gender VARCHAR(10) NOT NULL CHECK (gender IN ('Nam', 'Nữ')),
     address TEXT NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'Đang học' CHECK (status IN ('Đang học', 'Bảo lưu', 'Đã tốt nghiệp')),
+    status VARCHAR(50) NOT NULL DEFAULT 'Đang học' CHECK (status IN ('Đang học', 'Tạm dừng', 'Đã nghỉ học', 'Bảo lưu', 'Đã tốt nghiệp')),
     avatar_url TEXT,
+    parent_phone VARCHAR(50),
+    assignment_url TEXT,
+    home_town VARCHAR(255),
+    grade_level VARCHAR(50),
+    target_university VARCHAR(100),
+    custom_university VARCHAR(255),
+    exam_block VARCHAR(20),
+    study_goal VARCHAR(255),
+    facebook_url TEXT,
+    other_notes TEXT,
+    registered_date DATE,
+    total_sessions_in_month INTEGER DEFAULT 12,
+    attended_sessions_in_month INTEGER DEFAULT 0,
+    absent_sessions_in_month INTEGER DEFAULT 0,
+    remaining_sessions INTEGER DEFAULT 12,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -77,6 +92,9 @@ CREATE TABLE IF NOT EXISTS classes (
     tuition_fee NUMERIC(12, 2) NOT NULL DEFAULT 0,
     schedule_days INTEGER[] NOT NULL DEFAULT '{}', -- e.g. [2, 4, 6]
     shift_id INTEGER NOT NULL CHECK (shift_id BETWEEN 1 AND 5),
+    start_time VARCHAR(10) DEFAULT '18:30',
+    end_time VARCHAR(10) DEFAULT '20:30',
+    is_recurring BOOLEAN DEFAULT TRUE,
     meeting_link TEXT,
     status VARCHAR(50) NOT NULL DEFAULT 'Đang mở' CHECK (status IN ('Đang mở', 'Sắp khai giảng', 'Đã kết thúc')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -112,6 +130,11 @@ CREATE TABLE IF NOT EXISTS schedule_slots (
     topic TEXT,
     meeting_link TEXT,
     status VARCHAR(50) NOT NULL DEFAULT 'Đã lên lịch' CHECK (status IN ('Đã lên lịch', 'Đã hoàn thành', 'Đã hủy', 'Đổi lịch')),
+    checkin_time VARCHAR(10),
+    checkout_time VARCHAR(10),
+    checkin_status VARCHAR(30) CHECK (checkin_status IS NULL OR checkin_status IN ('Chưa chấm công', 'Đúng giờ', 'Đi muộn')),
+    checkin_method VARCHAR(30) CHECK (checkin_method IS NULL OR checkin_method IN ('TEACHER_SELF', 'ADMIN', 'SYSTEM')),
+    checkin_note TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -128,9 +151,12 @@ CREATE TABLE IF NOT EXISTS attendance_records (
     class_id VARCHAR(50) NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
     student_id VARCHAR(50) NOT NULL REFERENCES students(id) ON DELETE CASCADE,
     date DATE NOT NULL,
-    status VARCHAR(50) NOT NULL CHECK (status IN ('Có mặt', 'Vắng có phép', 'Vắng không phép', 'Đi muộn')),
+    status VARCHAR(50) NOT NULL CHECK (status IN ('Có mặt', 'Vắng có phép', 'Vắng không phép', 'Đi muộn', 'Điểm danh bù')),
     checkin_time VARCHAR(20),
     note TEXT,
+    original_slot_id VARCHAR(50),
+    makeup_reason TEXT,
+    method VARCHAR(30) DEFAULT 'MANUAL',
     updated_by VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT uq_attendance_slot_student UNIQUE (schedule_slot_id, student_id)
@@ -171,10 +197,14 @@ CREATE TABLE IF NOT EXISTS tuition_invoices (
     paid_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
     remaining_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
     due_date DATE NOT NULL,
-    status VARCHAR(50) NOT NULL CHECK (status IN ('Đã nộp', 'Còn nợ', 'Quá hạn')),
+    package_id VARCHAR(50),
+    session_count INTEGER DEFAULT 0,
+    used_sessions INTEGER DEFAULT 0,
+    status VARCHAR(50) NOT NULL CHECK (status IN ('Đã nộp', 'Còn nợ', 'Quá hạn', 'Miễn giảm', 'DA_NOP', 'CON_NO')),
     paid_date DATE,
     payment_method VARCHAR(50) CHECK (payment_method IN ('Chuyển khoản QR', 'Tiền mặt', 'Thẻ ngân hàng')),
     transaction_code VARCHAR(100),
+    note TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -245,6 +275,160 @@ CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
 
 
 
+-- ============================================================================
+-- 14. SESSION_PACKAGES TABLE (goi combo: so tien = so buoi)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS session_packages (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    session_count INTEGER NOT NULL DEFAULT 0,
+    price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    description TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_packages_active ON session_packages(is_active);
+
+INSERT INTO session_packages (id, name, session_count, price, description, is_active) VALUES
+    ('PKG10', 'Gói Cơ Bản (10 Buổi)', 10, 1000000, 'Khóa trải nghiệm nền tảng, làm quen lộ trình học.', TRUE),
+    ('PKG20', 'Gói Nâng Cao (20 Buổi)', 20, 1800000, 'Tiết kiệm hơn, kèm bài tập dự án và cố vấn 1-1.', TRUE),
+    ('PKG30', 'Gói Chuyên Sâu (30 Buổi)', 30, 2500000, 'Lộ trình dài, bám sát mục tiêu đầu ra.', TRUE),
+    ('PKG50', 'Gói Master VIP (50 Buổi)', 50, 3900000, 'Gói dài hạn cho chương trình cao cấp.', FALSE)
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    session_count = EXCLUDED.session_count,
+    price = EXCLUDED.price,
+    description = EXCLUDED.description,
+    is_active = EXCLUDED.is_active,
+    updated_at = NOW();
+
+-- ============================================================================
+-- 15. TIME_SHIFTS TABLE (danh muc ca hoc)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS time_shifts (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    start_time VARCHAR(10) NOT NULL,
+    end_time VARCHAR(10) NOT NULL,
+    duration_hours NUMERIC(4, 1) NOT NULL DEFAULT 2.0,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    sort_order INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Seed 5 ca co dinh (id 1..5 khop TIME_SHIFTS trong src/types/schedule.ts)
+INSERT INTO time_shifts (id, name, start_time, end_time, duration_hours, is_active, sort_order) VALUES
+    (1, 'Ca 1 (08:00 - 10:00)', '08:00', '10:00', 2.0, true, 1),
+    (2, 'Ca 2 (10:15 - 12:15)', '10:15', '12:15', 2.0, true, 2),
+    (3, 'Ca 3 (13:30 - 15:30)', '13:30', '15:30', 2.0, true, 3),
+    (4, 'Ca 4 (15:45 - 17:45)', '15:45', '17:45', 2.0, true, 4),
+    (5, 'Ca 5 (18:30 - 20:30)', '18:30', '20:30', 2.0, true, 5)
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    start_time = EXCLUDED.start_time,
+    end_time = EXCLUDED.end_time,
+    duration_hours = EXCLUDED.duration_hours,
+    is_active = EXCLUDED.is_active,
+    sort_order = EXCLUDED.sort_order;
+
+SELECT setval('time_shifts_id_seq', GREATEST((SELECT MAX(id) FROM time_shifts), 5));
+
+-- ============================================================================
+-- 14. DONG BO COT DRIFT (an toan khi chay lai tren DB da co du lieu)
+-- Cac cot duoi day duoc code su dung (src/repositories/SupabaseRepository.ts)
+-- nhung khong nam trong CREATE TABLE o tren.
+-- ============================================================================
+ALTER TABLE tuition_invoices
+    ADD COLUMN IF NOT EXISTS package_id VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS session_count INTEGER DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS used_sessions INTEGER DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS note TEXT;
+
+-- ============================================================================
+-- 15. TRIGGERS DONG BO USERS <-> TEACHERS/STUDENTS
+-- Sua ten/email o bat ky dau (webapp, dashboard, SQL) deu tu dong dong bo.
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.sync_user_to_profiles()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF pg_trigger_depth() > 1 THEN
+        RETURN NEW;
+    END IF;
+
+    IF NEW.role = 'TEACHER' THEN
+        UPDATE public.teachers
+        SET name = NEW.name,
+            email = COALESCE(NEW.email, email),
+            updated_at = NOW()
+        WHERE id = NEW.id;
+    END IF;
+
+    IF NEW.role = 'STUDENT' THEN
+        UPDATE public.students
+        SET name = NEW.name,
+            email = COALESCE(NEW.email, email)
+        WHERE id = NEW.id;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.sync_teacher_to_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF pg_trigger_depth() > 1 THEN
+        RETURN NEW;
+    END IF;
+
+    UPDATE public.users
+    SET name = NEW.name,
+        email = COALESCE(NEW.email, email),
+        updated_at = NOW()
+    WHERE id = NEW.id;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.sync_student_to_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF pg_trigger_depth() > 1 THEN
+        RETURN NEW;
+    END IF;
+
+    UPDATE public.users
+    SET name = NEW.name,
+        email = COALESCE(NEW.email, email),
+        updated_at = NOW()
+    WHERE id = NEW.id;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_sync_user_to_profiles ON public.users;
+CREATE TRIGGER trg_sync_user_to_profiles
+    AFTER UPDATE OF name, email ON public.users
+    FOR EACH ROW
+    EXECUTE FUNCTION public.sync_user_to_profiles();
+
+DROP TRIGGER IF EXISTS trg_sync_teacher_to_user ON public.teachers;
+CREATE TRIGGER trg_sync_teacher_to_user
+    AFTER UPDATE OF name, email ON public.teachers
+    FOR EACH ROW
+    EXECUTE FUNCTION public.sync_teacher_to_user();
+
+DROP TRIGGER IF EXISTS trg_sync_student_to_user ON public.students;
+CREATE TRIGGER trg_sync_student_to_user
+    AFTER UPDATE OF name, email ON public.students
+    FOR EACH ROW
+    EXECUTE FUNCTION public.sync_student_to_user();
+
 -- Disable Row Level Security (RLS) for server-side service role access or enable full service-role bypass
 ALTER TABLE users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE classrooms DISABLE ROW LEVEL SECURITY;
@@ -259,4 +443,3 @@ ALTER TABLE tuition_invoices DISABLE ROW LEVEL SECURITY;
 ALTER TABLE teacher_payroll_periods DISABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs DISABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications DISABLE ROW LEVEL SECURITY;
-

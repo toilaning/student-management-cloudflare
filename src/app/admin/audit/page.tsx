@@ -1,17 +1,65 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Header } from '@/components/common/Header';
-import { PaginationControls } from '@/components/common/PaginationControls';
-import { AuditLog } from '@/types/audit';
-import { History, Shield, User, Clock, Search } from 'lucide-react';
+import { RoleGuard } from '@/components/common/RoleGuard';
+import { DataTable, Pager, Column } from '@/components/ui/DataTable';
+import { SegmentedControl, TabItem } from '@/components/ui/Tabs';
+import { SearchInput } from '@/components/ui/SearchInput';
+import { Badge } from '@/components/ui/Badge';
+import { Card, StatCard } from '@/components/ui/Card';
+import { Sheet } from '@/components/ui/Sheet';
+import { Button } from '@/components/ui/Button';
+import { AuditLog, AuditAction } from '@/types/audit';
+import {
+  History,
+  Shield,
+  Activity,
+  CalendarCheck,
+  CreditCard,
+  FileCheck,
+  User,
+  Clock,
+  Laptop,
+} from 'lucide-react';
+
+const ACTION_LABELS: Record<string, { label: string; tone: 'neutral' | 'primary' | 'success' | 'warning' | 'danger' | 'info' }> = {
+  ALL: { label: 'Tất cả', tone: 'neutral' },
+  CREATE: { label: 'Tạo mới', tone: 'success' },
+  UPDATE: { label: 'Cập nhật', tone: 'info' },
+  UPDATE_STATUS: { label: 'Đổi trạng thái', tone: 'info' },
+  DELETE: { label: 'Xóa', tone: 'danger' },
+  LOGIN: { label: 'Đăng nhập', tone: 'neutral' },
+  ATTENDANCE_CHECK: { label: 'Điểm danh', tone: 'primary' },
+  SCHEDULE_CHANGE: { label: 'Đổi lịch', tone: 'warning' },
+  PAYMENT_PROCESS: { label: 'Thanh toán', tone: 'success' },
+  PACKAGE_PURCHASE: { label: 'Mua gói', tone: 'primary' },
+  REQUEST_DECIDE: { label: 'Duyệt đơn', tone: 'primary' },
+};
+
+function formatDateTime(isoStr: string) {
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  } catch {
+    return isoStr;
+  }
+}
 
 export default function AdminAuditPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [actionFilter, setActionFilter] = useState<string>('ALL');
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
-  // Pagination states
+  // Phân trang
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(25);
 
@@ -30,18 +78,58 @@ export default function AdminAuditPage() {
     load();
   }, []);
 
-  const filtered = logs.filter(l =>
-    l.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    l.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    l.details.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    l.action.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const tabItems: TabItem<string>[] = useMemo(() => {
+    const counts: Record<string, number> = { ALL: logs.length };
+    logs.forEach((l) => {
+      counts[l.action] = (counts[l.action] || 0) + 1;
+    });
+
+    const popularActions = [
+      'ALL',
+      'ATTENDANCE_CHECK',
+      'SCHEDULE_CHANGE',
+      'PAYMENT_PROCESS',
+      'REQUEST_DECIDE',
+      'CREATE',
+      'UPDATE',
+      'DELETE',
+    ];
+
+    return popularActions.map((act) => ({
+      value: act,
+      label: ACTION_LABELS[act]?.label || act,
+      count: counts[act] || 0,
+    }));
+  }, [logs]);
+
+  const filtered = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    return logs.filter((l) => {
+      if (actionFilter !== 'ALL' && l.action !== actionFilter) return false;
+      if (!q) return true;
+      return (
+        l.userName?.toLowerCase().includes(q) ||
+        l.userId?.toLowerCase().includes(q) ||
+        l.details?.toLowerCase().includes(q) ||
+        l.action?.toLowerCase().includes(q) ||
+        l.targetResource?.toLowerCase().includes(q) ||
+        l.id?.toLowerCase().includes(q)
+      );
+    });
+  }, [logs, actionFilter, searchTerm]);
 
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
-  const paginatedLogs = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const paginatedLogs = useMemo(() => {
+    return filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  }, [filtered, currentPage, pageSize]);
 
   const handleSearchChange = (val: string) => {
     setSearchTerm(val);
+    setCurrentPage(1);
+  };
+
+  const handleActionFilterChange = (act: string) => {
+    setActionFilter(act);
     setCurrentPage(1);
   };
 
@@ -50,87 +138,301 @@ export default function AdminAuditPage() {
     setCurrentPage(1);
   };
 
-  return (
-    <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
-      <Header 
-        title="Nhật ký Hệ thống (Audit Trail)" 
-        subtitle="Ghi nhận mọi thao tác phân công, sửa lịch, điểm danh, nộp học phí và duyệt đơn" 
-      />
+  // Thống kê nhanh
+  const stats = useMemo(() => {
+    const attendanceCount = logs.filter((l) => l.action === 'ATTENDANCE_CHECK').length;
+    const paymentCount = logs.filter((l) => l.action === 'PAYMENT_PROCESS').length;
+    const scheduleCount = logs.filter((l) => l.action === 'SCHEDULE_CHANGE').length;
+    return {
+      total: logs.length,
+      attendance: attendanceCount,
+      payment: paymentCount,
+      schedule: scheduleCount,
+    };
+  }, [logs]);
 
-      <main className="p-6 max-w-7xl mx-auto w-full space-y-6">
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="relative w-full sm:w-80">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Tìm theo người dùng, nội dung, thao tác..."
-              value={searchTerm}
-              onChange={e => handleSearchChange(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-indigo-600"
+  const columns: Column<AuditLog>[] = [
+    {
+      key: 'id',
+      header: 'Mã & Thời gian',
+      className: 'w-48 whitespace-nowrap',
+      render: (row) => (
+        <div className="space-y-0.5">
+          <p className="font-mono text-[12px] font-bold text-foreground">{row.id}</p>
+          <p className="text-[12px] text-muted-foreground tabular">{formatDateTime(row.timestamp)}</p>
+        </div>
+      ),
+    },
+    {
+      key: 'user',
+      header: 'Người thực hiện',
+      className: 'min-w-[180px]',
+      render: (row) => {
+        const roleTone =
+          row.userRole === 'ADMIN'
+            ? 'danger'
+            : row.userRole === 'TEACHER'
+            ? 'info'
+            : 'neutral';
+        return (
+          <div className="space-y-1">
+            <p className="font-semibold text-foreground text-[13px]">{row.userName}</p>
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono text-[11px] text-muted-foreground">{row.userId}</span>
+              <Badge tone={roleTone} className="text-[10px] px-1.5 py-0">
+                {row.userRole}
+              </Badge>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'action',
+      header: 'Hành động',
+      className: 'w-36 whitespace-nowrap',
+      render: (row) => {
+        const cfg = ACTION_LABELS[row.action] || { label: row.action, tone: 'neutral' };
+        return <Badge tone={cfg.tone}>{cfg.label}</Badge>;
+      },
+    },
+    {
+      key: 'resource',
+      header: 'Tài nguyên',
+      className: 'w-36 whitespace-nowrap',
+      render: (row) => (
+        <div className="space-y-0.5">
+          <span className="inline-block px-2 py-0.5 rounded-pill bg-primary-soft text-primary-ink font-mono text-[11px] font-semibold">
+            {row.targetResource}
+          </span>
+          {row.targetId && (
+            <p className="font-mono text-[11px] text-muted-foreground truncate max-w-[130px]" title={row.targetId}>
+              {row.targetId}
+            </p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'details',
+      header: 'Chi tiết thao tác',
+      render: (row) => (
+        <p className="text-[13px] text-foreground leading-snug line-clamp-2 max-w-xl">
+          {row.details}
+        </p>
+      ),
+    },
+  ];
+
+  return (
+    <RoleGuard allowedRoles={['ADMIN']}>
+      <div className="flex-1 flex flex-col min-h-screen">
+        <Header
+          title="Nhật ký hệ thống"
+          subtitle="Ghi nhận mọi thao tác phân công, sửa lịch, điểm danh, nộp học phí và duyệt đơn"
+        />
+
+        <main className="p-4 sm:p-6 max-w-content mx-auto w-full space-y-5">
+          {/* Thống kê nhanh */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <StatCard
+              label="Tổng lượt thao tác"
+              value={stats.total}
+              icon={<Activity size={20} />}
+              tone="primary"
+            />
+            <StatCard
+              label="Lượt điểm danh"
+              value={stats.attendance}
+              icon={<CalendarCheck size={20} />}
+              tone="info"
+            />
+            <StatCard
+              label="Lượt thanh toán"
+              value={stats.payment}
+              icon={<CreditCard size={20} />}
+              tone="success"
+            />
+            <StatCard
+              label="Điều chỉnh lịch học"
+              value={stats.schedule}
+              icon={<History size={20} />}
+              tone="warning"
             />
           </div>
-          <div className="text-xs text-slate-500 font-medium w-full sm:w-auto text-left sm:text-right">
-            Tổng cộng: <strong className="text-slate-800">{filtered.length}</strong> / {logs.length} bản ghi
-          </div>
-        </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-200">
-                <tr>
-                  <th className="px-4 py-3">Mã log</th>
-                  <th className="px-4 py-3">Thời gian</th>
-                  <th className="px-4 py-3">Người thực hiện</th>
-                  <th className="px-4 py-3">Vai trò</th>
-                  <th className="px-4 py-3">Hành động</th>
-                  <th className="px-4 py-3">Tài nguyên</th>
-                  <th className="px-4 py-3">Chi tiết diễn giải</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {paginatedLogs.map(l => (
-                  <tr key={l.id} className="hover:bg-slate-50/80 transition">
-                    <td className="px-4 py-3 font-mono font-bold text-slate-600">{l.id}</td>
-                    <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
-                      {new Date(l.timestamp).toLocaleString('vi-VN')}
-                    </td>
-                    <td className="px-4 py-3 font-semibold text-slate-800">
-                      {l.userName} ({l.userId})
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded font-semibold text-[10px] ${
-                        l.userRole === 'ADMIN'
-                          ? 'bg-purple-100 text-purple-700'
-                          : l.userRole === 'TEACHER'
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-emerald-100 text-emerald-700'
-                      }`}>
-                        {l.userRole}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-semibold text-slate-700">{l.action}</td>
-                    <td className="px-4 py-3 font-mono text-indigo-600">{l.targetResource}</td>
-                    <td className="px-4 py-3 text-slate-700 font-medium max-w-md">{l.details}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {/* Bộ lọc & Tìm kiếm */}
+          <Card padded={false} className="p-3 sm:p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <SearchInput
+                value={searchTerm}
+                onChange={handleSearchChange}
+                placeholder="Tìm người dùng, mã nhật ký, nội dung..."
+                className="w-full sm:w-80"
+              />
+              <p className="text-[12px] text-muted-foreground tabular shrink-0">
+                Hiển thị <span className="font-bold text-foreground">{filtered.length}</span> / {logs.length} bản ghi
+              </p>
+            </div>
 
-          {/* Pagination Controls */}
-          <PaginationControls
-            currentPage={currentPage}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            totalItems={filtered.length}
-            onPageChange={setCurrentPage}
-            onPageSizeChange={handlePageSizeChange}
-            pageSizeOptions={[10, 25, 50, 100]}
-            itemLabel="nhật ký"
+            <SegmentedControl
+              items={tabItems}
+              value={actionFilter}
+              onChange={handleActionFilterChange}
+            />
+          </Card>
+
+          {/* Bảng dữ liệu */}
+          <DataTable
+            columns={columns}
+            rows={paginatedLogs}
+            rowKey={(row) => row.id}
+            loading={loading}
+            emptyTitle="Không có nhật ký phù hợp"
+            emptyDescription="Chưa có thao tác nào khớp với điều kiện tìm kiếm hoặc bộ lọc hiện tại."
+            emptyIcon={<History size={28} />}
+            onRowClick={(row) => setSelectedLog(row)}
+            renderMobile={(row) => {
+              const cfg = ACTION_LABELS[row.action] || { label: row.action, tone: 'neutral' };
+              const roleTone =
+                row.userRole === 'ADMIN'
+                  ? 'danger'
+                  : row.userRole === 'TEACHER'
+                  ? 'info'
+                  : 'neutral';
+
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="font-mono text-[12px] font-bold text-foreground">{row.id}</span>
+                      <p className="text-[11px] text-muted-foreground tabular">{formatDateTime(row.timestamp)}</p>
+                    </div>
+                    <Badge tone={cfg.tone}>{cfg.label}</Badge>
+                  </div>
+
+                  <p className="text-[13px] text-foreground leading-snug">{row.details}</p>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-line text-[11px]">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-medium text-foreground">{row.userName}</span>
+                      <Badge tone={roleTone} className="text-[10px] px-1 py-0">
+                        {row.userRole}
+                      </Badge>
+                    </div>
+                    <span className="font-mono text-muted-foreground">{row.targetResource}</span>
+                  </div>
+                </div>
+              );
+            }}
+            footer={
+              <Pager
+                page={currentPage}
+                pageSize={pageSize}
+                total={filtered.length}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={handlePageSizeChange}
+              />
+            }
           />
-        </div>
-      </main>
-    </div>
+        </main>
+
+        {/* Hộp thoại xem chi tiết bản ghi */}
+        <Sheet
+          isOpen={!!selectedLog}
+          onClose={() => setSelectedLog(null)}
+          title="Chi tiết thao tác nhật ký"
+          description={selectedLog ? `Mã bản ghi: ${selectedLog.id}` : undefined}
+          footer={
+            <Button variant="secondary" onClick={() => setSelectedLog(null)}>
+              Đóng
+            </Button>
+          }
+        >
+          {selectedLog && (
+            <div className="space-y-4 text-[13px]">
+              <div className="p-3 rounded-field bg-muted/60 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Thời gian:</span>
+                  <span className="font-semibold text-foreground tabular">{formatDateTime(selectedLog.timestamp)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Người thực hiện:</span>
+                  <span className="font-semibold text-foreground">
+                    {selectedLog.userName} ({selectedLog.userId})
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Vai trò:</span>
+                  <Badge
+                    tone={
+                      selectedLog.userRole === 'ADMIN'
+                        ? 'danger'
+                        : selectedLog.userRole === 'TEACHER'
+                        ? 'info'
+                        : 'neutral'
+                    }
+                  >
+                    {selectedLog.userRole}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Hành động:</span>
+                  <Badge tone={ACTION_LABELS[selectedLog.action]?.tone || 'neutral'}>
+                    {ACTION_LABELS[selectedLog.action]?.label || selectedLog.action}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Tài nguyên tác động:</span>
+                  <span className="font-mono font-semibold text-foreground">{selectedLog.targetResource}</span>
+                </div>
+                {selectedLog.targetId && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Mã đối tượng:</span>
+                    <span className="font-mono text-foreground">{selectedLog.targetId}</span>
+                  </div>
+                )}
+                {selectedLog.ipAddress && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Địa chỉ IP:</span>
+                    <span className="font-mono text-foreground">{selectedLog.ipAddress}</span>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                  Nội dung diễn giải
+                </p>
+                <div className="p-3 rounded-field bg-muted text-foreground leading-relaxed">
+                  {selectedLog.details}
+                </div>
+              </div>
+
+              {(selectedLog.oldValue || selectedLog.newValue) && (
+                <div className="space-y-2">
+                  <p className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide">
+                    Biến động dữ liệu
+                  </p>
+                  {selectedLog.oldValue && (
+                    <div className="p-2.5 rounded-field bg-danger-soft/30 border border-danger-soft text-[12px] font-mono break-all">
+                      <span className="font-bold text-danger">Giá trị cũ: </span>
+                      {selectedLog.oldValue}
+                    </div>
+                  )}
+                  {selectedLog.newValue && (
+                    <div className="p-2.5 rounded-field bg-success-soft/30 border border-success-soft text-[12px] font-mono break-all">
+                      <span className="font-bold text-success">Giá trị mới: </span>
+                      {selectedLog.newValue}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </Sheet>
+      </div>
+    </RoleGuard>
   );
 }
+

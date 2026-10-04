@@ -1,11 +1,19 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { AppProvider } from '@/context/AppContext';
+import { ToastProvider } from '@/components/ui/Toast';
 import { Sidebar } from '@/components/common/Sidebar';
+import { BottomNav } from '@/components/common/BottomNav';
 
 export const metadata: Metadata = {
   title: 'Quản Lý Luyện Thi Kiến Trúc & Mỹ Thuật',
-  description: 'Hệ Thống Quản Lý Luyện Thi Kiến Trúc & Mỹ Thuật',
+  description: 'Hệ thống quản lý luyện thi kiến trúc và mỹ thuật',
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover' as const,
 };
 
 export default function RootLayout({
@@ -15,14 +23,17 @@ export default function RootLayout({
 }) {
   return (
     <html lang="vi">
-      <body className="bg-slate-50 min-h-screen text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
+      <body className="bg-background min-h-screen text-foreground antialiased">
         <AppProvider>
-          <div className="flex min-h-screen">
-            <Sidebar />
-            <div className="flex-1 flex flex-col min-w-0">
-              {children}
+          <ToastProvider>
+            <div className="flex min-h-screen">
+              <Sidebar />
+              <div className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">
+                {children}
+              </div>
+              <BottomNav />
             </div>
-          </div>
+          </ToastProvider>
         </AppProvider>
       </body>
     </html>

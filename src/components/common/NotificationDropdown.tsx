@@ -4,18 +4,19 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '@/context/AppContext';
 import { AppNotification } from '@/types/notification';
 import { Bell, CheckCheck, Info, Calendar, CreditCard, AlertTriangle, ExternalLink } from 'lucide-react';
+import { cn } from '@/lib/cn';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 export const NotificationDropdown: React.FC = () => {
   const { currentUser } = useApp();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const loadNotifications = async () => {
     if (!currentUser?.id) return;
     try {
-      const res = await fetch(`/api/notifications?userId=${currentUser.id}&role=${currentUser.role}`);
+      const res = await fetch('/api/notifications?userId=' + currentUser.id + '&role=' + currentUser.role);
       const data = await res.json();
       setNotifications(data.notifications || []);
     } catch (e) {
@@ -29,26 +30,21 @@ export const NotificationDropdown: React.FC = () => {
       return;
     }
     loadNotifications();
-    const interval = setInterval(loadNotifications, 15000); // Polling 15s
+    const interval = setInterval(loadNotifications, 15000);
     return () => clearInterval(interval);
   }, [currentUser]);
 
-  // Click outside to close
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setIsOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  if (!currentUser) {
-    return null;
-  }
+  if (!currentUser) return null;
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const markAllRead = async () => {
     if (!currentUser?.id) return;
@@ -58,7 +54,7 @@ export const NotificationDropdown: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'MARK_ALL_READ', userId: currentUser.id }),
       });
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     } catch (e) {
       console.error(e);
     }
@@ -71,7 +67,7 @@ export const NotificationDropdown: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'MARK_READ', id }),
       });
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
     } catch (e) {
       console.error(e);
     }
@@ -80,13 +76,13 @@ export const NotificationDropdown: React.FC = () => {
   const getIcon = (type: string) => {
     switch (type) {
       case 'SCHEDULE':
-        return <Calendar size={15} className="text-indigo-600" />;
+        return <Calendar size={15} className="text-primary" />;
       case 'PAYMENT':
-        return <CreditCard size={15} className="text-emerald-600" />;
+        return <CreditCard size={15} className="text-success" />;
       case 'WARNING':
-        return <AlertTriangle size={15} className="text-amber-600" />;
+        return <AlertTriangle size={15} className="text-warning" />;
       default:
-        return <Info size={15} className="text-blue-600" />;
+        return <Info size={15} className="text-info" />;
     }
   };
 
@@ -94,24 +90,25 @@ export const NotificationDropdown: React.FC = () => {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        title="Thông báo hệ thống"
-        className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition relative"
+        title="Thông báo"
+        aria-label="Thông báo"
+        className="relative p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-field transition cursor-pointer"
       >
         <Bell size={18} />
         {unreadCount > 0 && (
-          <span className="min-w-[18px] h-[18px] bg-rose-500 text-white text-[10px] font-bold rounded-full absolute -top-1 -right-1 ring-2 ring-white flex items-center justify-center px-1 animate-pulse">
+          <span className="min-w-[17px] h-[17px] bg-danger text-white text-[10px] font-bold rounded-full absolute -top-0.5 -right-0.5 ring-2 ring-card flex items-center justify-center px-1">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="fixed sm:absolute right-3 left-3 sm:left-auto sm:right-0 mt-2 w-[calc(100vw-1.5rem)] sm:w-96 max-w-sm sm:max-w-none bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-          <div className="p-4 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
+        <div className="fixed sm:absolute right-3 left-3 sm:left-auto sm:right-0 mt-2 w-[calc(100vw-1.5rem)] sm:w-96 max-w-sm sm:max-w-none bg-card rounded-card shadow-pop border border-line z-50 overflow-hidden animate-in-up">
+          <div className="px-4 py-3 border-b border-line flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-800 text-sm">Thông báo</span>
+              <span className="font-bold text-foreground text-sm">Thông báo</span>
               {unreadCount > 0 && (
-                <span className="bg-indigo-50 text-indigo-700 text-[11px] font-bold px-2 py-0.2 rounded-full border border-indigo-100">
+                <span className="bg-primary-soft text-primary-ink text-[11px] font-bold px-2 py-0.5 rounded-pill">
                   {unreadCount} mới
                 </span>
               )}
@@ -119,61 +116,50 @@ export const NotificationDropdown: React.FC = () => {
             {unreadCount > 0 && (
               <button
                 onClick={markAllRead}
-                className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1 whitespace-nowrap shrink-0"
+                className="text-[12px] text-primary hover:text-primary-hover font-semibold flex items-center gap-1 cursor-pointer"
               >
                 <CheckCheck size={14} /> Đọc tất cả
               </button>
             )}
           </div>
 
-          <div className="max-h-96 overflow-y-auto divide-y divide-slate-100">
+          <div className="max-h-96 overflow-y-auto divide-y divide-line">
             {notifications.length > 0 ? (
-              notifications.map(n => (
+              notifications.map((n) => (
                 <div
                   key={n.id}
                   onClick={() => markSingleRead(n.id)}
-                  className={`p-3.5 hover:bg-slate-50/80 cursor-pointer transition flex items-start gap-3 text-xs ${
-                    !n.isRead ? 'bg-indigo-50/30' : ''
-                  }`}
+                  className={cn(
+                    'p-3.5 hover:bg-muted/60 cursor-pointer transition flex items-start gap-3',
+                    !n.isRead && 'bg-primary-soft/30'
+                  )}
                 >
-                  <div className="p-2 rounded-xl bg-slate-100 shrink-0 mt-0.5">
-                    {getIcon(n.type)}
-                  </div>
+                  <div className="p-2 rounded-field bg-muted shrink-0 mt-0.5">{getIcon(n.type)}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
-                      <h4 className={`text-slate-800 truncate ${!n.isRead ? 'font-bold' : 'font-semibold'}`}>
+                      <h4 className={cn('text-[13px] text-foreground truncate', !n.isRead ? 'font-bold' : 'font-semibold')}>
                         {n.title}
                       </h4>
-                      <span className="text-[10px] text-slate-400 shrink-0">
+                      <span className="text-[10px] text-subtle-foreground shrink-0 tabular">
                         {n.createdAt.slice(11, 16)}
                       </span>
                     </div>
-                    <p className="text-slate-600 text-[11px] mt-1 leading-relaxed">
-                      {n.message}
-                    </p>
+                    <p className="text-[12px] text-muted-foreground mt-1 leading-snug">{n.message}</p>
                     {n.link && (
                       <a
                         href={n.link}
-                        className="inline-flex items-center gap-1 text-[11px] text-indigo-600 font-bold hover:underline mt-1.5"
+                        className="inline-flex items-center gap-1 text-[11px] text-primary font-bold hover:underline mt-1.5"
                       >
                         Xem chi tiết <ExternalLink size={10} />
                       </a>
                     )}
                   </div>
-                  {!n.isRead && (
-                    <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0 mt-2"></span>
-                  )}
+                  {!n.isRead && <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-2" />}
                 </div>
               ))
             ) : (
-              <div className="py-12 text-center text-xs text-slate-400">
-                Không có thông báo nào.
-              </div>
+              <EmptyState icon={<Bell size={22} />} title="Chưa có thông báo" />
             )}
-          </div>
-
-          <div className="p-3 bg-slate-50 border-t border-slate-100 text-center text-[11px] text-slate-500">
-            Hệ thống Quản lý Luyện thi
           </div>
         </div>
       )}

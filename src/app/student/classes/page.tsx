@@ -4,22 +4,48 @@ import React, { useState, useEffect } from 'react';
 import { Header } from '@/components/common/Header';
 import { useApp } from '@/context/AppContext';
 import { RoleGuard } from '@/components/common/RoleGuard';
+import { Card, StatCard } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { SearchInput } from '@/components/ui/SearchInput';
+import { Sheet } from '@/components/ui/Sheet';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { useToast } from '@/components/ui/Toast';
 import { ClassEntity } from '@/types/classroom';
 import { TimeShift, TIME_SHIFTS } from '@/types/schedule';
-import { BookOpen, Users, UserCheck, Search, Check, Plus, AlertCircle, Clock, Calendar, MapPin, CheckCircle2, ChevronRight, Video, ExternalLink, RefreshCw } from 'lucide-react';
-import Link from 'next/link';
+import { cn } from '@/lib/cn';
+import {
+  BookOpen,
+  Users,
+  UserCheck,
+  Check,
+  Plus,
+  AlertCircle,
+  Clock,
+  Calendar,
+  MapPin,
+  Video,
+  ExternalLink,
+  RefreshCw,
+} from 'lucide-react';
 
 export default function StudentClassesPage() {
   const { currentUser, isReady } = useApp();
+  const toast = useToast();
   const [classes, setClasses] = useState<ClassEntity[]>([]);
   const [shifts, setShifts] = useState<TimeShift[]>(TIME_SHIFTS);
   const [student, setStudent] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   // Map classId -> ca mới mà HS muốn đổi sang (shift id)
   const [targetShiftByClass, setTargetShiftByClass] = useState<Record<string, number>>({});
+  // Hộp thoại xác nhận đổi ca
+  const [pendingChange, setPendingChange] = useState<{
+    classId: string;
+    className: string;
+    targetShiftId: number;
+  } | null>(null);
 
   const loadData = async () => {
     if (!isReady || !currentUser?.id) return;
@@ -39,6 +65,7 @@ export default function StudentClassesPage() {
       if (shiftData.shifts) setShifts(shiftData.shifts);
     } catch (e) {
       console.error(e);
+      toast.error('Không thể tải dữ liệu lớp học.');
     } finally {
       setLoading(false);
     }
@@ -65,29 +92,22 @@ export default function StudentClassesPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setActionMessage(`Đăng ký thành công ca học lớp "${className}"!`);
+        toast.success(`Đăng ký thành công ca học lớp "${className}".`);
         await loadData();
-        setTimeout(() => setActionMessage(null), 3500);
       } else {
-        alert(data.error || 'Đăng ký ca học thất bại');
+        toast.error(data.error || 'Đăng ký ca học thất bại.');
       }
     } catch (e: any) {
-      alert(e.message || 'Lỗi mạng');
+      toast.error(e.message || 'Lỗi kết nối mạng.');
     } finally {
       setActionLoadingId(null);
     }
   };
 
-  // Đổi ca TRỰC TIẾP: chuyển HS sang lớp cùng môn ở ca mới (KHÔNG tạo request chờ duyệt, KHÔNG chặn sĩ số)
-  const handleChangeShift = async (classId: string, className: string, currentShiftId: number) => {
-    const targetShiftId = targetShiftByClass[classId];
-    if (!targetShiftId) {
-      alert('Vui lòng chọn ca học mới muốn chuyển sang.');
-      return;
-    }
-    if (!confirm(`Bạn có chắc muốn đổi ca của lớp "${className}" sang ${shiftMap.get(targetShiftId)?.name || `Ca ${targetShiftId}`}?`)) {
-      return;
-    }
+  // Đổi ca sau khi xác nhận trong Sheet
+  const handleConfirmShiftChange = async () => {
+    if (!pendingChange) return;
+    const { classId, targetShiftId } = pendingChange;
     setActionLoadingId(classId);
     try {
       const res = await fetch('/api/classes/enroll', {
@@ -103,22 +123,22 @@ export default function StudentClassesPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setActionMessage(data.message || 'Đổi ca thành công!');
-        setTargetShiftByClass(prev => ({ ...prev, [classId]: undefined as any }));
+        toast.success(data.message || 'Đổi ca thành công.');
+        setTargetShiftByClass((prev) => ({ ...prev, [classId]: undefined as any }));
+        setPendingChange(null);
         await loadData();
-        setTimeout(() => setActionMessage(null), 3500);
       } else {
-        alert(data.error || 'Đổi ca thất bại');
+        toast.error(data.error || 'Đổi ca thất bại.');
       }
     } catch (e: any) {
-      alert(e.message || 'Lỗi mạng');
+      toast.error(e.message || 'Lỗi kết nối mạng.');
     } finally {
       setActionLoadingId(null);
     }
   };
 
   const shiftMap = new Map<number, TimeShift>();
-  shifts.forEach(s => shiftMap.set(s.id, s));
+  shifts.forEach((s) => shiftMap.set(s.id, s));
 
   // --- Hỗ trợ chặn ca trùng giờ phía client (mirror logic backend enroll/route.ts) ---
   const timeToMin = (t?: string): number => {
@@ -132,7 +152,7 @@ export default function StudentClassesPage() {
     let startTime = cls.startTime;
     let endTime = cls.endTime;
     if (!startTime || !endTime) {
-      const sh = shiftMap.get(cls.shiftId ?? 0) || TIME_SHIFTS.find(s => s.id === cls.shiftId);
+      const sh = shiftMap.get(cls.shiftId ?? 0) || TIME_SHIFTS.find((s) => s.id === cls.shiftId);
       if (!sh) return null;
       startTime = sh.startTime;
       endTime = sh.endTime;
@@ -142,7 +162,8 @@ export default function StudentClassesPage() {
 
   // 2 khoảng giờ có trùng nhau không (xử lý ca qua đêm).
   const rangesOverlap = (aStart: number, aEnd: number, bStart: number, bEnd: number): boolean => {
-    let aE = aEnd, bE = bEnd;
+    let aE = aEnd,
+      bE = bEnd;
     if (aStart > aE) aE += 1440;
     if (bStart > bE) bE += 1440;
     return Math.max(aStart, bStart) < Math.min(aE, bE);
@@ -150,22 +171,22 @@ export default function StudentClassesPage() {
 
   // Ca mục tiêu (shiftId) có trùng giờ với lớp khác mà học sinh đã đăng ký (trên ít nhất 1 ngày chung) không.
   const shiftConflictsWithEnrolled = (fromClass: ClassEntity, targetShiftId: number): boolean => {
-    const targetShift = shiftMap.get(targetShiftId) || TIME_SHIFTS.find(s => s.id === targetShiftId);
+    const targetShift = shiftMap.get(targetShiftId) || TIME_SHIFTS.find((s) => s.id === targetShiftId);
     if (!targetShift) return false;
 
     // Giờ của ca mục tiêu trên LỚP ĐỘC LẬP (cùng subject) sẽ thừa hưởng giờ ca đó.
     const targetStart = timeToMin(targetShift.startTime);
     const targetEnd = timeToMin(targetShift.endTime);
-    const targetDays = new Set((fromClass.scheduleDays || []));
+    const targetDays = new Set(fromClass.scheduleDays || []);
 
-    const enrolledIds = (student?.enrolledClassIds || []);
+    const enrolledIds = student?.enrolledClassIds || [];
     for (const otherId of enrolledIds) {
-      const other = classes.find(c => c.id === otherId);
+      const other = classes.find((c) => c.id === otherId);
       if (!other || other.id === fromClass.id) continue;
 
       // Phải có ít nhất 1 ngày học chung
       const otherDays = new Set(other.scheduleDays || []);
-      const hasCommonDay = [...targetDays].some(d => otherDays.has(d));
+      const hasCommonDay = [...targetDays].some((d) => otherDays.has(d));
       if (!hasCommonDay) continue;
 
       const otherRange = classTimeRange(other);
@@ -181,299 +202,387 @@ export default function StudentClassesPage() {
   // Ca mục tiêu có lớp cùng môn đang chạy không (điều kiện để đổi ca backend tìm thấy lớp đích).
   const hasTargetClassForShift = (fromClass: ClassEntity, targetShiftId: number): boolean => {
     const subject = (fromClass.subject || '').trim().toLowerCase();
-    return classes.some(c =>
-      c.id !== fromClass.id &&
-      (c.subject || '').trim().toLowerCase() === subject &&
-      Number(c.shiftId) === targetShiftId
+    return classes.some(
+      (c) =>
+        c.id !== fromClass.id &&
+        (c.subject || '').trim().toLowerCase() === subject &&
+        Number(c.shiftId) === targetShiftId
     );
   };
 
-  const filtered = classes.filter(c =>
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.teacherId.toLowerCase().includes(searchTerm.toLowerCase())
+  const filtered = classes.filter(
+    (c) =>
+      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.teacherId.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const enrolledCount = student?.enrolledClassIds?.length || 0;
 
   return (
     <RoleGuard allowedRoles={['STUDENT', 'ADMIN']}>
-      <div className="flex-1 flex flex-col min-h-screen bg-slate-50/70 font-sans text-slate-800">
+      <div className="flex-1 flex flex-col min-h-screen">
         <Header
-          title="Chọn Ca Học Trực Quan (Schedule Box Picker)"
-          subtitle="Hệ thống đăng ký và đổi ca học theo Box lịch trực quan cho kỳ Tháng 09/2026"
+          title="Lớp học & ca học"
+          subtitle="Đăng ký và đổi ca học các lớp trong kỳ"
         />
 
-        <main className="p-6 max-w-7xl mx-auto w-full space-y-6">
-          {actionMessage && (
-            <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center justify-between shadow-xs animate-fadeIn">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 size={16} className="text-emerald-600" />
-                <span>{actionMessage}</span>
-              </div>
-              <button onClick={() => setActionMessage(null)} className="text-emerald-600 hover:underline font-bold">
-                Đóng
-              </button>
+        <main className="p-4 sm:p-6 max-w-content mx-auto w-full space-y-5">
+          {/* Thống kê nhanh */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+            <StatCard
+              label="Lớp đã đăng ký"
+              value={enrolledCount}
+              hint="Số lớp/ca đang theo học"
+              tone="primary"
+              icon={<BookOpen size={18} />}
+            />
+            <StatCard
+              label="Tổng số lớp"
+              value={classes.length}
+              hint="Lớp đang mở trong hệ thống"
+              tone="info"
+              icon={<Calendar size={18} />}
+            />
+            <StatCard
+              label="Sĩ số chuẩn"
+              value="15"
+              hint="Học viên tối đa mỗi ca"
+              tone="info"
+              icon={<Users size={18} />}
+              className="col-span-2 sm:col-span-1"
+            />
+          </div>
+
+          {/* Thanh tìm kiếm */}
+          <SearchInput
+            value={searchTerm}
+            onChange={setSearchTerm}
+            placeholder="Tìm theo môn học, tên lớp, ca học, giảng viên..."
+          />
+
+          {/* Quy ước trạng thái */}
+          <div className="flex items-center gap-3 sm:gap-4 text-[13px] font-medium text-muted-foreground flex-wrap bg-card p-3.5 rounded-card border border-line">
+            <span className="text-[12px] uppercase tracking-wider font-bold text-subtle-foreground">
+              Quy ước:
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Badge tone="success" dot>
+                Còn chỗ
+              </Badge>
+              <span className="text-[12px]">Chọn ca này</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Badge tone="primary" dot>
+                Ca của bạn
+              </Badge>
+              <span className="text-[12px]">Đang theo học</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Badge tone="info">Đủ sĩ số</Badge>
+              <span className="text-[12px]">Hết chỗ</span>
+            </span>
+          </div>
+
+          {/* Danh sách lớp học */}
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="h-72 rounded-card bg-muted animate-pulse border border-line" />
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
+            <Card>
+              <EmptyState
+                icon={<BookOpen size={24} />}
+                title="Không tìm thấy lớp học nào"
+                description={
+                  searchTerm
+                    ? 'Không có kết quả phù hợp với từ khoá tìm kiếm.'
+                    : 'Hiện chưa có lớp học nào trong danh sách.'
+                }
+                action={
+                  searchTerm ? (
+                    <Button variant="secondary" onClick={() => setSearchTerm('')}>
+                      Xoá tìm kiếm
+                    </Button>
+                  ) : undefined
+                }
+              />
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+              {filtered.map((cls) => {
+                const isEnrolled = student?.enrolledClassIds?.includes(cls.id);
+                const maxCapacity = 15;
+                const currentStudents = cls.studentIds?.length || 0;
+                const isFull = currentStudents >= maxCapacity;
+
+                const shiftInfo = shiftMap.get(cls.shiftId ?? 1);
+                const shiftName = shiftInfo?.name || `Ca ${cls.shiftId}`;
+                const shiftTime = shiftInfo
+                  ? `${shiftInfo.startTime} – ${shiftInfo.endTime}`
+                  : '08:00 – 10:00';
+
+                let badge = null;
+                if (isEnrolled) {
+                  badge = (
+                    <Badge tone="primary" dot>
+                      Ca của bạn
+                    </Badge>
+                  );
+                } else if (isFull) {
+                  badge = <Badge tone="info">Đủ sĩ số</Badge>;
+                } else {
+                  badge = (
+                    <Badge tone="success" dot>
+                      Còn chỗ ({maxCapacity - currentStudents})
+                    </Badge>
+                  );
+                }
+
+                return (
+                  <Card
+                    key={cls.id}
+                    className={cn(
+                      'flex flex-col justify-between transition-all',
+                      isEnrolled && 'border-primary ring-1 ring-primary/20 shadow-primary/10'
+                    )}
+                  >
+                    <div className="space-y-3.5">
+                      {/* Tiêu đề & huy hiệu */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Badge tone="info">
+                              {cls.code} • {cls.id}
+                            </Badge>
+                            <Badge tone="primary">{cls.subject}</Badge>
+                          </div>
+                          <h3 className="text-base font-bold text-foreground mt-2 leading-snug truncate">
+                            {cls.name}
+                          </h3>
+                        </div>
+                        {badge}
+                      </div>
+
+                      {/* Chi tiết lịch & phòng */}
+                      <div className="bg-muted rounded-field p-3.5 border border-line space-y-2 text-[13px]">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
+                            <Calendar size={14} className="text-primary shrink-0" /> Lịch học:
+                          </span>
+                          <span className="font-semibold text-foreground">
+                            Thứ {cls.scheduleDays.join(', ')}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
+                            <Clock size={14} className="text-primary shrink-0" /> Ca & khung giờ:
+                          </span>
+                          <span className="font-semibold text-foreground tabular">
+                            {shiftName} ({shiftTime})
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
+                            <MapPin size={14} className="text-primary shrink-0" /> Phòng học:
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-foreground">{cls.roomId}</span>
+                            {cls.meetingLink && (
+                              <a
+                                href={cls.meetingLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-pill bg-primary-soft text-primary-ink text-[11px] font-semibold hover:bg-primary/20 transition"
+                                title="Vào phòng Discord"
+                              >
+                                <Video size={12} />
+                                <span>Discord</span>
+                                <ExternalLink size={10} className="shrink-0" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
+                            <UserCheck size={14} className="text-primary shrink-0" /> Giảng viên:
+                          </span>
+                          <span className="font-semibold text-foreground">{cls.teacherId}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1 border-t border-line">
+                          <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
+                            <Users size={14} className="text-primary shrink-0" /> Sĩ số:
+                          </span>
+                          <span className="font-semibold text-foreground tabular">
+                            {currentStudents}/{maxCapacity} học viên
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Thao tác */}
+                    <div className="pt-4 border-t border-line mt-4">
+                      {isEnrolled ? (
+                        <div className="space-y-2.5">
+                          <div className="flex items-center justify-between p-2.5 rounded-field bg-primary-soft text-primary-ink text-[13px] font-semibold">
+                            <span className="flex items-center gap-1.5">
+                              <Check size={14} /> Ca đang học: {shiftName}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <span className="text-[12px] font-semibold text-muted-foreground flex items-center gap-1">
+                              <RefreshCw size={12} /> Chọn ca muốn chuyển sang:
+                            </span>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              {shifts
+                                .filter((s) => s.id !== (cls.shiftId ?? 1))
+                                .map((s) => {
+                                  const conflicts = shiftConflictsWithEnrolled(cls, s.id);
+                                  const hasTarget = hasTargetClassForShift(cls, s.id);
+                                  const disabledReason = !hasTarget
+                                    ? 'Không có lớp cùng môn ở ca này'
+                                    : conflicts
+                                    ? 'Trùng giờ với lớp khác bạn đang học'
+                                    : '';
+                                  const selected = targetShiftByClass[cls.id] === s.id;
+                                  return (
+                                    <button
+                                      key={s.id}
+                                      type="button"
+                                      disabled={!!disabledReason || actionLoadingId === cls.id}
+                                      onClick={() => {
+                                        setTargetShiftByClass((prev) => ({
+                                          ...prev,
+                                          [cls.id]: prev[cls.id] === s.id ? (undefined as any) : s.id,
+                                        }));
+                                      }}
+                                      title={disabledReason || undefined}
+                                      className={cn(
+                                        'relative px-2.5 py-2 rounded-field text-[12px] border transition text-left leading-tight cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed',
+                                        selected
+                                          ? 'border-primary bg-primary-soft text-primary-ink ring-2 ring-primary/20 font-bold'
+                                          : 'border-line bg-card text-foreground hover:bg-muted font-medium'
+                                      )}
+                                    >
+                                      {disabledReason && (
+                                        <span
+                                          className="absolute top-1.5 right-1.5 text-danger"
+                                          title={disabledReason}
+                                        >
+                                          <AlertCircle size={12} />
+                                        </span>
+                                      )}
+                                      <span className="block font-bold">{s.name}</span>
+                                      <span className="block font-mono text-[11px] text-muted-foreground tabular">
+                                        {s.startTime} – {s.endTime}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                            </div>
+                            {shifts.filter((s) => s.id !== (cls.shiftId ?? 1)).length === 0 && (
+                              <p className="text-[12px] text-muted-foreground italic">
+                                Không có ca nào khác để đổi.
+                              </p>
+                            )}
+                          </div>
+
+                          <Button
+                            variant="secondary"
+                            size="md"
+                            fullWidth
+                            loading={actionLoadingId === cls.id}
+                            disabled={!targetShiftByClass[cls.id]}
+                            onClick={() => {
+                              const targetId = targetShiftByClass[cls.id];
+                              if (!targetId) {
+                                toast.error('Vui lòng chọn ca học mới muốn chuyển sang.');
+                                return;
+                              }
+                              setPendingChange({
+                                classId: cls.id,
+                                className: cls.name,
+                                targetShiftId: targetId,
+                              });
+                            }}
+                            icon={<RefreshCw size={14} />}
+                          >
+                            Đổi ca
+                          </Button>
+                        </div>
+                      ) : isFull ? (
+                        <Button variant="secondary" size="md" fullWidth disabled>
+                          Hết chỗ
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="primary"
+                          size="md"
+                          fullWidth
+                          loading={actionLoadingId === cls.id}
+                          onClick={() => handleSelectShift(cls.id, cls.name)}
+                          icon={<Plus size={16} />}
+                        >
+                          Chọn ca này
+                        </Button>
+                      )}
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
           )}
-
-          {/* Search & Info Bar */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-            <div className="relative w-full sm:w-80">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Tìm theo môn học, tên lớp, ca học, giảng viên..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-emerald-600"
-              />
-            </div>
-            <div className="text-xs text-slate-500 font-medium">
-              Số ca bạn đã đăng ký: <strong className="text-blue-600 font-bold">{student?.enrolledClassIds?.length || 0} ca/lớp</strong>
-            </div>
-          </div>
-
-          {/* HƯỚNG DẪN MÀU SẮC BOX */}
-          <div className="flex items-center gap-4 text-xs font-semibold text-slate-600 flex-wrap bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs">
-            <span className="text-slate-400 text-[11px] uppercase tracking-wider font-bold">Quy ước màu Box:</span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-md bg-emerald-500 ring-2 ring-emerald-200"></span>
-              🟩 Xanh lá: Còn chỗ (Nút "Chọn ca này")
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-md bg-blue-500 ring-2 ring-blue-200"></span>
-              🟦 Xanh dương: Ca bạn đang học (Nút "Đã đăng ký" / "Đổi ca khác")
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-md bg-slate-400 ring-2 ring-slate-200"></span>
-              ⬛ Xám: Đã đủ chỗ (Nhãn "Hết chỗ")
-            </span>
-          </div>
-
-          {/* GRID BOX CÁC CA HỌC */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filtered.map(cls => {
-              const isEnrolled = student?.enrolledClassIds?.includes(cls.id);
-              const maxCapacity = 15; // Quy chuẩn tối đa 15 học viên mỗi lớp/ca
-              const currentStudents = cls.studentIds.length;
-              const isFull = currentStudents >= maxCapacity;
-
-              // Lấy cấu hình khung giờ động của Admin
-              const shiftInfo = shiftMap.get(cls.shiftId ?? 1);
-              const shiftName = shiftInfo?.name || `Ca ${cls.shiftId}`;
-              const shiftTime = shiftInfo ? `${shiftInfo.startTime} - ${shiftInfo.endTime}` : '08:00 - 10:00';
-
-              // Card styling phân theo 3 trạng thái màu
-              let cardBgBorder = '';
-              let badgeStatus = null;
-
-              if (isEnrolled) {
-                // Ca học viên đang học
-                cardBgBorder = 'bg-white border-2 border-indigo-600 shadow-xs ring-1 ring-indigo-500/20';
-                badgeStatus = (
-                  <span className="text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-indigo-600 text-white shadow-2xs flex items-center gap-1 shrink-0">
-                    <Check size={12} /> Ca của bạn
-                  </span>
-                );
-              } else if (isFull) {
-                // Đủ chỗ
-                cardBgBorder = 'bg-slate-50/80 border border-slate-200/80 opacity-75';
-                badgeStatus = (
-                  <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-slate-200 text-slate-700 shrink-0">
-                    Đủ sĩ số
-                  </span>
-                );
-              } else {
-                // Còn chỗ
-                cardBgBorder = 'bg-white border border-slate-200/90 hover:border-slate-300 shadow-2xs';
-                badgeStatus = (
-                  <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0">
-                    Còn chỗ ({maxCapacity - currentStudents})
-                  </span>
-                );
-              }
-
-              return (
-                <div
-                  key={cls.id}
-                  className={`rounded-xl p-5 transition-all flex flex-col justify-between ${cardBgBorder}`}
-                >
-                  <div className="space-y-3.5">
-                    {/* Header Box */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white text-slate-700 border border-slate-200 shadow-2xs">
-                            {cls.code} • {cls.id}
-                          </span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
-                            {cls.subject}
-                          </span>
-                        </div>
-                        <h3 className="font-bold text-slate-900 text-base mt-2 leading-snug">{cls.name}</h3>
-                      </div>
-                      {badgeStatus}
-                    </div>
-
-                    {/* Chi tiết Box: Thứ/Ngày, Ca học, Khung giờ, Phòng, Giảng viên, Sĩ số */}
-                    <div className="bg-white rounded-xl p-3.5 border border-slate-100 shadow-2xs space-y-2 text-xs">
-                      {/* Thứ/Ngày */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-                          <Calendar size={13} className="text-emerald-500" /> Thứ / Lịch học:
-                        </span>
-                        <span className="font-bold text-emerald-700">Thứ {cls.scheduleDays.join(', ')}</span>
-                      </div>
-
-                      {/* Ca học & Khung giờ (giờ Admin đã cấu hình) */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-                          <Clock size={13} className="text-indigo-500" /> Ca học & Khung giờ:
-                        </span>
-                        <span className="font-bold text-indigo-700">
-                          {shiftName} ({shiftTime})
-                        </span>
-                      </div>
-
-                      {/* Phòng học */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-                          <MapPin size={13} className="text-rose-400" /> Phòng học:
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-semibold text-slate-700">{cls.roomId}</span>
-                          {cls.meetingLink && (
-                            <a
-                              href={cls.meetingLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 font-semibold text-[11px] transition-colors"
-                              title="Vào phòng xưởng Discord"
-                            >
-                              <Video size={11} className="text-indigo-600" />
-                              <span>Vào Discord</span>
-                              <ExternalLink size={10} className="shrink-0" />
-                            </a>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Giảng viên */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-                          <UserCheck size={13} className="text-slate-400" /> Giảng viên:
-                        </span>
-                        <span className="font-semibold text-slate-800">{cls.teacherId}</span>
-                      </div>
-
-                      {/* Sĩ số hiện tại */}
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                        <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-                          <Users size={13} className="text-blue-500" /> Sĩ số hiện tại:
-                        </span>
-                        <span className="font-bold text-slate-900">
-                          {currentStudents}/{maxCapacity} học viên
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Nút hành động theo đúng quy định */}
-                  <div className="pt-4 border-t border-slate-100 mt-4">
-                    {isEnrolled ? (
-                      /* 🟦 Ca bạn đang học: hiện ca hiện tại + chọn ca mới để đổi trực tiếp */
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <button
-                            disabled
-                            className="flex-1 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold border border-blue-200 flex items-center justify-center gap-1.5 cursor-default"
-                          >
-                            <Check size={14} /> Ca đang chọn: {shiftName}
-                          </button>
-                        </div>
-                        {/* Chọn ca mới dạng NÚT bấm (thay dropdown) */}
-                        <div className="space-y-2">
-                          <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
-                            <RefreshCw size={11} /> Chọn ca muốn đổi sang:
-                          </span>
-                          <div className="grid grid-cols-2 gap-1.5">
-                            {shifts
-                              .filter(s => s.id !== (cls.shiftId ?? 1))
-                              .map(s => {
-                                const conflicts = shiftConflictsWithEnrolled(cls, s.id);
-                                const hasTarget = hasTargetClassForShift(cls, s.id);
-                                const disabledReason = !hasTarget
-                                  ? 'Ca này không có lớp cùng môn đang mở'
-                                  : conflicts
-                                  ? 'Trùng giờ với lớp khác bạn đang học'
-                                  : '';
-                                const selected = targetShiftByClass[cls.id] === s.id;
-                                return (
-                                  <button
-                                    key={s.id}
-                                    type="button"
-                                    disabled={!!disabledReason || actionLoadingId === cls.id}
-                                    onClick={() => {
-                                      setTargetShiftByClass(prev => ({
-                                        ...prev,
-                                        [cls.id]: prev[cls.id] === s.id ? (undefined as any) : s.id,
-                                      }));
-                                    }}
-                                    title={disabledReason || undefined}
-                                    className={`relative px-2 py-2 rounded-xl text-[11px] font-bold border transition text-left leading-tight disabled:opacity-40 disabled:cursor-not-allowed ${
-                                      selected
-                                        ? 'border-rose-400 bg-rose-50 text-rose-700 ring-2 ring-rose-200'
-                                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-                                    }`}
-                                  >
-                                    {disabledReason && (
-                                      <span className="absolute -top-1.5 -right-1.5 text-base" aria-hidden>⛔</span>
-                                    )}
-                                    <span className="block font-bold">{s.name}</span>
-                                    <span className="block font-mono text-[10px] text-slate-400">
-                                      {s.startTime} - {s.endTime}
-                                    </span>
-                                  </button>
-                                );
-                              })}
-                          </div>
-                          {shifts.filter(s => s.id !== (cls.shiftId ?? 1)).length === 0 && (
-                            <p className="text-[11px] text-slate-400 italic">Không có ca nào khác để đổi.</p>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => handleChangeShift(cls.id, cls.name, cls.shiftId ?? 1)}
-                          disabled={actionLoadingId === cls.id || !targetShiftByClass[cls.id]}
-                          className="w-full py-2.5 bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer whitespace-nowrap disabled:opacity-50"
-                          title="Đổi sang ca đã chọn (không cần duyệt)"
-                        >
-                          <RefreshCw size={12} className={actionLoadingId === cls.id ? 'animate-spin' : ''} /> Đổi ca
-                        </button>
-                      </div>
-                    ) : isFull ? (
-                      /* ⬛ Đã đủ chỗ: Nhãn 'Hết chỗ' */
-                      <button
-                        disabled
-                        className="w-full py-2.5 bg-slate-200 text-slate-500 rounded-xl text-xs font-bold cursor-not-allowed flex items-center justify-center gap-1.5"
-                      >
-                        Hết chỗ
-                      </button>
-                    ) : (
-                      /* 🟩 Còn chỗ: Nút 'Chọn ca này' */
-                      <button
-                        onClick={() => handleSelectShift(cls.id, cls.name)}
-                        disabled={actionLoadingId === cls.id}
-                        className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
-                      >
-                        <Plus size={14} /> {actionLoadingId === cls.id ? 'Đang xử lý...' : 'Chọn ca này'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </main>
+
+        {/* Hộp thoại xác nhận đổi ca */}
+        <Sheet
+          isOpen={!!pendingChange}
+          onClose={() => setPendingChange(null)}
+          title="Xác nhận đổi ca học"
+          description="Kiểm tra lại thông tin trước khi thực hiện chuyển ca."
+          footer={
+            <div className="flex items-center justify-end gap-2 w-full">
+              <Button variant="secondary" onClick={() => setPendingChange(null)}>
+                Huỷ
+              </Button>
+              <Button
+                variant="primary"
+                loading={!!actionLoadingId}
+                onClick={handleConfirmShiftChange}
+              >
+                Xác nhận đổi ca
+              </Button>
+            </div>
+          }
+        >
+          {pendingChange && (
+            <div className="space-y-3 py-2 text-[13px]">
+              <p className="text-foreground">
+                Bạn có chắc muốn đổi ca của lớp{' '}
+                <strong className="text-primary">{pendingChange.className}</strong> sang{' '}
+                <strong>
+                  {shiftMap.get(pendingChange.targetShiftId)?.name ||
+                    `Ca ${pendingChange.targetShiftId}`}
+                </strong>{' '}
+                (
+                {shiftMap.get(pendingChange.targetShiftId)?.startTime} –{' '}
+                {shiftMap.get(pendingChange.targetShiftId)?.endTime}
+                )?
+              </p>
+              <p className="text-[12px] text-muted-foreground">
+                Hệ thống sẽ chuyển bạn sang lớp học tương ứng ở ca mới ngay lập tức.
+              </p>
+            </div>
+          )}
+        </Sheet>
       </div>
     </RoleGuard>
   );

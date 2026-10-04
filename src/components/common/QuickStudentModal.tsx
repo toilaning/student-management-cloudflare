@@ -1,8 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Phone, ExternalLink, ShieldCheck, UserCheck, AlertCircle, Copy, Check } from 'lucide-react';
+import { Phone, ExternalLink, Copy, Check } from 'lucide-react';
 import { Student } from '@/types/student';
+import { Sheet } from '@/components/ui/Sheet';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 interface QuickStudentModalProps {
   studentId: string | null;
@@ -37,8 +41,6 @@ export function QuickStudentModal({ studentId, onClose }: QuickStudentModalProps
     fetchStudent();
   }, [studentId]);
 
-  if (!studentId) return null;
-
   const copyInfo = () => {
     if (!student) return;
     const text = `Học viên: ${student.name} (${student.id})
@@ -50,109 +52,121 @@ Link Bài tập: ${student.assignmentUrl || 'Chưa có'}`;
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const statusTone =
+    student?.status === 'Đang học'
+      ? 'success'
+      : (student?.status as any) === 'Đã nghỉ học'
+      ? 'danger'
+      : 'warning';
+
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full border border-slate-200 overflow-hidden">
-        {/* Header */}
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm">
-              {student?.name?.charAt(0) || 'H'}
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-800 text-sm">{student?.name || 'Đang nạp...'}</h3>
-              <span className="text-[11px] font-mono text-indigo-600 font-semibold">{studentId}</span>
-            </div>
-          </div>
-          <button 
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition cursor-pointer"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="p-5 space-y-4 text-xs">
-          {loading ? (
-            <div className="py-8 text-center text-slate-400">Đang nạp thông tin...</div>
-          ) : student ? (
-            <>
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="font-medium text-slate-500">Trạng thái:</span>
-                <span className={`px-2.5 py-0.5 rounded-full font-bold text-[11px] ${
-                  student.status === 'Đang học' 
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : (student.status as any) === 'Đã nghỉ học'
-                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                    : 'bg-amber-50 text-amber-700 border border-amber-200'
-                }`}>
-                  {student.status || 'Đang học'}
-                </span>
-              </div>
-
-              {/* SĐT Học sinh & SĐT Phụ huynh */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
-                  <span className="text-[11px] font-semibold text-slate-400">SĐT Học sinh</span>
-                  <div className="font-bold text-slate-800 flex items-center justify-between">
-                    <span>{student.phone || 'Chưa có'}</span>
-                    {student.phone && (
-                      <a href={`tel:${student.phone}`} className="text-indigo-600 hover:text-indigo-800" title="Gọi ngay">
-                        <Phone size={13} />
-                      </a>
-                    )}
-                  </div>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
-                  <span className="text-[11px] font-semibold text-slate-400">SĐT Phụ huynh</span>
-                  <div className="font-bold text-slate-800 flex items-center justify-between">
-                    <span>{student.parentPhone || 'Chưa có'}</span>
-                    {student.parentPhone && (
-                      <a href={`tel:${student.parentPhone}`} className="text-indigo-600 hover:text-indigo-800" title="Gọi phụ huynh">
-                        <Phone size={13} />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Link bài tập tổng hợp */}
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5">
-                <span className="text-[11px] font-semibold text-slate-400">Link Bài Tập Tổng Hợp</span>
-                {student.assignmentUrl ? (
-                  <a
-                    href={student.assignmentUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 font-semibold truncate hover:underline"
-                  >
-                    <span className="truncate">{student.assignmentUrl}</span>
-                    <ExternalLink size={13} className="shrink-0" />
-                  </a>
-                ) : (
-                  <p className="text-slate-400 italic">Học sinh chưa cập nhật link bài tập</p>
-                )}
-              </div>
-
-              {/* Action nút copy */}
-              <div className="pt-2 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={copyInfo}
-                  className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold transition flex items-center gap-1.5"
-                >
-                  {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                  <span>{copied ? 'Đã sao chép!' : 'Sao chép thông tin'}</span>
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="py-6 text-center text-slate-400">Không tìm thấy thông tin học sinh này.</div>
+    <Sheet
+      isOpen={Boolean(studentId)}
+      onClose={onClose}
+      title={student?.name || (loading ? 'Đang tải thông tin...' : 'Thông tin học sinh')}
+      description={studentId ? `Mã học viên: ${studentId}` : undefined}
+      size="sm"
+      footer={
+        <>
+          <Button variant="ghost" size="md" onClick={onClose}>
+            Đóng
+          </Button>
+          {student && (
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={copyInfo}
+              icon={copied ? <Check size={16} className="text-success" /> : <Copy size={16} />}
+            >
+              {copied ? 'Đã sao chép' : 'Sao chép thông tin'}
+            </Button>
           )}
-        </div>
+        </>
+      }
+    >
+      <div className="space-y-4 py-1 text-xs">
+        {loading ? (
+          <div className="space-y-3 py-4">
+            <div className="h-10 bg-muted rounded-field animate-pulse" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="h-16 bg-muted rounded-field animate-pulse" />
+              <div className="h-16 bg-muted rounded-field animate-pulse" />
+            </div>
+            <div className="h-12 bg-muted rounded-field animate-pulse" />
+          </div>
+        ) : student ? (
+          <>
+            <div className="flex items-center justify-between p-3.5 bg-muted rounded-field border border-line">
+              <span className="font-semibold text-muted-foreground text-[13px]">Trạng thái</span>
+              <Badge tone={statusTone} dot>
+                {student.status || 'Đang học'}
+              </Badge>
+            </div>
+
+            {/* SĐT Học sinh & SĐT Phụ huynh */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="p-3 bg-muted rounded-field border border-line space-y-1">
+                <span className="text-[12px] font-medium text-muted-foreground">SĐT học viên</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold text-foreground text-sm tabular">
+                    {student.phone || 'Chưa cập nhật'}
+                  </span>
+                  {student.phone && (
+                    <a
+                      href={`tel:${student.phone}`}
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-primary hover:bg-primary-soft hover:text-primary-ink transition"
+                      title="Gọi học viên"
+                    >
+                      <Phone size={13} />
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-3 bg-muted rounded-field border border-line space-y-1">
+                <span className="text-[12px] font-medium text-muted-foreground">SĐT phụ huynh</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold text-foreground text-sm tabular">
+                    {student.parentPhone || 'Chưa cập nhật'}
+                  </span>
+                  {student.parentPhone && (
+                    <a
+                      href={`tel:${student.parentPhone}`}
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-primary hover:bg-primary-soft hover:text-primary-ink transition"
+                      title="Gọi phụ huynh"
+                    >
+                      <Phone size={13} />
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Link bài tập */}
+            <div className="p-3 bg-muted rounded-field border border-line space-y-1">
+              <span className="text-[12px] font-medium text-muted-foreground">Link bài tập tổng hợp</span>
+              {student.assignmentUrl ? (
+                <a
+                  href={student.assignmentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-primary hover:text-primary-hover font-semibold text-sm truncate"
+                >
+                  <span className="truncate">{student.assignmentUrl}</span>
+                  <ExternalLink size={13} className="shrink-0" />
+                </a>
+              ) : (
+                <p className="text-subtle-foreground text-xs italic">Chưa cập nhật link bài tập</p>
+              )}
+            </div>
+          </>
+        ) : (
+          <EmptyState
+            title="Không tìm thấy học sinh"
+            description="Không có dữ liệu cho mã học viên này."
+          />
+        )}
       </div>
-    </div>
+    </Sheet>
   );
 }

@@ -2,7 +2,12 @@
 
 import React, { useState } from 'react';
 import { TuitionInvoice } from '@/types/finance';
-import { Send, CheckCircle2, AlertCircle, RefreshCw, Zap, HelpCircle } from 'lucide-react';
+import { Send, CheckCircle2, AlertCircle, Zap, HelpCircle } from 'lucide-react';
+import { Card, CardHeader } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Field, Input, Select } from '@/components/ui/Field';
+import { cn } from '@/lib/cn';
 
 interface BankWebhookSimulatorProps {
   invoices?: TuitionInvoice[];
@@ -94,48 +99,40 @@ export const BankWebhookSimulator: React.FC<BankWebhookSimulatorProps> = ({ invo
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
-      <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-            <Zap size={18} />
-          </div>
-          <div>
-            <h3 className="font-bold text-slate-800 text-sm sm:text-base">
-              Công cụ Giả lập Webhook Ngân hàng (Bank Simulator)
-            </h3>
-            <p className="text-xs text-slate-500">
-              Mô phỏng tức thì biến động số dư từ cổng SePay / Casso / Bank Gateway để kiểm tra tự động gạch nợ
-            </p>
-          </div>
-        </div>
-        <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          Ready to Test
-        </span>
-      </div>
+    <Card className="space-y-4">
+      <CardHeader
+        icon={<Zap size={18} />}
+        title="Giả lập Webhook ngân hàng"
+        subtitle="Mô phỏng biến động số dư từ cổng SePay, Casso hoặc Bank Gateway để kiểm tra tự động gạch nợ."
+        action={
+          <Badge tone="success" dot className="hidden sm:inline-flex">
+            Sẵn sàng thử nghiệm
+          </Badge>
+        }
+      />
 
       <form onSubmit={handleTriggerWebhook} className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
-          {/* Kiểu gạch nợ */}
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {/* Chế độ gạch nợ */}
+          <div className="space-y-1.5">
+            <label className="block text-[13px] font-semibold text-foreground">
               Chế độ gạch nợ
             </label>
-            <div className="flex gap-2">
+            <div className="grid grid-cols-2 p-1 bg-muted rounded-field border border-line gap-1">
               <button
                 type="button"
                 onClick={() => {
                   setTargetType('invoice');
                   if (selectedInvoiceId) handleSelectInvoice(selectedInvoiceId);
                 }}
-                className={`flex-1 py-1.5 px-2 rounded-lg font-medium border text-center transition ${
+                className={cn(
+                  'py-2 px-3 rounded-field text-xs font-semibold transition cursor-pointer text-center',
                   targetType === 'invoice'
-                    ? 'bg-indigo-50 border-indigo-300 text-indigo-700 font-semibold'
-                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
+                    ? 'bg-card text-foreground shadow-soft'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
               >
-                Theo Mã Hóa Đơn
+                Theo mã hóa đơn
               </button>
               <button
                 type="button"
@@ -143,165 +140,142 @@ export const BankWebhookSimulator: React.FC<BankWebhookSimulatorProps> = ({ invo
                   setTargetType('student');
                   handleStudentIdChange(manualStudentId);
                 }}
-                className={`flex-1 py-1.5 px-2 rounded-lg font-medium border text-center transition ${
+                className={cn(
+                  'py-2 px-3 rounded-field text-xs font-semibold transition cursor-pointer text-center',
                   targetType === 'student'
-                    ? 'bg-indigo-50 border-indigo-300 text-indigo-700 font-semibold'
-                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
+                    ? 'bg-card text-foreground shadow-soft'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
               >
-                Theo Mã Sinh Viên
+                Theo mã học viên
               </button>
             </div>
           </div>
 
           {/* Chọn hóa đơn hoặc nhập mã SV */}
           {targetType === 'invoice' ? (
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">
-                Chọn Hóa đơn mục tiêu
-              </label>
-              <select
+            <Field label="Chọn hóa đơn mục tiêu">
+              <Select
                 value={selectedInvoiceId}
                 onChange={e => handleSelectInvoice(e.target.value)}
-                className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
               >
                 <option value="">-- Chọn hóa đơn mẫu --</option>
                 {invoices.map(inv => (
                   <option key={inv.id} value={inv.id}>
-                    [{inv.id}] - {inv.studentId} - Còn: {inv.remainingAmount.toLocaleString('vi-VN')} đ ({inv.status})
+                    [{inv.id}] - {inv.studentId} - Còn: {inv.remainingAmount.toLocaleString('vi-VN')}đ ({inv.status})
                   </option>
                 ))}
-              </select>
-            </div>
+              </Select>
+            </Field>
           ) : (
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">
-                Mã Sinh Viên (STxxx)
-              </label>
-              <input
+            <Field label="Mã học viên (STxxx)">
+              <Input
                 type="text"
                 value={manualStudentId}
                 onChange={e => handleStudentIdChange(e.target.value)}
                 placeholder="Ví dụ: ST001, ST002"
-                className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono uppercase focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                className="font-mono uppercase"
               />
-            </div>
+            </Field>
           )}
 
           {/* Cổng Gateway */}
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1">
-              Cổng Gateway Giả Lập
-            </label>
-            <select
+          <Field label="Cổng ngân hàng giả lập">
+            <Select
               value={gateway}
               onChange={e => setGateway(e.target.value)}
-              className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
             >
               <option value="SePay">SePay Webhook (sepay.vn)</option>
               <option value="Casso">Casso OpenBanking (casso.vn)</option>
               <option value="VietQR">VietQR Pro Gateway</option>
               <option value="MBBank">MBBank Open API</option>
               <option value="Vietcombank">Vietcombank Digibank</option>
-            </select>
-          </div>
+            </Select>
+          </Field>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Số tiền chuyển */}
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1">
-              Số tiền chuyển (VNĐ)
-            </label>
+          <Field label="Số tiền chuyển (VNĐ)">
             <div className="relative">
-              <input
+              <Input
                 type="number"
                 min="1000"
                 step="1000"
                 value={transferAmount}
                 onChange={e => setTransferAmount(Number(e.target.value))}
-                className="w-full pl-3 pr-12 py-1.5 border border-slate-300 rounded-lg text-xs font-mono font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                className="pr-9 font-mono font-bold text-foreground"
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold">
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-semibold">
                 đ
               </span>
             </div>
-          </div>
+          </Field>
 
           {/* Nội dung chuyển khoản */}
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1">
-              Nội dung chuyển khoản (Content/Description)
-            </label>
-            <input
+          <Field label="Nội dung chuyển khoản (Content/Description)">
+            <Input
               type="text"
               value={content}
               onChange={e => setContent(e.target.value)}
               placeholder="VD: ST001 nop hoc phi TUI0001"
-              className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+              className="font-mono"
             />
-          </div>
+          </Field>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
-          <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
-            <HelpCircle size={14} className="text-slate-400 shrink-0" />
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+          <div className="text-[12px] text-muted-foreground flex items-center gap-1.5">
+            <HelpCircle size={15} className="text-muted-foreground shrink-0" />
             <span>
-              Cú pháp nhận diện: Hệ thống tự động trích xuất mã <code className="bg-slate-100 text-indigo-600 px-1 py-0.5 rounded font-bold">TUIxxx</code> hoặc <code className="bg-slate-100 text-indigo-600 px-1 py-0.5 rounded font-bold">STxxx</code> trong nội dung để gạch nợ.
+              Cú pháp nhận diện: Hệ thống tự động trích xuất mã <code className="bg-muted px-1.5 py-0.5 rounded text-primary-ink font-mono font-semibold">TUIxxx</code> hoặc <code className="bg-muted px-1.5 py-0.5 rounded text-primary-ink font-mono font-semibold">STxxx</code> trong nội dung để gạch nợ.
             </span>
           </div>
 
-          <button
+          <Button
             type="submit"
-            disabled={loading}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-lg text-xs font-bold shadow-xs transition disabled:opacity-50"
+            variant="primary"
+            size="md"
+            loading={loading}
+            icon={<Send size={15} />}
           >
-            {loading ? (
-              <>
-                <RefreshCw size={14} className="animate-spin" />
-                <span>Đang xử lý Webhook...</span>
-              </>
-            ) : (
-              <>
-                <Send size={14} />
-                <span>Bắn Webhook Giả Lập</span>
-              </>
-            )}
-          </button>
+            Bắn webhook giả lập
+          </Button>
         </div>
       </form>
 
       {/* Thông báo kết quả */}
       {result && (
         <div
-          className={`mt-4 p-3.5 rounded-lg border text-xs flex items-start gap-3 animate-in fade-in duration-200 ${
+          className={cn(
+            'p-4 rounded-field border text-[13px] flex items-start gap-3 animate-in-up',
             result.success
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-              : 'bg-rose-50 border-rose-200 text-rose-900'
-          }`}
+              ? 'bg-success-soft border-success/30 text-foreground'
+              : 'bg-danger-soft border-danger/30 text-foreground'
+          )}
         >
           {result.success ? (
-            <CheckCircle2 size={18} className="text-emerald-600 shrink-0 mt-0.5" />
+            <CheckCircle2 size={18} className="text-success shrink-0 mt-0.5" />
           ) : (
-            <AlertCircle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+            <AlertCircle size={18} className="text-danger shrink-0 mt-0.5" />
           )}
           <div className="flex-1 min-w-0">
-            <div className="font-bold text-sm">
-              {result.success ? 'Gạch nợ Webhook thành công!' : 'Thực thi không thành công'}
+            <div className="font-bold text-[14px]">
+              {result.success ? 'Gạch nợ webhook thành công' : 'Thực thi không thành công'}
             </div>
-            <div className="mt-0.5">{result.message}</div>
+            <div className="mt-0.5 text-muted-foreground">{result.message}</div>
             {result.data?.reconciledInvoices && result.data.reconciledInvoices.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-emerald-200/60 font-mono text-[11px] space-y-1">
-                <div className="font-bold text-emerald-800">Chi tiết hóa đơn đã cập nhật:</div>
+              <div className="mt-3 pt-3 border-t border-line font-mono text-xs space-y-1.5">
+                <div className="font-bold text-foreground font-sans">Chi tiết hóa đơn đã cập nhật:</div>
                 {result.data.reconciledInvoices.map((inv: any) => (
                   <div key={inv.id} className="flex flex-wrap items-center gap-2">
                     <span className="font-bold">{inv.id}</span>
-                    <span>(Học viên: {inv.studentId})</span>
-                    <span>+{inv.paidAmountAdded?.toLocaleString('vi-VN')} đ</span>
-                    <span>| Còn nợ: {inv.remainingAmount?.toLocaleString('vi-VN')} đ</span>
-                    <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded font-semibold text-[10px]">
+                    <span className="text-muted-foreground">(Học viên: {inv.studentId})</span>
+                    <span className="text-success font-semibold">+{inv.paidAmountAdded?.toLocaleString('vi-VN')}đ</span>
+                    <span className="text-muted-foreground">| Còn nợ: {inv.remainingAmount?.toLocaleString('vi-VN')}đ</span>
+                    <Badge tone="success" className="text-[11px] py-0.5 px-2">
                       {inv.status}
-                    </span>
+                    </Badge>
                   </div>
                 ))}
               </div>
@@ -309,6 +283,6 @@ export const BankWebhookSimulator: React.FC<BankWebhookSimulatorProps> = ({ invo
           </div>
         </div>
       )}
-    </div>
+    </Card>
   );
 };

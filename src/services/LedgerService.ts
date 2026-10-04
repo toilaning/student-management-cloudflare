@@ -75,8 +75,9 @@ export class LedgerService {
     teachers.forEach(tc => {
       const tcSlots = monthSlots.filter(s => s.teacherId === tc.id);
       const rate = tc.ratePerSession || 250000;
-      totalTeacherSessions += tcSlots.length;
-      totalTeacherExpense += tcSlots.length * rate;
+      const paidSlots = tcSlots.filter(isSessionPayable);
+      totalTeacherSessions += paidSlots.length;
+      totalTeacherExpense += paidSlots.length * rate;
     });
 
     const manualList = await this.getExpensesByMonth(month);
@@ -94,6 +95,7 @@ export class LedgerService {
       netProfit,
       invoicesCount: monthInvoices.length,
       teacherSessionsCount: totalTeacherSessions,
+      teacherScheduledCount: monthSlots.filter(s => s.status !== 'Đã hủy').length,
       expenses: manualList,
     };
   }
@@ -106,13 +108,20 @@ export class LedgerService {
     return teachers.map(tc => {
       const tcSlots = monthSlots.filter(s => s.teacherId === tc.id);
       const rate = tc.ratePerSession || 250000;
-      const totalEarnings = tcSlots.length * rate;
+      const scheduledSlots = tcSlots.filter(s => s.status !== 'Đã hủy');
+      const checkedInSlots = tcSlots.filter(s => !!s.checkinTime);
+      const paidSlots = tcSlots.filter(isSessionPayable);
+      const lateSlots = tcSlots.filter(s => s.checkinStatus === 'Đi muộn');
+      const totalEarnings = paidSlots.length * rate;
 
       return {
         teacherId: tc.id,
         teacherName: tc.name,
         month,
-        totalSessions: tcSlots.length,
+        totalSessions: paidSlots.length,
+        scheduledSessions: scheduledSlots.length,
+        checkedInSessions: checkedInSlots.length,
+        lateSessions: lateSlots.length,
         ratePerSession: rate,
         totalEarnings,
         status: 'CHƯA_CHỐT' as const
@@ -123,4 +132,13 @@ export class LedgerService {
   public static clearAll(): void {
     this.expenses.clear();
   }
+}
+
+/**
+ * Một ca được tính trả lương khi giáo viên đã chấm công vào ca,
+ * hoặc ca đã được đánh dấu hoàn thành (dữ liệu cũ trước khi có chấm công).
+ */
+function isSessionPayable(slot: { checkinTime?: string; status: string }): boolean {
+  if (slot.status === 'Đã hủy') return false;
+  return !!slot.checkinTime || slot.status === 'Đã hoàn thành';
 }
