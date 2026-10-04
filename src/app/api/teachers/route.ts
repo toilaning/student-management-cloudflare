@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { repo } from '@/repositories';
+import { AuthService } from '@/services/AuthService';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,6 +83,27 @@ export async function POST(request: Request) {
 
     await repo.createTeacher(newTeacher);
 
+    // Tạo tài khoản đăng nhập cho giảng viên mới (mật khẩu mặc định 123456).
+    const defaultPassword = '123456';
+    const teacherEmail = newTeacher.email || `${newId.toLowerCase()}@edu.vn`;
+    try {
+      const authService = new AuthService(repo);
+      const existingUser = await repo.getUserById(newId);
+      if (!existingUser) {
+        await repo.createUser({
+          id: newId,
+          username: newId.toLowerCase(),
+          passwordHash: authService.hashPassword(defaultPassword),
+          role: 'TEACHER',
+          name: newTeacher.name,
+          email: teacherEmail,
+          isActive: true,
+        });
+      }
+    } catch (userErr) {
+      console.warn('[CREATE-TEACHER] Không tạo được tài khoản đăng nhập:', userErr);
+    }
+
     await repo.addAuditLog({
       action: 'CREATE',
       userId: 'ADMIN001',
@@ -92,7 +114,12 @@ export async function POST(request: Request) {
       details: `Thêm giảng viên mới ${newId} - ${name} (${specialty})`,
     });
 
-    return NextResponse.json({ success: true, teacher: newTeacher, message: `Thêm giảng viên ${newId} thành công` });
+    return NextResponse.json({
+      success: true,
+      teacher: newTeacher,
+      defaultPassword,
+      message: `Thêm giảng viên ${newId} thành công`,
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Lỗi khi tạo giảng viên' }, { status: 500 });
   }

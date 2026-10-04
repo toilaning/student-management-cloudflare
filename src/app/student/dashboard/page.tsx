@@ -373,7 +373,7 @@ export default function StudentDashboardPage() {
                     {pendingRequests.slice(0, 3).map((r) => (
                       <div key={r.id} className="flex items-center justify-between gap-2 p-2.5 rounded-field bg-muted">
                         <span className="text-[13px] font-medium text-foreground truncate">
-                          {r.type === 'XIN_NGHI' ? 'Xin nghỉ học' : 'Đổi lịch'}
+                          Xin nghỉ học
                         </span>
                         <Badge tone="warning">Chờ duyệt</Badge>
                       </div>

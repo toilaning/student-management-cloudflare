@@ -34,7 +34,10 @@ interface StudentAttendanceSummary {
 }
 
 export default function AttendanceAnalyticsPage() {
-  const [selectedMonth, setSelectedMonth] = useState<string>('2026-09');
+  // Mặc định tháng hiện tại theo giờ Việt Nam.
+  const [selectedMonth, setSelectedMonth] = useState<string>(() =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Saigon' }).format(new Date()).slice(0, 7)
+  );
   const [selectedClassId, setSelectedClassId] = useState<string>('ALL');
   const [classes, setClasses] = useState<ClassEntity[]>([]);
   const [items, setItems] = useState<StudentAttendanceSummary[]>([]);

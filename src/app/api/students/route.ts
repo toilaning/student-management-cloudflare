@@ -4,12 +4,35 @@ import { StudentService } from '@/services/StudentService';
 
 export const dynamic = 'force-dynamic';
 
+/** Khớp mã lọc mục tiêu trường + khối thi với hồ sơ học sinh. */
+function matchesUniFilter(s: { targetUniversity?: string; examBlock?: string; customUniversity?: string }, filter: string): boolean {
+  switch (filter) {
+    case 'HAU_V': return s.targetUniversity === 'HAU' && s.examBlock === 'KHOI_V';
+    case 'HAU_H': return s.targetUniversity === 'HAU' && s.examBlock === 'KHOI_H';
+    case 'HUCE_V': return s.targetUniversity === 'HUCE' && s.examBlock === 'KHOI_V';
+    case 'HUCE_H': return s.targetUniversity === 'HUCE' && s.examBlock === 'KHOI_H';
+    case 'MTCN_V': return s.targetUniversity === 'MTCN' && s.examBlock === 'KHOI_V';
+    case 'MTCN_H': return s.targetUniversity === 'MTCN' && s.examBlock === 'KHOI_H';
+    case 'NUAE': return s.targetUniversity === 'NUAE';
+    case 'HNUE': return s.targetUniversity === 'HNUE';
+    case 'VNUFA': return s.targetUniversity === 'VNUFA';
+    case 'HOU': return s.targetUniversity === 'HOU';
+    case 'VNU-SIS': return s.targetUniversity === 'VNU-SIS';
+    case 'KHAC': return s.targetUniversity === 'KHAC' || !!s.customUniversity;
+    default: return true;
+  }
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
   const search = searchParams.get('search')?.toLowerCase();
+  const status = searchParams.get('status');
+  const uni = searchParams.get('uni');
+  const limitParam = searchParams.get('limit');
   const page = parseInt(searchParams.get('page') || '1', 10);
-  const limit = parseInt(searchParams.get('limit') || '50', 10);
+  // limit=all dùng cho các ô chọn học sinh (hoá đơn, đơn từ) cần đủ danh sách.
+  const limit = limitParam === 'all' ? Number.MAX_SAFE_INTEGER : parseInt(limitParam || '50', 10);
 
   if (id) {
     const student = await repo.getStudentById(id);
@@ -73,6 +96,12 @@ export async function GET(request: Request) {
       (s.phone && s.phone.includes(search)) ||
       (s.email && s.email.toLowerCase().includes(search))
     );
+  }
+  if (status && status !== 'ALL') {
+    students = students.filter(s => s.status === status);
+  }
+  if (uni && uni !== 'ALL') {
+    students = students.filter(s => matchesUniFilter(s, uni));
   }
 
   const total = students.length;

@@ -164,7 +164,7 @@ export default function TeacherRequestsPage() {
       className: 'w-32',
       render: (r) => (
         <Badge tone={r.type === 'XIN_NGHI' ? 'warning' : 'info'}>
-          {r.type === 'XIN_NGHI' ? 'Xin nghỉ học' : 'Đổi ca học'}
+          Xin nghỉ học
         </Badge>
       ),
     },
@@ -237,8 +237,8 @@ export default function TeacherRequestsPage() {
     <RoleGuard allowedRoles={['TEACHER', 'ADMIN']}>
       <div className="flex-1 flex flex-col min-h-screen">
         <Header
-          title="Xử lý đơn xin nghỉ & đổi ca học"
-          subtitle="Phê duyệt hoặc từ chối nguyện vọng của học viên trong các lớp phụ trách"
+          title="Xử lý đơn xin nghỉ học"
+          subtitle="Phê duyệt hoặc từ chối đơn xin nghỉ của học viên trong các lớp phụ trách"
         />
 
         <main className="p-4 sm:p-6 max-w-content mx-auto w-full space-y-5">
@@ -335,7 +335,7 @@ export default function TeacherRequestsPage() {
 
                 <div className="flex items-center justify-between text-xs">
                   <Badge tone={r.type === 'XIN_NGHI' ? 'warning' : 'info'}>
-                    {r.type === 'XIN_NGHI' ? 'Xin nghỉ học' : 'Đổi ca học'}
+                    Xin nghỉ học
                   </Badge>
                   <span className="tabular text-muted-foreground">
                     {new Date(r.createdAt).toLocaleDateString('vi-VN')}
@@ -436,7 +436,7 @@ export default function TeacherRequestsPage() {
                 <div>
                   <span className="text-muted-foreground block mb-0.5">Loại yêu cầu:</span>
                   <Badge tone={selectedRequest.type === 'XIN_NGHI' ? 'warning' : 'info'}>
-                    {selectedRequest.type === 'XIN_NGHI' ? 'Xin nghỉ học' : 'Đổi ca học'}
+                    Xin nghỉ học
                   </Badge>
                 </div>
                 <div>

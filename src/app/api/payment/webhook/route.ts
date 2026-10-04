@@ -160,7 +160,7 @@ export async function POST(request: Request) {
       const deductAmount = Math.min(debtAmount, remainingTransfer);
       inv.paidAmount = inv.paidAmount + deductAmount;
       inv.remainingAmount = Math.max(0, inv.amount - inv.paidAmount);
-      inv.status = (inv.remainingAmount === 0 ? 'DA_NOP' : 'CON_NO') as TuitionStatus;
+      inv.status = inv.remainingAmount === 0 ? 'Đã nộp' : 'Còn nợ';
       inv.paidDate = todayStr;
       inv.paymentMethod = 'Chuyển khoản QR';
       inv.transactionCode = referenceCode;
@@ -186,7 +186,7 @@ export async function POST(request: Request) {
       const inv = targetInvoices[0];
       inv.paidAmount += transferAmount;
       inv.remainingAmount = 0;
-      inv.status = 'DA_NOP' as TuitionStatus;
+      inv.status = 'Đã nộp';
       inv.paidDate = todayStr;
       inv.paymentMethod = 'Chuyển khoản QR';
       inv.transactionCode = referenceCode;
@@ -196,7 +196,7 @@ export async function POST(request: Request) {
         studentId: inv.studentId,
         paidAmountAdded: transferAmount,
         remainingAmount: 0,
-        status: 'DA_NOP',
+        status: 'Đã nộp',
       });
     }
 

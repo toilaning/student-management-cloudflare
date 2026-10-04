@@ -36,7 +36,8 @@ export async function PUT(request: Request) {
       code,
       subject,
       teacherId,
-      roomId = "ONLINE",
+      // Không mặc định 'ONLINE': giáo viên nhận ca (chỉ gửi classId + teacherId) sẽ vô tình ghi đè phòng thật.
+      roomId,
       shiftId,
       startTime,
       endTime,

@@ -23,6 +23,7 @@ import {
   useToast,
 } from '@/components/ui';
 import { cn } from '@/lib/cn';
+import { timeToMinutes, minutesTo24h } from '@/utils/date';
 import {
   CheckCircle2,
   Clock,
@@ -73,7 +74,11 @@ function AttendanceContent() {
         const loadedSlots = data.slots || [];
         setSlots(loadedSlots);
         if (!selectedSlotId && loadedSlots.length > 0) {
-          setSelectedSlotId(loadedSlots[0].id);
+          // Ưu tiên ca thuộc lớp được chỉ định trên URL (khi bấm từ trang Lớp của tôi).
+          const preferred = classIdParam
+            ? loadedSlots.find((s: any) => s.classId === classIdParam)
+            : null;
+          setSelectedSlotId(preferred ? preferred.id : loadedSlots[0].id);
         }
       } catch (e) {
         console.error(e);
@@ -144,12 +149,12 @@ function AttendanceContent() {
   const handleStatusChange = (index: number, newStatus: AttendanceStatus) => {
     const updated = [...records];
     updated[index].status = newStatus;
+    const slot = slots.find((s) => s.id === selectedSlotId);
     if (newStatus === 'Có mặt') {
-      const slot = slots.find((s) => s.id === selectedSlotId);
-      updated[index].checkinTime = slot ? `${slot.startTime}:05` : '08:05';
+      updated[index].checkinTime = slot ? slot.startTime : '08:00';
     } else if (newStatus === 'Đi muộn') {
-      const slot = slots.find((s) => s.id === selectedSlotId);
-      updated[index].checkinTime = slot ? `${slot.startTime.split(':')[0]}:30` : '08:30';
+      // Đi muộn: ghi mốc 30 phút sau khi ca bắt đầu, không trùng giờ vào ca.
+      updated[index].checkinTime = slot ? minutesTo24h(timeToMinutes(slot.startTime) + 30) : '08:30';
     } else {
       updated[index].checkinTime = undefined;
     }

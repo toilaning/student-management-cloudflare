@@ -78,7 +78,8 @@ export function TeacherCheckinCard({ teacherId }: { teacherId?: string }) {
     }
   };
 
-  const doneCount = slots.filter((s) => s.checkinTime).length;
+  // Chỉ tính là xong khi đã kết ca (có giờ ra), không phải mới vào ca.
+  const doneCount = slots.filter((s) => s.checkoutTime).length;
 
   return (
     <Card className="space-y-4">

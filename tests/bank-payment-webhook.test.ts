@@ -19,7 +19,7 @@ test('Bank Payment Webhook & Reconciliation Suite: Kiểm tra phân hệ gạch 
     paidAmount: 0,
     remainingAmount: 2000000,
     dueDate: '2026-09-10',
-    status: 'CON_NO',
+    status: 'Còn nợ',
   };
 
   const initialInv2: TuitionInvoice = {
@@ -31,7 +31,7 @@ test('Bank Payment Webhook & Reconciliation Suite: Kiểm tra phân hệ gạch 
     paidAmount: 0,
     remainingAmount: 1500000,
     dueDate: '2026-10-10',
-    status: 'CON_NO',
+    status: 'Còn nợ',
   };
 
   // Nạp hóa đơn mẫu vào repository
@@ -74,7 +74,7 @@ test('Bank Payment Webhook & Reconciliation Suite: Kiểm tra phân hệ gạch 
     assert.ok(data.message.includes('Bỏ qua'));
   });
 
-  await t.test('3. Webhook chuyển khoản đúng mã hóa đơn (TUI_TEST_001) -> Gạch nợ thành công, chuyển sang DA_NOP', async () => {
+  await t.test('3. Webhook chuyển khoản đúng mã hóa đơn (TUI_TEST_001) -> Gạch nợ thành công, chuyển sang Đã nộp', async () => {
     const req = new Request('http://localhost:3000/api/payment/webhook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -101,13 +101,13 @@ test('Bank Payment Webhook & Reconciliation Suite: Kiểm tra phân hệ gạch 
     assert.ok(updated);
     assert.equal(updated.paidAmount, 2000000);
     assert.equal(updated.remainingAmount, 0);
-    assert.equal(updated.status, 'DA_NOP');
+    assert.equal(updated.status, 'Đã nộp');
     assert.equal(updated.paymentMethod, 'Chuyển khoản QR');
     assert.equal(updated.transactionCode, 'TXN_TEST_FULL_01');
     assert.ok(updated.paidDate);
   });
 
-  await t.test('4. Webhook chuyển khoản thiếu tiền (Partial payment) -> Giảm remainingAmount, giữ trạng thái CON_NO', async () => {
+  await t.test('4. Webhook chuyển khoản thiếu tiền (Partial payment) -> Giảm remainingAmount, giữ trạng thái Còn nợ', async () => {
     const req = new Request('http://localhost:3000/api/payment/webhook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -133,7 +133,7 @@ test('Bank Payment Webhook & Reconciliation Suite: Kiểm tra phân hệ gạch 
     assert.ok(updated);
     assert.equal(updated.paidAmount, 500000);
     assert.equal(updated.remainingAmount, 1000000);
-    assert.equal(updated.status, 'CON_NO');
+    assert.equal(updated.status, 'Còn nợ');
     assert.equal(updated.transactionCode, 'TXN_TEST_PARTIAL_01');
   });
 
@@ -157,12 +157,12 @@ test('Bank Payment Webhook & Reconciliation Suite: Kiểm tra phân hệ gạch 
     assert.equal(data.success, true);
     assert.equal(data.studentId, testStudentId);
 
-    // inv2 vốn còn nợ 1.000.000, sau khi nộp tiếp 1.000.000 phải chuyển sang DA_NOP
+    // inv2 vốn còn nợ 1.000.000, sau khi nộp tiếp 1.000.000 phải chuyển sang Đã nộp
     const updatedInv2 = await repo.getTuitionInvoiceById(inv2Id);
     assert.ok(updatedInv2);
     assert.equal(updatedInv2.paidAmount, 1500000);
     assert.equal(updatedInv2.remainingAmount, 0);
-    assert.equal(updatedInv2.status, 'DA_NOP');
+    assert.equal(updatedInv2.status, 'Đã nộp');
   });
 
   await t.test('6. Kiểm tra ghi nhận Audit Log chuẩn xác với action PAYMENT_PROCESS và chi tiết nguồn BANK_WEBHOOK_AUTO', async () => {

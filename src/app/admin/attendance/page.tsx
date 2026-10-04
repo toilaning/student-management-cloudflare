@@ -3,6 +3,7 @@
 import { getTodayDateStr } from '@/utils/date';
 
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Header } from '@/components/common/Header';
 import { RoleGuard } from '@/components/common/RoleGuard';
 import { AttendanceRecord, AttendanceStatus } from '@/types/attendance';
@@ -49,14 +50,19 @@ interface ExtendedAttendanceRecord extends AttendanceRecord {
 
 function AdminAttendanceContent() {
   const toast = useToast();
+  const searchParams = useSearchParams();
+
+  // Nhận ngữ cảnh khi được điều hướng từ Dashboard/Calendar (?classId=...&date=...)
+  const classIdParam = searchParams.get('classId');
+  const dateParam = searchParams.get('date');
 
   const [editingAttendanceStudent, setEditingAttendanceStudent] = useState<any>(null);
   const [editRemainingInput, setEditRemainingInput] = useState<number>(12);
   const [studentDetailMap, setStudentDetailMap] = useState<Record<string, any>>({});
 
-  const [selectedDate, setSelectedDate] = useState<string>(getTodayDateStr());
+  const [selectedDate, setSelectedDate] = useState<string>(dateParam || getTodayDateStr());
   const [classes, setClasses] = useState<ClassEntity[]>([]);
-  const [selectedClassId, setSelectedClassId] = useState<string>('ALL');
+  const [selectedClassId, setSelectedClassId] = useState<string>(classIdParam || 'ALL');
   const [slots, setSlots] = useState<ScheduleSlot[]>([]);
   const [selectedSlotId, setSelectedSlotId] = useState<string>('');
 

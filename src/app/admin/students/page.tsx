@@ -162,11 +162,20 @@ export default function AdminStudentsPage() {
     remainingSessions: 12,
   });
 
-  const loadStudents = async (p = 1, limit = 20, search = '') => {
+  const loadStudents = async (
+    p = 1,
+    limit = 20,
+    search = '',
+    status = statusTab,
+    uni = targetUniFilter
+  ) => {
     setLoading(true);
     try {
       const [stRes, clsRes] = await Promise.all([
-        fetch(`/api/students?page=${p}&limit=${limit}&search=${encodeURIComponent(search)}`),
+        fetch(
+          `/api/students?page=${p}&limit=${limit}&search=${encodeURIComponent(search)}` +
+            `&status=${encodeURIComponent(status)}&uni=${encodeURIComponent(uni)}`
+        ),
         fetch('/api/classes'),
       ]);
       const stData = await stRes.json();
@@ -183,8 +192,9 @@ export default function AdminStudentsPage() {
   };
 
   useEffect(() => {
-    loadStudents(page, pageSize, searchTerm);
-  }, [page, pageSize, searchTerm]);
+    loadStudents(page, pageSize, searchTerm, statusTab, targetUniFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageSize, searchTerm, statusTab, targetUniFilter]);
 
   const handleRowStatusChange = async (student: Student, newStatus: Student['status']) => {
     if (!student || !newStatus || newStatus === student.status) return;
@@ -476,26 +486,8 @@ Lưu ý: Vui lòng đăng nhập và đổi mật khẩu trong lần đầu sử
     setTimeout(() => setCopiedHandover(false), 2500);
   };
 
-  const filteredStudents = students.filter((st) => {
-    if (statusTab !== 'ALL' && st.status !== statusTab) {
-      return false;
-    }
-    if (targetUniFilter !== 'ALL') {
-      if (targetUniFilter === 'HAU_V') return st.targetUniversity === 'HAU' && st.examBlock === 'KHOI_V';
-      if (targetUniFilter === 'HAU_H') return st.targetUniversity === 'HAU' && st.examBlock === 'KHOI_H';
-      if (targetUniFilter === 'HUCE_V') return st.targetUniversity === 'HUCE' && st.examBlock === 'KHOI_V';
-      if (targetUniFilter === 'HUCE_H') return st.targetUniversity === 'HUCE' && st.examBlock === 'KHOI_H';
-      if (targetUniFilter === 'MTCN_V') return st.targetUniversity === 'MTCN' && st.examBlock === 'KHOI_V';
-      if (targetUniFilter === 'MTCN_H') return st.targetUniversity === 'MTCN' && st.examBlock === 'KHOI_H';
-      if (targetUniFilter === 'NUAE') return st.targetUniversity === 'NUAE';
-      if (targetUniFilter === 'HNUE') return st.targetUniversity === 'HNUE';
-      if (targetUniFilter === 'VNUFA') return st.targetUniversity === 'VNUFA';
-      if (targetUniFilter === 'HOU') return st.targetUniversity === 'HOU';
-      if (targetUniFilter === 'VNU-SIS') return st.targetUniversity === 'VNU-SIS';
-      if (targetUniFilter === 'KHAC') return st.targetUniversity === 'KHAC' || !!st.customUniversity;
-    }
-    return true;
-  });
+  // Lọc trạng thái và mục tiêu trường đã thực hiện ở máy chủ để phân trang chính xác.
+  const filteredStudents = students;
 
   const columns: Column<Student>[] = [
     {
@@ -696,7 +688,10 @@ Lưu ý: Vui lòng đăng nhập và đổi mật khẩu trong lần đầu sử
             <SegmentedControl
               items={STATUS_OPTIONS}
               value={statusTab}
-              onChange={(val) => setStatusTab(val as typeof statusTab)}
+              onChange={(val) => {
+                setStatusTab(val as typeof statusTab);
+                setPage(1);
+              }}
             />
           </div>
 
@@ -708,7 +703,7 @@ Lưu ý: Vui lòng đăng nhập và đổi mật khẩu trong lần đầu sử
                 Lọc theo mục tiêu trường và khối thi
               </span>
               <span className="text-[12px] text-subtle-foreground font-mono">
-                {filteredStudents.length} học viên
+                {total} học viên
               </span>
             </div>
 
@@ -717,7 +712,10 @@ Lưu ý: Vui lòng đăng nhập và đổi mật khẩu trong lần đầu sử
                 <button
                   key={f.id}
                   type="button"
-                  onClick={() => setTargetUniFilter(f.id)}
+                  onClick={() => {
+                    setTargetUniFilter(f.id);
+                    setPage(1);
+                  }}
                   className={`px-3 h-8 rounded-pill text-[12px] font-semibold transition-all cursor-pointer border ${
                     targetUniFilter === f.id
                       ? 'bg-primary text-white border-primary shadow-primary'

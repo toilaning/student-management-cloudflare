@@ -54,7 +54,7 @@ export default function AdminRequestsPage() {
     try {
       const [reqRes, stuRes, clsRes, schedRes] = await Promise.all([
         fetch('/api/requests'),
-        fetch('/api/students'),
+        fetch('/api/students?limit=all'),
         fetch('/api/classes'),
         fetch('/api/schedule'),
       ]);
@@ -335,7 +335,7 @@ export default function AdminRequestsPage() {
       <div className="flex-1 flex flex-col min-h-screen">
         <Header
           title="Duyệt đơn từ"
-          subtitle="Quản lý yêu cầu xin nghỉ học và đổi ca của học viên"
+          subtitle="Xử lý đơn xin nghỉ học của học viên"
         />
 
         <main className="p-4 sm:p-6 max-w-content mx-auto w-full space-y-5">

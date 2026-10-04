@@ -27,7 +27,7 @@ export default function TeacherDashboardPage() {
           fetch(`/api/classes?teacherId=${currentUser?.id || ''}`),
           fetch(`/api/schedule?teacherId=${currentUser?.id || ''}`),
           fetch(`/api/requests?teacherId=${currentUser?.id || ''}`),
-          Promise.resolve({ json: () => ({ payroll: null }) }),
+          fetch(`/api/payroll?teacherId=${currentUser?.id || ''}`),
         ]);
 
         const clsData = await clsRes.json();
@@ -79,7 +79,7 @@ export default function TeacherDashboardPage() {
             <StatCard
               label="Đơn chờ duyệt"
               value={loading ? '—' : pendingRequests}
-              hint="Đơn xin nghỉ & đổi ca"
+              hint="Đơn xin nghỉ của học viên"
               icon={<Inbox size={20} />}
               tone="warning"
             />
@@ -207,7 +207,7 @@ export default function TeacherDashboardPage() {
             <Card className="space-y-4 flex flex-col">
               <CardHeader
                 title="Yêu cầu từ học viên"
-                subtitle="Đơn xin nghỉ & đổi lịch mới nhất"
+                subtitle="Đơn xin nghỉ mới nhất"
                 action={
                   <Link href="/teacher/requests">
                     <Button variant="ghost" size="sm" icon={<ArrowRight size={14} />}>
@@ -227,7 +227,7 @@ export default function TeacherDashboardPage() {
                 <EmptyState
                   icon={<Inbox size={28} />}
                   title="Không có yêu cầu"
-                  description="Hiện tại không có đơn xin nghỉ hay đổi lịch nào cần xử lý."
+                  description="Hiện tại không có đơn xin nghỉ nào cần xử lý."
                 />
               ) : (
                 <div className="space-y-2.5 flex-1 overflow-y-auto">
@@ -262,7 +262,7 @@ export default function TeacherDashboardPage() {
                       </p>
                       <div className="text-[11px] text-subtle-foreground flex items-center justify-between">
                         <span>
-                          {req.type === 'XIN_NGHI' ? 'Xin nghỉ học' : 'Đổi ca học'} • Lớp{' '}
+                          Xin nghỉ học • Lớp{' '}
                           {req.classId}
                         </span>
                         <span className="tabular">

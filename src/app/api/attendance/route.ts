@@ -5,6 +5,35 @@ import { getTodayDateStr, getNowTimeStr, timeToMinutes } from '@/utils/date';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Trừ 1 buổi vào gói hoá đơn đang hoạt động của học sinh khi được ghi nhận có đi học.
+ * Chỉ trừ cho các trạng thái tính là có mặt. Bọc lỗi để không làm hỏng thao tác điểm danh.
+ */
+async function deductSessionForAttendance(studentId: string, status: AttendanceStatus): Promise<void> {
+  const countsAsAttended =
+    status === 'Có mặt' || status === 'Đi muộn' || status === 'Điểm danh bù';
+  if (!countsAsAttended) return;
+
+  try {
+    const invoices = await repo.getTuitionInvoicesByStudentId(studentId);
+    const availableInvoice = (invoices || []).find(
+      (inv) =>
+        inv &&
+        typeof inv.sessionCount === 'number' &&
+        inv.sessionCount > 0 &&
+        (inv.usedSessions || 0) < inv.sessionCount
+    );
+    if (availableInvoice) {
+      availableInvoice.usedSessions = (availableInvoice.usedSessions || 0) + 1;
+      await repo.updateTuitionInvoice(availableInvoice);
+    }
+  } catch (sessionErr: any) {
+    console.warn(
+      `[attendance] Không thể trừ buổi cho học sinh ${studentId}: ${sessionErr?.message || sessionErr}`
+    );
+  }
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const slotId = searchParams.get('slotId');
@@ -175,25 +204,7 @@ export async function POST(request: Request) {
       const saved = await repo.saveAttendanceRecord(newRecord);
 
       // Tự động trừ 1 buổi (usedSessions) khỏi gói hoá đơn đang hoạt động của học sinh.
-      // Bọc riêng trong try/catch để không bao giờ làm fail điểm danh nếu lỗi xảy ra.
-      try {
-        const invoices = await repo.getTuitionInvoicesByStudentId(studentId);
-        const availableInvoice = (invoices || []).find(
-          (inv) =>
-            inv &&
-            typeof inv.sessionCount === 'number' &&
-            inv.sessionCount > 0 &&
-            (inv.usedSessions || 0) < inv.sessionCount
-        );
-        if (availableInvoice) {
-          availableInvoice.usedSessions = (availableInvoice.usedSessions || 0) + 1;
-          await repo.updateTuitionInvoice(availableInvoice);
-        }
-      } catch (sessionErr: any) {
-        console.warn(
-          `[attendance] Không thể trừ buổi cho học sinh ${studentId}: ${sessionErr?.message || sessionErr}`
-        );
-      }
+      await deductSessionForAttendance(studentId, status);
 
       const studentObj = await repo.getStudentById(studentId);
       await repo.addAuditLog({
@@ -219,7 +230,27 @@ export async function POST(request: Request) {
       const realRecords = (body.records as AttendanceRecord[]).filter(
         (r) => r && String(r.status) !== 'Chưa điểm danh'
       );
+
+      // Phải đọc sổ hiện có TRƯỚC khi lưu để biết dòng nào là mới, tránh trừ buổi trùng.
+      const alreadyRecorded = new Set<string>();
+      const slotIdsToCheck = Array.from(
+        new Set(realRecords.map((r) => r.scheduleSlotId).filter(Boolean))
+      );
+      for (const sid of slotIdsToCheck) {
+        const existing = await repo.getAttendanceBySlotId(sid);
+        existing.forEach((r) => alreadyRecorded.add(`${r.scheduleSlotId}::${r.studentId}`));
+      }
+
       const saved = await repo.saveAttendanceBatch(realRecords);
+
+      // Trừ buổi cho các bản ghi có mặt và chưa từng được ghi nhận trước đó.
+      const toDeduct = realRecords.filter(
+        (r) => !alreadyRecorded.has(`${r.scheduleSlotId}::${r.studentId}`)
+      );
+      for (const rec of toDeduct) {
+        await deductSessionForAttendance(rec.studentId, rec.status);
+      }
+
       await repo.addAuditLog({
         userId: updatedBy,
         userName: updaterName,
@@ -232,6 +263,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, count: saved.length, records: saved });
     } else if (body.record) {
       const saved = await repo.saveAttendanceRecord(body.record);
+      await deductSessionForAttendance(saved.studentId, saved.status);
       await repo.addAuditLog({
         userId: updatedBy,
         userName: updaterName,

@@ -8,7 +8,10 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const month = searchParams.get('month') || '2026-09'; // YYYY-MM
+    // Mặc định lấy tháng hiện tại theo giờ Việt Nam.
+    const month =
+      searchParams.get('month') ||
+      new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Saigon' }).format(new Date()).slice(0, 7);
     const classId = searchParams.get('classId');
 
     // 1. Lấy toàn bộ học viên & lớp học
@@ -66,7 +69,8 @@ export async function GET(request: Request) {
         excusedCount: 0,
         unexcusedCount: 0,
         makeupCount: 0,
-        rate: 100,
+        // Chưa có bản ghi điểm danh nào thì chưa thể coi là chuyên cần 100%.
+        rate: 0,
       };
     });
 

@@ -236,13 +236,13 @@ function AdminGuidesContent() {
 
             <Card className="space-y-3">
               <CardHeader
-                title="2. Quản lý lịch dạy và đổi ca"
+                title="2. Quản lý lịch dạy"
                 icon={<CalendarDays size={18} />}
               />
               <ul className="text-[13px] text-muted-foreground space-y-2 list-disc pl-4 leading-relaxed">
                 <li>Xem lịch dạy cá nhân theo tuần hoặc theo tháng.</li>
-                <li>Khi có việc bận, gửi yêu cầu đổi ca hoặc báo dạy bù trước tối thiểu 24 giờ.</li>
-                <li>Quản trị viên duyệt đơn và hệ thống sẽ gửi thông báo đến các học sinh bị ảnh hưởng.</li>
+                <li>Chấm công theo ca trước khi vào lớp để hệ thống ghi nhận thù lao.</li>
+                <li>Khi có việc bận, báo trước cho quản trị viên để sắp xếp dạy bù.</li>
               </ul>
             </Card>
 
@@ -313,13 +313,14 @@ function AdminGuidesContent() {
 
             <Card className="space-y-3">
               <CardHeader
-                title="4. Gửi đơn xin nghỉ và xin đổi ca"
+                title="4. Gửi đơn xin nghỉ học"
                 icon={<FileText size={18} />}
               />
               <ul className="text-[13px] text-muted-foreground space-y-2 list-disc pl-4 leading-relaxed">
                 <li>Khi bận việc đột xuất, gửi đơn xin nghỉ trực tiếp trên cổng học sinh.</li>
                 <li>Chọn ngày nghỉ, ca học và nhập lý do ngắn gọn.</li>
                 <li>Nhận kết quả phản hồi của giáo viên ngay trên màn hình thông báo.</li>
+                <li>Muốn học ca khác thì vào mục <strong>Lớp của tôi</strong> để đổi ca ngay, không cần chờ duyệt.</li>
               </ul>
             </Card>
           </div>
@@ -338,4 +339,3 @@ export default function AdminGuidesPage() {
     </RoleGuard>
   );
 }
-

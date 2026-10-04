@@ -30,9 +30,9 @@ import {
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState({
-    totalStudents: 400,
-    totalTeachers: 20,
-    totalClasses: 30,
+    totalStudents: 0,
+    totalTeachers: 0,
+    totalClasses: 0,
     totalRevenue: 0,
     totalPayroll: 0,
     outstandingDebt: 0,
@@ -77,10 +77,13 @@ export default function AdminDashboardPage() {
           }
         };
 
-        const [tuitionData, logsData, slotsData] = await Promise.all([
+        const [tuitionData, logsData, slotsData, studentsData, teachersData, classesData] = await Promise.all([
           fetchSafe('/api/finance'),
           fetchSafe('/api/audit'),
           fetchSafe(`/api/schedule?date=${getTodayDateStr()}`),
+          fetchSafe('/api/students?limit=1'),
+          fetchSafe('/api/teachers'),
+          fetchSafe('/api/classes'),
         ]);
 
         let totalRevenue = 0;
@@ -93,9 +96,9 @@ export default function AdminDashboardPage() {
         }
 
         setStats({
-          totalStudents: 400,
-          totalTeachers: 20,
-          totalClasses: 30,
+          totalStudents: studentsData.total ?? (studentsData.students?.length || 0),
+          totalTeachers: teachersData.teachers?.length || 0,
+          totalClasses: classesData.classes?.length || 0,
           totalRevenue,
           totalPayroll: 0,
           outstandingDebt,
@@ -384,4 +387,3 @@ export default function AdminDashboardPage() {
     </RoleGuard>
   );
 }
-

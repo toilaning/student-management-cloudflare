@@ -9,6 +9,8 @@ export const dynamic = 'force-dynamic';
 const ON_TIME_WINDOW_MINUTES = 15;
 /** Mở chấm công sớm trước giờ vào ca. */
 const EARLY_OPEN_MINUTES = 30;
+/** Cho phép kết ca muộn hơn giờ kết thúc để giáo viên kịp chốt ca. */
+const CHECKOUT_GRACE_MINUTES = 60;
 
 /** Kiểm tra chuỗi giờ hợp lệ theo định dạng HH:mm (00:00 - 23:59). */
 function isValidHHmm(value: string): boolean {
@@ -105,7 +107,8 @@ export async function POST(request: Request) {
       }
       slot.checkinMethod = 'ADMIN';
       slot.checkinNote = (body.note || '').trim() || undefined;
-      if (checkinTime && !slot.checkoutTime && slot.status === 'Đã lên lịch') {
+      // Ca chỉ được coi là hoàn thành khi đã có đủ giờ vào và giờ ra.
+      if (checkinTime && checkoutTime && slot.status === 'Đã lên lịch') {
         slot.status = 'Đã hoàn thành';
       }
 
@@ -155,16 +158,40 @@ export async function POST(request: Request) {
     const startMins = timeToMinutes(slot.startTime);
     const endMins = timeToMinutes(slot.endTime);
     const isOvernight = startMins > endMins;
-    const inShift = isOvernight
+    const endMinsWithGrace = endMins + CHECKOUT_GRACE_MINUTES;
+
+    // Vào ca: chỉ mở trong khoảng ca học (sớm tối đa EARLY_OPEN_MINUTES).
+    const inCheckinWindow = isOvernight
       ? nowMins >= startMins - EARLY_OPEN_MINUTES || nowMins <= endMins
       : nowMins >= startMins - EARLY_OPEN_MINUTES && nowMins <= endMins;
 
-    if (!inShift) {
+    // Kết ca: cho phép muộn hơn giờ kết thúc tối đa CHECKOUT_GRACE_MINUTES để giáo viên kịp chốt ca.
+    const inCheckoutWindow = isOvernight
+      ? nowMins >= startMins || nowMins <= endMinsWithGrace
+      : nowMins >= startMins - EARLY_OPEN_MINUTES && nowMins <= endMinsWithGrace;
+
+    if (action === 'CHECKIN' && !inCheckinWindow) {
       return NextResponse.json(
         {
           success: false,
           error:
             'Chưa tới giờ chấm công. Ca học ' +
+            slot.startTime +
+            ' - ' +
+            slot.endTime +
+            ', hiện tại ' +
+            nowTimeStr,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (action === 'CHECKOUT' && !inCheckoutWindow) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Ca học đã kết thúc quá lâu, không thể kết ca. Ca học ' +
             slot.startTime +
             ' - ' +
             slot.endTime +

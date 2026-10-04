@@ -39,7 +39,7 @@ export const NAV_GROUPS: Record<Role, NavGroup[]> = {
       items: [
         { label: 'Lịch học trung tâm', href: '/admin/calendar', icon: CalendarDays },
         { label: 'Điểm danh', href: '/admin/attendance', icon: UserCheck },
-        { label: 'Đơn từ & đổi ca', href: '/admin/requests', icon: Inbox },
+        { label: 'Đơn từ', href: '/admin/requests', icon: Inbox },
       ],
     },
     {
