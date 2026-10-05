@@ -196,7 +196,7 @@ export default function TeacherClassesPage() {
           </div>
           {st.homeTown && <div>Quê quán: {st.homeTown}</div>}
           {st.otherNotes && (
-            <div className="text-[11px] text-warning bg-warning-soft px-1.5 py-0.5 rounded-field inline-block">
+            <div className="text-[11px] text-foreground bg-warning-soft px-1.5 py-0.5 rounded-field inline-block">
               {st.otherNotes}
             </div>
           )}

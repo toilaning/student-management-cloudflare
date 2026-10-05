@@ -616,7 +616,7 @@ export default function AdminRequestsPage() {
                         className={cn(
                           'p-3 rounded-field text-xs font-semibold border transition text-center cursor-pointer',
                           decisionAction === 'ĐÃ_DUYỆT'
-                            ? 'bg-success-soft text-success border-success'
+                            ? 'bg-success-soft text-foreground border-success'
                             : 'bg-card text-muted-foreground border-line hover:text-foreground'
                         )}
                       >
@@ -633,7 +633,7 @@ export default function AdminRequestsPage() {
                         className={cn(
                           'p-3 rounded-field text-xs font-semibold border transition text-center cursor-pointer',
                           decisionAction === 'TỪ_CHỐI'
-                            ? 'bg-danger-soft text-danger border-danger'
+                            ? 'bg-danger-soft text-foreground border-danger'
                             : 'bg-card text-muted-foreground border-line hover:text-foreground'
                         )}
                       >

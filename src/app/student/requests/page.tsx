@@ -382,7 +382,7 @@ export default function StudentRequestsPage() {
                     ))}
                   </Select>
                 ) : (
-                  <div className="p-3 bg-warning-soft rounded-field border border-warning/30 text-warning text-xs">
+                  <div className="p-3 bg-warning-soft rounded-field border border-warning/30 text-foreground text-xs">
                     Lớp này hiện chưa có lịch học nào được sắp xếp.
                   </div>
                 )}

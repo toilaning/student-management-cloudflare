@@ -51,10 +51,10 @@ export const StatCard: React.FC<{
 }> = ({ label, value, hint, icon, tone = 'primary', className }) => {
   const tones: Record<string, string> = {
     primary: 'bg-primary-soft text-primary-ink',
-    success: 'bg-success-soft text-success',
-    warning: 'bg-warning-soft text-warning',
-    danger: 'bg-danger-soft text-danger',
-    info: 'bg-info-soft text-info',
+    success: 'bg-success-soft text-foreground',
+    warning: 'bg-warning-soft text-foreground',
+    danger: 'bg-danger-soft text-foreground',
+    info: 'bg-info-soft text-foreground',
   };
   return (
     <Card className={cn('flex items-center gap-4', className)}>

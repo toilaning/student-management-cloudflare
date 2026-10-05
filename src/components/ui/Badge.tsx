@@ -5,13 +5,26 @@ import type { TuitionStatus } from '@/types/finance';
 
 type Tone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger' | 'info';
 
+/*
+  Chữ trong nhãn luôn dùng màu mực đậm để đọc rõ trên nền pastel.
+  Màu trạng thái được giữ ở phần nền và ở chấm tròn phía trước.
+*/
 const tones: Record<Tone, string> = {
-  neutral: 'bg-muted text-muted-foreground',
-  primary: 'bg-primary-soft text-primary-ink',
-  success: 'bg-success-soft text-success',
-  warning: 'bg-warning-soft text-warning',
-  danger: 'bg-danger-soft text-danger',
-  info: 'bg-info-soft text-info',
+  neutral: 'bg-muted text-foreground',
+  primary: 'bg-primary-soft text-foreground',
+  success: 'bg-success-soft text-foreground',
+  warning: 'bg-warning-soft text-foreground',
+  danger: 'bg-danger-soft text-foreground',
+  info: 'bg-info-soft text-foreground',
+};
+
+const dotTones: Record<Tone, string> = {
+  neutral: 'bg-muted-foreground',
+  primary: 'bg-primary',
+  success: 'bg-success',
+  warning: 'bg-warning',
+  danger: 'bg-danger',
+  info: 'bg-info',
 };
 
 export const Badge: React.FC<{
@@ -27,7 +40,7 @@ export const Badge: React.FC<{
       className
     )}
   >
-    {dot && <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />}
+    {dot && <span className={cn('w-1.5 h-1.5 rounded-full', dotTones[tone])} />}
     {children}
   </span>
 );
