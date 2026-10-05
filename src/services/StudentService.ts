@@ -72,9 +72,7 @@ export class StudentService {
       createdAt: new Date().toISOString(),
     };
 
-    await this.repo.createStudent(newStudent);
-
-    // Tạo tài khoản User cho học sinh
+    // Bảng students có khoá ngoại trỏ sang users, nên phải tạo tài khoản trước.
     const authService = new AuthService(this.repo);
     const existingUser = await this.repo.getUserById(studentId);
     if (!existingUser) {
@@ -88,6 +86,8 @@ export class StudentService {
         isActive: true,
       });
     }
+
+    await this.repo.createStudent(newStudent);
 
     await this.repo.addAuditLog({
       action: 'CREATE',

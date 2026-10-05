@@ -81,9 +81,8 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
     };
 
-    await repo.createTeacher(newTeacher);
-
-    // Tạo tài khoản đăng nhập cho giảng viên mới (mật khẩu mặc định 123456).
+    // Bảng teachers có khoá ngoại trỏ sang users, nên tạo tài khoản đăng nhập trước.
+    // Mật khẩu mặc định 123456.
     const defaultPassword = '123456';
     const teacherEmail = newTeacher.email || `${newId.toLowerCase()}@edu.vn`;
     try {
@@ -100,9 +99,14 @@ export async function POST(request: Request) {
           isActive: true,
         });
       }
-    } catch (userErr) {
-      console.warn('[CREATE-TEACHER] Không tạo được tài khoản đăng nhập:', userErr);
+    } catch (userErr: any) {
+      return NextResponse.json(
+        { error: `Không tạo được tài khoản đăng nhập cho ${newId}: ${userErr?.message || userErr}` },
+        { status: 500 }
+      );
     }
+
+    await repo.createTeacher(newTeacher);
 
     await repo.addAuditLog({
       action: 'CREATE',
