@@ -30,11 +30,11 @@ Biến môi trường chính:
 
 ## Cơ sở dữ liệu
 
-- `supabase/schema.sql` — schema đầy đủ (bảng, index, trigger đồng bộ users/teachers/students). Chạy file này trên project Supabase mới.
-- `supabase/migrations/` — migration theo ngày.
-- `supabase/archive/` — SQL cũ đã gộp vào `schema.sql`, giữ làm lịch sử.
+- `supabase/setup.sql` — script duy nhất để dựng database. Mở Supabase Dashboard → SQL Editor → dán toàn bộ file → Run.
 
-Không có dữ liệu mẫu trong repo. Sau khi chạy `schema.sql`, tạo tài khoản quản trị đầu tiên bằng câu lệnh SQL hoặc qua Supabase Auth rồi thêm bản ghi vào bảng `users`.
+Script chạy được nhiều lần trên cùng một database: database trống thì tạo mới, database đang chạy thì chỉ bổ sung phần còn thiếu và không xoá dữ liệu. Nó tạo đủ bảng, ràng buộc, index, trigger đồng bộ users/teachers/students, bật RLS cho mọi bảng và nạp sẵn danh mục nền (ca làm việc, gói combo, phòng học).
+
+Không có dữ liệu mẫu trong repo. Sau khi chạy `setup.sql`, tạo tài khoản quản trị đầu tiên bằng câu lệnh SQL ở cuối file hoặc qua Supabase Auth rồi thêm bản ghi vào bảng `users`.
 
 ## Kiểm tra
 

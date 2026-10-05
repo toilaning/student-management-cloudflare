@@ -78,8 +78,7 @@ src/
 
 tests/                      # 19 test files (node:test)
 discord-bot/src/            # bot: api.js, commands/, events/, cron/, config.js
-scripts/new-migration.sh    # tạo file migration Supabase
-supabase/                   # schema.sql, migrations/ (SQL cũ đã dồn vào archive/)
+supabase/setup.sql          # script duy nhất dựng database Supabase (idempotent)
 docs/archive/               # 19 SPEC files cũ (đặc tả tính năng, giữ làm lịch sử)
 ```
 
@@ -156,7 +155,7 @@ users/                 route.ts
 | Truy vấn DB X | `src/repositories/SupabaseRepository.ts` (+ `IRepository.ts`) |
 | Kiểu dữ liệu X | `src/types/X.ts` |
 | UI component X | `src/components/<domain>/...` |
-| Schema/migration | `supabase/schema.sql`, `supabase/migrations/*.sql` |
+| Schema database | `supabase/setup.sql` |
 | Đặc tả tính năng cũ | `docs/archive/*_SPEC.md` |
 | Test tính năng X | `tests/*X*.test.ts` |
 | Discord bot | `discord-bot/src/...` |
