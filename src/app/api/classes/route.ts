@@ -340,6 +340,12 @@ export async function POST(request: Request) {
 
     await repo.createClass(newClass);
 
+    // Database thiếu cột sĩ số thì lớp vẫn tạo được, nhưng sĩ số đã nhập không
+    // lưu lại. Trả cờ để giao diện nhắc admin chạy setup.sql.
+    const capacitySaved = repo.supportsClassCapacity
+      ? await repo.supportsClassCapacity()
+      : true;
+
     // Cập nhật assignedClassIds của giảng viên
     const teacher = await repo.getTeacherById(teacherId);
     if (teacher) {
@@ -388,10 +394,11 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       class: newClass,
+      capacitySaved,
       bulkScheduleResult,
       message: `Tạo lớp ${newClass.name} (${newId}) thành công!${
         bulkScheduleResult ? ` Đã tự động sinh ${bulkScheduleResult.summary.createdCount} ca học (${newClass.startTime} - ${newClass.endTime}) cho các ngày tới.` : ''
-      }`,
+      }${capacitySaved ? '' : ' Lưu ý: database chưa có cột sĩ số nên giới hạn sĩ số chưa lưu được.'}`,
     });
   } catch (error: any) {
     const raw = String(error?.message || '');

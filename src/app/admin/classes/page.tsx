@@ -187,7 +187,13 @@ export default function AdminClassesPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success(data.message || 'Tạo lớp học mới thành công');
+        if (data.capacitySaved === false) {
+          toast.info(
+            'Đã tạo lớp, nhưng database chưa có cột sĩ số nên giới hạn sĩ số chưa lưu được. Chạy supabase/setup.sql trong Supabase SQL Editor rồi đặt lại sĩ số.'
+          );
+        } else {
+          toast.success(data.message || 'Tạo lớp học mới thành công');
+        }
         setShowAddClassModal(false);
         setNewClassFormData({
           name: '',
@@ -865,6 +871,12 @@ export default function AdminClassesPage() {
           }
         >
           <form onSubmit={handleCreateClass} className="space-y-4">
+            {!capacitySupported && (
+              <div className="p-3 bg-warning-soft border border-warning/30 rounded-card text-xs text-foreground leading-relaxed">
+                Database chưa có cột sĩ số nên ô “Sĩ số tối đa” bên dưới sẽ không lưu được. Mở Supabase Dashboard → SQL Editor,
+                chạy file <span className="font-mono font-semibold">supabase/setup.sql</span> rồi tạo lớp lại.
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Tên lớp học" required>
                 <Input
