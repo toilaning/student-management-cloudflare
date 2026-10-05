@@ -317,6 +317,11 @@ alter table public.students
     add column if not exists absent_sessions_in_month  integer default 0,
     add column if not exists remaining_sessions        integer default 12;
 
+-- Đơn giá mỗi ca dạy của giáo viên (dùng để tính lương theo ca).
+-- Trang nhân sự cho nhập và lưu giá trị này, nên bảng phải có cột tương ứng.
+alter table public.teachers
+    add column if not exists rate_per_session numeric(12,2) default 0;
+
 alter table public.classes
     add column if not exists start_time   varchar(10) default '18:30',
     add column if not exists end_time     varchar(10) default '20:30',

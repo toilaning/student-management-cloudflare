@@ -8,6 +8,7 @@ import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
 import { TIME_SHIFTS, TimeShift } from '@/types/schedule';
 import { timeToMinutes, formatTimeHM } from '@/utils/date';
+import { getClassTimeRange } from '@/utils/schedule';
 import {
   minuteToPercent,
   buildTimelineTicks,
@@ -125,6 +126,8 @@ export default function AdminClassesPage() {
   const [editingCapacityClass, setEditingCapacityClass] = useState<ClassEntity | null>(null);
   const [savingCapacity, setSavingCapacity] = useState(false);
   const [capacityInput, setCapacityInput] = useState(15);
+  // Database có cột sĩ số hay chưa; chưa có thì cảnh báo thay vì lưu hụt.
+  const [capacitySupported, setCapacitySupported] = useState(true);
 
   // Sheet xác nhận xoá lớp
   const [classToDelete, setClassToDelete] = useState<ClassEntity | null>(null);
@@ -146,6 +149,9 @@ export default function AdminClassesPage() {
       const clsData = await clsRes.json();
       const tcData = await tcRes.json();
       setClasses(clsData.classes || []);
+      if (typeof clsData.capacitySupported === 'boolean') {
+        setCapacitySupported(clsData.capacitySupported);
+      }
       setTeachers(tcData.teachers || []);
       try {
         const shiftData = await shiftRes.json();
@@ -471,9 +477,34 @@ export default function AdminClassesPage() {
     setNewClassFormData({ ...newClassFormData, scheduleDays: updated });
   };
 
-  /** Áp một ca mẫu (Ca 1..Ca 5) vào khung giờ của lớp. */
-  const applyShiftPreset = (startTime: string, endTime: string) => {
-    setNewClassFormData({ ...newClassFormData, startTime, endTime });
+  /**
+   * Áp một ca mẫu vào lớp: ghi cả khung giờ lẫn shiftId, để lớp luôn nhất quán
+   * (trước đây chỉ ghi giờ, khiến lớp mang ca mặc định lệch hẳn với giờ đang dạy).
+   */
+  const applyShiftPreset = (shift: TimeShift) => {
+    setNewClassFormData({
+      ...newClassFormData,
+      shiftId: shift.id,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+    });
+  };
+
+  /**
+   * Đổi khung giờ thủ công. Nếu khung giờ trùng một ca mẫu thì cập nhật luôn
+   * shiftId để lớp không còn mang ca lệch với giờ đang dạy; giờ lẻ thì giữ
+   * nguyên ca hiện tại và chỉ dùng khung giờ làm nguồn chính khi hiển thị.
+   */
+  const setCustomTime = (patch: { startTime?: string; endTime?: string }) => {
+    const startTime = patch.startTime ?? newClassFormData.startTime;
+    const endTime = patch.endTime ?? newClassFormData.endTime;
+    const matched = shifts.find((s) => s.startTime === startTime && s.endTime === endTime);
+    setNewClassFormData({
+      ...newClassFormData,
+      startTime,
+      endTime,
+      shiftId: matched ? matched.id : newClassFormData.shiftId,
+    });
   };
 
   /** Mở bảng chỉnh danh sách ca học của trung tâm. */
@@ -595,8 +626,8 @@ export default function AdminClassesPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {paginatedClasses.map((cls) => {
-                const classStartTime = cls.startTime || '18:30';
-                const classEndTime = cls.endTime || '20:30';
+                // Giờ riêng của lớp là nguồn chính; ca mẫu chỉ dùng khi lớp chưa đặt giờ.
+                const { startTime: classStartTime, endTime: classEndTime } = getClassTimeRange(cls, shifts);
                 const isRecurringClass = cls.isRecurring !== false;
 
                 return (
@@ -763,8 +794,9 @@ export default function AdminClassesPage() {
                           const later = new Date(now);
                           later.setMonth(later.getMonth() + 3);
                           setQuickScheduleEndDate(later.toISOString().split('T')[0]);
-                          setQuickScheduleStartTime(cls.startTime || '18:30');
-                          setQuickScheduleEndTime(cls.endTime || '20:30');
+                          const clsTime = getClassTimeRange(cls, shifts);
+                          setQuickScheduleStartTime(clsTime.startTime || '18:30');
+                          setQuickScheduleEndTime(clsTime.endTime || '20:30');
                           setQuickScheduleDays(
                             cls.scheduleDays && cls.scheduleDays.length > 0 ? cls.scheduleDays : [2, 4, 6]
                           );
@@ -904,14 +936,16 @@ export default function AdminClassesPage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {shifts.map((shift) => {
+                    // Ưu tiên shiftId để nhận đúng ca đã chọn; lớp cũ chỉ có giờ thì so theo giờ.
                     const isActive =
-                      newClassFormData.startTime === shift.startTime &&
-                      newClassFormData.endTime === shift.endTime;
+                      Number(newClassFormData.shiftId) === shift.id ||
+                      (newClassFormData.startTime === shift.startTime &&
+                        newClassFormData.endTime === shift.endTime);
                     return (
                       <button
                         type="button"
                         key={shift.id}
-                        onClick={() => applyShiftPreset(shift.startTime, shift.endTime)}
+                        onClick={() => applyShiftPreset(shift)}
                         className={
                           'h-10 px-3.5 rounded-pill text-[12px] font-semibold border transition cursor-pointer tabular ' +
                           (isActive
@@ -933,7 +967,7 @@ export default function AdminClassesPage() {
                     type="time"
                     required
                     value={newClassFormData.startTime}
-                    onChange={(e) => setNewClassFormData({ ...newClassFormData, startTime: e.target.value })}
+                    onChange={(e) => setCustomTime({ startTime: e.target.value })}
                     className="font-mono font-bold"
                   />
                 </Field>
@@ -942,7 +976,7 @@ export default function AdminClassesPage() {
                     type="time"
                     required
                     value={newClassFormData.endTime}
-                    onChange={(e) => setNewClassFormData({ ...newClassFormData, endTime: e.target.value })}
+                    onChange={(e) => setCustomTime({ endTime: e.target.value })}
                     className="font-mono font-bold"
                   />
                 </Field>
@@ -1186,6 +1220,12 @@ export default function AdminClassesPage() {
           }
         >
           <form onSubmit={handleSaveCapacity} className="space-y-4">
+            {!capacitySupported && (
+              <div className="p-3 bg-warning-soft border border-warning/30 rounded-card text-xs text-foreground leading-relaxed">
+                Database chưa có cột sĩ số nên thay đổi này chưa lưu được. Mở Supabase Dashboard → SQL Editor, chạy file{' '}
+                <span className="font-mono font-semibold">supabase/setup.sql</span> rồi quay lại lưu.
+              </div>
+            )}
             <div className="bg-muted p-3 rounded-card border border-line text-xs space-y-1">
               <div className="text-muted-foreground">Hiện tại:</div>
               <div className="font-bold text-foreground font-mono">

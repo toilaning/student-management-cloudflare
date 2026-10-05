@@ -557,7 +557,9 @@ export default function AdminCalendarPage() {
                 >
                   <option value="ALL">Tất cả ca</option>
                   {shifts.map(s => (
-                    <option key={s.id} value={String(s.id)}>Ca {s.id}</option>
+                    <option key={s.id} value={String(s.id)}>
+                      {s.name || `Ca ${s.id} (${formatTimeHM(s.startTime)} - ${formatTimeHM(s.endTime)})`}
+                    </option>
                   ))}
                 </Select>
               </div>
@@ -1062,4 +1064,3 @@ export default function AdminCalendarPage() {
     </RoleGuard>
   );
 }
-

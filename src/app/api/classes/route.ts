@@ -24,7 +24,13 @@ export async function GET(request: Request) {
     classes = classes.filter(c => c.studentIds.includes(studentId));
   }
 
-  return NextResponse.json({ classes });
+  // Cho giao diện biết database có lưu được sĩ số tối đa hay không, để báo rõ
+  // thay vì hiện giới hạn 15 như một con số thật khi cột còn thiếu.
+  const capacitySupported = repo.supportsClassCapacity
+    ? await repo.supportsClassCapacity()
+    : true;
+
+  return NextResponse.json({ classes, capacitySupported });
 }
 
 export async function PUT(request: Request) {
@@ -119,6 +125,21 @@ export async function PUT(request: Request) {
 
     if (meetingLink !== undefined) {
       cls.meetingLink = meetingLink;
+    }
+
+    // Database cũ chưa có cột max_students thì không lưu được sĩ số.
+    // Báo thẳng cho admin biết thay vì báo thành công trong khi dữ liệu không đổi.
+    if (maxStudents !== undefined && repo.supportsClassCapacity) {
+      const supported = await repo.supportsClassCapacity();
+      if (!supported) {
+        return NextResponse.json(
+          {
+            error:
+              'Database chưa có cột sĩ số (classes.max_students). Chạy file supabase/setup.sql trong Supabase Dashboard → SQL Editor để bật giới hạn sĩ số.',
+          },
+          { status: 409 }
+        );
+      }
     }
 
     await repo.updateClass(cls);
@@ -267,6 +288,14 @@ export async function POST(request: Request) {
     const parsedEndTime = (endTime || '20:30').trim();
     const parsedIsRecurring = isRecurring !== undefined ? Boolean(isRecurring) : true;
 
+    // Nếu khung giờ gửi lên khớp đúng một ca mẫu thì dùng ca đó; lớp dùng giờ
+    // riêng vẫn giữ shift_id để lọc theo ca, nhưng giao diện luôn ưu tiên giờ thật.
+    const shifts = await ShiftService.getAllShifts();
+    const matchedShift = shifts.find(
+      (s) => s.startTime === parsedStartTime && s.endTime === parsedEndTime
+    );
+    const resolvedShiftId = matchedShift ? matchedShift.id : Number(shiftId) || 1;
+
     const allClasses = await repo.getAllClasses();
     const maxNum = allClasses.reduce((max, c) => {
       const match = String(c.id || '').match(/^CLS(\d+)$/i);
@@ -296,7 +325,7 @@ export async function POST(request: Request) {
       subject: subject.trim(),
       teacherId,
       roomId,
-      shiftId: Number(shiftId) || 1,
+      shiftId: resolvedShiftId,
       startTime: parsedStartTime,
       endTime: parsedEndTime,
       scheduleDays: Array.isArray(scheduleDays) ? scheduleDays.map(Number) : [2, 4, 6],

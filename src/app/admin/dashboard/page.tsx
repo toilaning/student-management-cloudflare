@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getTodayDateStr } from '@/utils/date';
+import { formatSlotBadgeLabel } from '@/utils/schedule';
 import { 
   Users, 
   GraduationCap, 
@@ -236,8 +237,8 @@ export default function AdminDashboardPage() {
                     {todaySlots.map(slot => (
                       <div key={slot.id} className="p-3.5 sm:p-4 hover:bg-muted/40 transition-colors flex items-center justify-between gap-3 text-[13px]">
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-9 h-9 rounded-field bg-primary-soft text-primary-ink flex items-center justify-center font-bold text-xs shrink-0 tabular">
-                            C{slot.shiftId}
+                          <div className="w-10 h-10 rounded-field bg-primary-soft text-primary-ink flex items-center justify-center font-bold shrink-0 tabular text-[10px] leading-tight text-center px-0.5">
+                            {formatSlotBadgeLabel(slot)}
                           </div>
                           <div className="min-w-0">
                             <p className="font-bold text-foreground truncate">

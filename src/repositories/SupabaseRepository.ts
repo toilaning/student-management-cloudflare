@@ -75,6 +75,11 @@ function mapTeacherFromDb(row: any): Teacher {
     phone: row.phone,
     specialty: row.specialty,
     hourlyRate: Number(row.hourly_rate),
+    // Đơn giá mỗi ca dạy (dùng để tính lương). Trước đây bị bỏ sót khi đọc
+    // nên mọi thay đổi đơn giá trong trang nhân sự đều không lưu được.
+    ratePerSession: row.rate_per_session !== null && row.rate_per_session !== undefined
+      ? Number(row.rate_per_session)
+      : undefined,
     status: row.status,
     bio: row.bio || undefined,
     assignedClassIds,
@@ -90,6 +95,7 @@ function mapTeacherToDb(teacher: Teacher): any {
     phone: teacher.phone,
     specialty: teacher.specialty,
     hourly_rate: teacher.hourlyRate,
+    rate_per_session: teacher.ratePerSession ?? teacher.hourlyRate ?? null,
     status: teacher.status,
     bio: teacher.bio || null,
     updated_at: new Date().toISOString(),
@@ -181,8 +187,10 @@ function mapClassFromDb(row: any): ClassEntity {
     tuitionFee: Number(row.tuition_fee),
     scheduleDays: row.schedule_days || [],
     shiftId: row.shift_id ? Number(row.shift_id) : 1,
-    startTime: row.start_time || '18:30',
-    endTime: row.end_time || '20:30',
+    // Không tự gán giờ mặc định: lớp không có giờ riêng thì để trống,
+    // giao diện sẽ lấy giờ thật theo ca (shift_id) trong bảng time_shifts.
+    startTime: row.start_time ? String(row.start_time).substring(0, 5) : undefined,
+    endTime: row.end_time ? String(row.end_time).substring(0, 5) : undefined,
     isRecurring: row.is_recurring !== undefined ? Boolean(row.is_recurring) : true,
     meetingLink: row.meeting_link || undefined,
     status: row.status,
@@ -201,8 +209,8 @@ function mapClassToDb(cls: ClassEntity): any {
     tuition_fee: cls.tuitionFee,
     schedule_days: cls.scheduleDays,
     shift_id: cls.shiftId || 1,
-    start_time: cls.startTime || '18:30',
-    end_time: cls.endTime || '20:30',
+    start_time: cls.startTime || null,
+    end_time: cls.endTime || null,
     is_recurring: cls.isRecurring !== undefined ? cls.isRecurring : true,
     meeting_link: cls.meetingLink || null,
     status: cls.status,
@@ -517,6 +525,20 @@ export class SupabaseRepository implements IRepository {
       this.client = getSupabaseAdminClient();
     }
     return this.client;
+  }
+
+  // Database cũ chưa chạy supabase/setup.sql sẽ thiếu cột classes.max_students.
+  // Khi đó giới hạn sĩ số không ghi được, nên giao diện cần biết để báo cho admin
+  // thay vì báo "đã lưu" trong khi thực tế không có gì thay đổi. Kết quả được nhớ lại.
+  private classCapacitySupported: boolean | null = null;
+
+  public async supportsClassCapacity(): Promise<boolean> {
+    if (this.classCapacitySupported !== null) return this.classCapacitySupported;
+    const client = this.getClient();
+    if (!client) return false;
+    const { error } = await client.from('classes').select('max_students').limit(1);
+    this.classCapacitySupported = !error;
+    return this.classCapacitySupported;
   }
 
   // --------------------------------------------------------------------------

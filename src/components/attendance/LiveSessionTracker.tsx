@@ -11,6 +11,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
+import { formatSlotTimeLabel } from '@/utils/schedule';
 
 interface StudentAttendanceDetail {
   id: string;
@@ -180,7 +181,7 @@ export function LiveSessionTracker({
           </span>
           <Badge tone="success" dot>Đang diễn ra</Badge>
           <span className="text-xs font-semibold text-muted-foreground">
-            Ca {slot.shiftId} ({slot.startTime} - {slot.endTime})
+            {formatSlotTimeLabel(slot)}
           </span>
         </div>
 

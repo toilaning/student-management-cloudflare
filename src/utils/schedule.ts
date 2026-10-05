@@ -75,3 +75,31 @@ export function formatSlotShortLabel(
   if (matchedShift) return `Ca ${matchedShift.id}`;
   return startTime && endTime ? `${startTime} – ${endTime}` : startTime || endTime || 'Chưa đặt giờ';
 }
+
+/**
+ * Nhãn cực ngắn cho ô vuông nhỏ trên bảng: "Ca 3" khi giờ khớp ca mẫu,
+ * ngược lại chỉ hiện giờ bắt đầu ("14:30") để vừa ô.
+ */
+export function formatSlotBadgeLabel(
+  slot: Pick<ScheduleSlot, 'startTime' | 'endTime' | 'shiftId'>,
+  shifts: TimeShift[] = TIME_SHIFTS,
+): string {
+  const matchedShift = findShiftByTime(slot.startTime, slot.endTime, shifts);
+  if (matchedShift) return `Ca ${matchedShift.id}`;
+  return toHHMM(slot.startTime) || '—';
+}
+
+/**
+ * Khung giờ thực tế của một buổi học. Giờ của buổi là nguồn chính; chỉ khi
+ * buổi chưa có giờ mới lấy tạm giờ của ca mẫu để giao diện không trống.
+ */
+export function getSlotTimeRange(
+  slot: Pick<ScheduleSlot, 'startTime' | 'endTime' | 'shiftId'>,
+  shifts: TimeShift[] = TIME_SHIFTS,
+): { startTime: string; endTime: string } {
+  const shift = shifts.find((s) => s.id === Number(slot.shiftId)) || null;
+  return {
+    startTime: toHHMM(slot.startTime) || toHHMM(shift?.startTime),
+    endTime: toHHMM(slot.endTime) || toHHMM(shift?.endTime),
+  };
+}

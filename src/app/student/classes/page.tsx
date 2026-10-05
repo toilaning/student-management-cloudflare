@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/Toast';
 import { ClassEntity } from '@/types/classroom';
 import { TimeShift, TIME_SHIFTS } from '@/types/schedule';
+import { getClassTimeRange } from '@/utils/schedule';
 import { cn } from '@/lib/cn';
 import {
   BookOpen,
@@ -319,10 +320,8 @@ export default function StudentClassesPage() {
                 const currentStudents = cls.studentIds?.length || 0;
                 const isFull = currentStudents >= maxCapacity;
 
-                const shiftInfo = shiftMap.get(cls.shiftId ?? 1);
-                // Lớp có khung giờ riêng; chỉ dùng giờ của ca mẫu khi lớp chưa đặt giờ.
-                const startTime = cls.startTime || shiftInfo?.startTime || '08:00';
-                const endTime = cls.endTime || shiftInfo?.endTime || '10:00';
+                // Giờ riêng của lớp là nguồn chính; ca mẫu chỉ dùng khi lớp chưa đặt giờ.
+                const { startTime, endTime } = getClassTimeRange(cls, shifts);
                 const shiftTime = `${startTime} – ${endTime}`;
 
                 let badge = null;
