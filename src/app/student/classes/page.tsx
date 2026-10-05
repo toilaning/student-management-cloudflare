@@ -280,10 +280,6 @@ export default function StudentClassesPage() {
               </Badge>
               <span className="text-[12px]">Đang theo học</span>
             </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Badge tone="info">Đủ sĩ số</Badge>
-              <span className="text-[12px]">Hết chỗ</span>
-            </span>
           </div>
 
           {/* Danh sách lớp học */}
@@ -316,9 +312,7 @@ export default function StudentClassesPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
               {filtered.map((cls) => {
                 const isEnrolled = student?.enrolledClassIds?.includes(cls.id);
-                const maxCapacity = cls.maxStudents || 15;
                 const currentStudents = cls.studentIds?.length || 0;
-                const isFull = currentStudents >= maxCapacity;
 
                 // Giờ riêng của lớp là nguồn chính; ca mẫu chỉ dùng khi lớp chưa đặt giờ.
                 const { startTime, endTime } = getClassTimeRange(cls, shifts);
@@ -331,12 +325,10 @@ export default function StudentClassesPage() {
                       Ca của bạn
                     </Badge>
                   );
-                } else if (isFull) {
-                  badge = <Badge tone="info">Đủ sĩ số</Badge>;
                 } else {
                   badge = (
                     <Badge tone="success" dot>
-                      Còn chỗ ({maxCapacity - currentStudents})
+                      Còn chỗ
                     </Badge>
                   );
                 }
@@ -420,7 +412,7 @@ export default function StudentClassesPage() {
                             <Users size={14} className="text-primary shrink-0" /> Sĩ số:
                           </span>
                           <span className="font-semibold text-foreground tabular">
-                            {currentStudents}/{maxCapacity} học viên
+                            {currentStudents} học viên
                           </span>
                         </div>
                       </div>
@@ -517,10 +509,6 @@ export default function StudentClassesPage() {
                             Đổi ca
                           </Button>
                         </div>
-                      ) : isFull ? (
-                        <Button variant="secondary" size="md" fullWidth disabled>
-                          Hết chỗ
-                        </Button>
                       ) : (
                         <Button
                           variant="primary"

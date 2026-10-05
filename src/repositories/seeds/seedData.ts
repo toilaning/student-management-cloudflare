@@ -173,7 +173,7 @@ export function generateSeedData() {
     const mon = MON_HOC[idx % MON_HOC.length];
     const code = `${mon.code}${101 + idx}`;
 
-    // Gán 12 - 14 học sinh vào mỗi lớp, luôn dưới trần sĩ số 15 để còn chỗ cho luồng ghi danh.
+    // Gán 12 - 14 học sinh vào mỗi lớp.
     const startIdx = (idx * 13) % (students.length - 20);
     const classStudentIds: string[] = [];
     const classSize = 12 + (idx % 3);
@@ -195,7 +195,6 @@ export function generateSeedData() {
       teacherId: teacher.id,
       roomId: room.id,
       studentIds: classStudentIds,
-      maxStudents: 15,
       tuitionFee: mon.fee,
       meetingLink: `https://meet.google.com/room-${classId.toLowerCase()}`,
       scheduleDays: days,

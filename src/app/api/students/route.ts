@@ -198,28 +198,11 @@ export async function POST(request: Request) {
 
     // Gán học sinh vào các lớp nếu có chọn
     if (enrolledClassIds && Array.isArray(enrolledClassIds) && enrolledClassIds.length > 0) {
-      // Chặn ngay lúc tạo hồ sơ nếu lớp đã đủ sĩ số, để không lách qua đường này.
-      const fullClasses: string[] = [];
       for (const classId of enrolledClassIds) {
         const cls = await repo.getClassById(classId);
         if (!cls || cls.studentIds.includes(student.id)) continue;
-        const capacity = cls.maxStudents || 15;
-        if (cls.studentIds.length >= capacity) {
-          fullClasses.push(`${cls.name} (${cls.studentIds.length}/${capacity})`);
-          continue;
-        }
         cls.studentIds.push(student.id);
         await repo.updateClass(cls);
-      }
-      if (fullClasses.length > 0) {
-        return NextResponse.json(
-          {
-            error: `Đã tạo hồ sơ học sinh nhưng chưa xếp được vào lớp đã đủ sĩ số: ${fullClasses.join(', ')}. Vui lòng chọn lớp khác.`,
-            student,
-            defaultPassword: result.defaultPassword,
-          },
-          { status: 409 }
-        );
       }
       student.enrolledClassIds = enrolledClassIds;
     }

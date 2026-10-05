@@ -139,14 +139,6 @@ export async function POST(request: Request) {
         }, { status: 409 });
       }
 
-      // Chặn ghi danh khi lớp đã đủ sĩ số
-      const capacity = cls.maxStudents || 15;
-      if (!cls.studentIds.includes(studentId) && cls.studentIds.length >= capacity) {
-        return NextResponse.json({
-          error: `Lớp ${cls.name} đã đủ sĩ số (${cls.studentIds.length}/${capacity}). Vui lòng chọn ca khác.`,
-        }, { status: 409 });
-      }
-
       if (!cls.studentIds.includes(studentId)) {
         cls.studentIds.push(studentId);
         await repo.updateClass(cls);
@@ -183,7 +175,7 @@ export async function POST(request: Request) {
       });
       return NextResponse.json({ success: true, message: `Đã xoá học viên ${student.name} khỏi lớp ${cls.name}` });
     } else if (action === 'CHANGE_SHIFT') {
-      // Đổi ca trực tiếp phía học sinh: KHÔNG tạo request chờ duyệt, KHÔNG chặn sĩ số.
+      // Đổi ca trực tiếp phía học sinh: KHÔNG tạo request chờ duyệt.
       // Tìm lớp cùng môn (subject) đang chạy ca mục tiêu (targetShiftId), rồi chuyển học sinh sang lớp đó.
       if (targetShiftId === undefined || targetShiftId === null) {
         return NextResponse.json({ error: 'Thiếu thông tin ca mới (targetShiftId)' }, { status: 400 });
@@ -214,14 +206,6 @@ export async function POST(request: Request) {
       if (changeOverlap) {
         return NextResponse.json({
           error: `Ca học này trùng giờ với lớp ${changeOverlap.className} bạn đã đăng ký (${changeOverlap.dayName}, ${changeOverlap.startLabel}-${changeOverlap.endLabel}). Vui lòng chọn ca khác.`,
-        }, { status: 409 });
-      }
-
-      // Chặn đổi ca khi lớp đích đã đủ sĩ số
-      const targetCapacity = targetClass.maxStudents || 15;
-      if (!targetClass.studentIds.includes(studentId) && targetClass.studentIds.length >= targetCapacity) {
-        return NextResponse.json({
-          error: `Lớp ${targetClass.name} đã đủ sĩ số (${targetClass.studentIds.length}/${targetCapacity}). Vui lòng chọn ca khác.`,
         }, { status: 409 });
       }
 

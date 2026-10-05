@@ -50,8 +50,6 @@ export interface IRepository {
   updateClass(classEntity: ClassEntity): Promise<ClassEntity>;
   createClass(classEntity: ClassEntity): Promise<ClassEntity>;
   deleteClass(id: string): Promise<boolean>;
-  /** Database hiện tại có lưu được sĩ số tối đa của lớp (cột classes.max_students) hay không. */
-  supportsClassCapacity?(): Promise<boolean>;
 
   // Schedule
   getAllScheduleSlots(): Promise<ScheduleSlot[]>;

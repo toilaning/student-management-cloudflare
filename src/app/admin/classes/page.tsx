@@ -71,7 +71,6 @@ export default function AdminClassesPage() {
     startTime: '18:30',
     endTime: '20:30',
     scheduleDays: [2, 4, 6] as number[],
-    maxStudents: 15,
     isRecurring: true,
     tuitionFee: 1500000,
     meetingLink: '',
@@ -122,13 +121,6 @@ export default function AdminClassesPage() {
   const [savingMeetLink, setSavingMeetLink] = useState(false);
   const [meetLinkInput, setMeetLinkInput] = useState('');
 
-  // Sheet chỉnh sĩ số tối đa của lớp
-  const [editingCapacityClass, setEditingCapacityClass] = useState<ClassEntity | null>(null);
-  const [savingCapacity, setSavingCapacity] = useState(false);
-  const [capacityInput, setCapacityInput] = useState(15);
-  // Database có cột sĩ số hay chưa; chưa có thì cảnh báo thay vì lưu hụt.
-  const [capacitySupported, setCapacitySupported] = useState(true);
-
   // Sheet xác nhận xoá lớp
   const [classToDelete, setClassToDelete] = useState<ClassEntity | null>(null);
   const [isDeletingClass, setIsDeletingClass] = useState(false);
@@ -149,9 +141,6 @@ export default function AdminClassesPage() {
       const clsData = await clsRes.json();
       const tcData = await tcRes.json();
       setClasses(clsData.classes || []);
-      if (typeof clsData.capacitySupported === 'boolean') {
-        setCapacitySupported(clsData.capacitySupported);
-      }
       setTeachers(tcData.teachers || []);
       try {
         const shiftData = await shiftRes.json();
@@ -187,13 +176,7 @@ export default function AdminClassesPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        if (data.capacitySaved === false) {
-          toast.info(
-            'Đã tạo lớp, nhưng database chưa có cột sĩ số nên giới hạn sĩ số chưa lưu được. Chạy supabase/setup.sql trong Supabase SQL Editor rồi đặt lại sĩ số.'
-          );
-        } else {
-          toast.success(data.message || 'Tạo lớp học mới thành công');
-        }
+        toast.success(data.message || 'Tạo lớp học mới thành công');
         setShowAddClassModal(false);
         setNewClassFormData({
           name: '',
@@ -205,7 +188,6 @@ export default function AdminClassesPage() {
           startTime: '18:30',
           endTime: '20:30',
           scheduleDays: [2, 4, 6],
-          maxStudents: 15,
           isRecurring: true,
           tuitionFee: 1500000,
           meetingLink: '',
@@ -394,36 +376,6 @@ export default function AdminClassesPage() {
   teachers.forEach((t) => {
     teacherMap[t.id] = t.name;
   });
-
-  const handleSaveCapacity = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingCapacityClass) return;
-    setSavingCapacity(true);
-    try {
-      const res = await fetch('/api/classes', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          classId: editingCapacityClass.id,
-          maxStudents: capacityInput,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success(data.message || 'Đã cập nhật sĩ số tối đa');
-        setClasses((prev) =>
-          prev.map((c) => (c.id === editingCapacityClass.id ? { ...c, maxStudents: capacityInput } : c))
-        );
-        setEditingCapacityClass(null);
-      } else {
-        toast.error(data.error || 'Cập nhật sĩ số thất bại');
-      }
-    } catch (err: any) {
-      toast.error(err?.message || 'Lỗi mạng');
-    } finally {
-      setSavingCapacity(false);
-    }
-  };
 
   useEffect(() => {
     setCurrentPage(1);
@@ -725,22 +677,9 @@ export default function AdminClassesPage() {
                           <span className="flex items-center gap-1.5">
                             <Users size={13} /> Sĩ số:
                           </span>
-                          <div className="flex items-center gap-1">
-                            <span className="font-mono font-semibold text-foreground">
-                              {(cls.studentIds || []).length}/{cls.maxStudents || 15} học viên
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingCapacityClass(cls);
-                                setCapacityInput(cls.maxStudents || 15);
-                              }}
-                              className="text-subtle-foreground hover:text-foreground cursor-pointer p-0.5"
-                              title="Chỉnh sĩ số tối đa"
-                            >
-                              <Edit3 size={11} />
-                            </button>
-                          </div>
+                          <span className="font-mono font-semibold text-foreground">
+                            {(cls.studentIds || []).length} học viên
+                          </span>
                         </div>
 
                         <div className="flex items-center justify-between border-t border-line/60 pt-1.5">
@@ -871,12 +810,6 @@ export default function AdminClassesPage() {
           }
         >
           <form onSubmit={handleCreateClass} className="space-y-4">
-            {!capacitySupported && (
-              <div className="p-3 bg-warning-soft border border-warning/30 rounded-card text-xs text-foreground leading-relaxed">
-                Database chưa có cột sĩ số nên ô “Sĩ số tối đa” bên dưới sẽ không lưu được. Mở Supabase Dashboard → SQL Editor,
-                chạy file <span className="font-mono font-semibold">supabase/setup.sql</span> rồi tạo lớp lại.
-              </div>
-            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Tên lớp học" required>
                 <Input
@@ -993,24 +926,6 @@ export default function AdminClassesPage() {
                   />
                 </Field>
               </div>
-
-              {/* Sĩ số tối đa của lớp */}
-              <Field label="Sĩ số tối đa" hint="Số học viên tối đa của lớp" required>
-                <Input
-                  type="number"
-                  min={1}
-                  max={200}
-                  required
-                  value={newClassFormData.maxStudents}
-                  onChange={(e) =>
-                    setNewClassFormData({
-                      ...newClassFormData,
-                      maxStudents: Math.max(1, Number(e.target.value) || 1),
-                    })
-                  }
-                  className="font-mono font-bold"
-                />
-              </Field>
 
               {/* Thứ trong tuần */}
               <div className="space-y-1.5">
@@ -1206,63 +1121,6 @@ export default function AdminClassesPage() {
             <div className="p-3 bg-muted border border-line rounded-card text-xs text-muted-foreground leading-relaxed">
               Liên kết phòng học sẽ tự động hiển thị trên thời khóa biểu và giao diện vào lớp của học viên và giảng viên.
             </div>
-          </form>
-        </Sheet>
-
-        {/* Sheet Chỉnh Sĩ Số Tối Đa Của Lớp */}
-        <Sheet
-          isOpen={!!editingCapacityClass}
-          onClose={() => setEditingCapacityClass(null)}
-          title="Sĩ số tối đa của lớp"
-          description={
-            editingCapacityClass
-              ? 'Lớp: ' + editingCapacityClass.name + ' (' + editingCapacityClass.id + ')'
-              : undefined
-          }
-          size="sm"
-          footer={
-            <div className="flex items-center justify-end gap-2 w-full">
-              <Button variant="secondary" onClick={() => setEditingCapacityClass(null)}>
-                Hủy
-              </Button>
-              <Button variant="primary" loading={savingCapacity} onClick={handleSaveCapacity}>
-                Lưu sĩ số
-              </Button>
-            </div>
-          }
-        >
-          <form onSubmit={handleSaveCapacity} className="space-y-4">
-            {!capacitySupported && (
-              <div className="p-3 bg-warning-soft border border-warning/30 rounded-card text-xs text-foreground leading-relaxed">
-                Database chưa có cột sĩ số nên thay đổi này chưa lưu được. Mở Supabase Dashboard → SQL Editor, chạy file{' '}
-                <span className="font-mono font-semibold">supabase/setup.sql</span> rồi quay lại lưu.
-              </div>
-            )}
-            <div className="bg-muted p-3 rounded-card border border-line text-xs space-y-1">
-              <div className="text-muted-foreground">Hiện tại:</div>
-              <div className="font-bold text-foreground font-mono">
-                {(editingCapacityClass?.studentIds || []).length}/{editingCapacityClass?.maxStudents || 15} học viên
-              </div>
-            </div>
-
-            <Field label="Sĩ số tối đa" hint="Khi đủ số này, hệ thống sẽ không nhận thêm học viên" required>
-              <Input
-                type="number"
-                min={1}
-                max={200}
-                required
-                value={capacityInput}
-                onChange={(e) => setCapacityInput(Math.max(1, Number(e.target.value) || 1))}
-                className="font-mono font-bold"
-              />
-            </Field>
-
-            {editingCapacityClass && capacityInput < (editingCapacityClass.studentIds || []).length && (
-              <p className="text-xs text-danger">
-                Lớp đang có {(editingCapacityClass.studentIds || []).length} học viên, sĩ số mới nhỏ hơn số hiện có.
-                Hệ thống vẫn lưu, nhưng sẽ không nhận thêm học viên cho tới khi sĩ số giảm xuống.
-              </p>
-            )}
           </form>
         </Sheet>
 

@@ -24,13 +24,7 @@ export async function GET(request: Request) {
     classes = classes.filter(c => c.studentIds.includes(studentId));
   }
 
-  // Cho giao diện biết database có lưu được sĩ số tối đa hay không, để báo rõ
-  // thay vì hiện giới hạn 15 như một con số thật khi cột còn thiếu.
-  const capacitySupported = repo.supportsClassCapacity
-    ? await repo.supportsClassCapacity()
-    : true;
-
-  return NextResponse.json({ classes, capacitySupported });
+  return NextResponse.json({ classes });
 }
 
 export async function PUT(request: Request) {
@@ -48,7 +42,6 @@ export async function PUT(request: Request) {
       startTime,
       endTime,
       scheduleDays,
-      maxStudents,
       isRecurring,
       tuitionFee,
       meetingLink,
@@ -115,31 +108,12 @@ export async function PUT(request: Request) {
       cls.scheduleDays = scheduleDays.map(Number);
     }
 
-    if (maxStudents !== undefined) {
-      cls.maxStudents = Math.max(1, Number(maxStudents) || 15);
-    }
-
     if (isRecurring !== undefined) {
       cls.isRecurring = Boolean(isRecurring);
     }
 
     if (meetingLink !== undefined) {
       cls.meetingLink = meetingLink;
-    }
-
-    // Database cũ chưa có cột max_students thì không lưu được sĩ số.
-    // Báo thẳng cho admin biết thay vì báo thành công trong khi dữ liệu không đổi.
-    if (maxStudents !== undefined && repo.supportsClassCapacity) {
-      const supported = await repo.supportsClassCapacity();
-      if (!supported) {
-        return NextResponse.json(
-          {
-            error:
-              'Database chưa có cột sĩ số (classes.max_students). Chạy file supabase/setup.sql trong Supabase Dashboard → SQL Editor để bật giới hạn sĩ số.',
-          },
-          { status: 409 }
-        );
-      }
     }
 
     await repo.updateClass(cls);
@@ -271,7 +245,6 @@ export async function POST(request: Request) {
       startTime = '18:30',
       endTime = '20:30',
       scheduleDays = [2, 4, 6],
-      maxStudents = 15,
       isRecurring = true,
       tuitionFee = 1500000,
       meetingLink = '',
@@ -329,7 +302,6 @@ export async function POST(request: Request) {
       startTime: parsedStartTime,
       endTime: parsedEndTime,
       scheduleDays: Array.isArray(scheduleDays) ? scheduleDays.map(Number) : [2, 4, 6],
-      maxStudents: Math.max(1, Number(maxStudents) || 15),
       isRecurring: parsedIsRecurring,
       tuitionFee: Number(tuitionFee) || 0,
       meetingLink: meetingLink?.trim() || '',
@@ -339,12 +311,6 @@ export async function POST(request: Request) {
     };
 
     await repo.createClass(newClass);
-
-    // Database thiếu cột sĩ số thì lớp vẫn tạo được, nhưng sĩ số đã nhập không
-    // lưu lại. Trả cờ để giao diện nhắc admin chạy setup.sql.
-    const capacitySaved = repo.supportsClassCapacity
-      ? await repo.supportsClassCapacity()
-      : true;
 
     // Cập nhật assignedClassIds của giảng viên
     const teacher = await repo.getTeacherById(teacherId);
@@ -394,11 +360,10 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       class: newClass,
-      capacitySaved,
       bulkScheduleResult,
       message: `Tạo lớp ${newClass.name} (${newId}) thành công!${
         bulkScheduleResult ? ` Đã tự động sinh ${bulkScheduleResult.summary.createdCount} ca học (${newClass.startTime} - ${newClass.endTime}) cho các ngày tới.` : ''
-      }${capacitySaved ? '' : ' Lưu ý: database chưa có cột sĩ số nên giới hạn sĩ số chưa lưu được.'}`,
+      }`,
     });
   } catch (error: any) {
     const raw = String(error?.message || '');
