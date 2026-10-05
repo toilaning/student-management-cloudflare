@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Header } from '@/components/common/Header';
 import { useApp } from '@/context/AppContext';
@@ -22,12 +22,13 @@ import {
   ChevronRight,
   CalendarDays,
 } from 'lucide-react';
-import { getTodayDateStr, getTodayDateStrByDate } from '@/utils/date';
+import { getTodayDateStr, getTodayDateStrByDate, minutesTo24h } from '@/utils/date';
+import { cn } from '@/lib/cn';
 import {
-  buildTimelineTicks,
-  clampSlotToTimeline,
-  TIMELINE_START_MINUTES,
-  TIMELINE_TOTAL_MINUTES,
+  computeTimelineBounds,
+  buildTicksBetween,
+  layoutDaySlots,
+  TimelineNowMarker,
 } from '@/components/schedule/Timeline';
 
 const DAY_LABELS: Record<number, string> = {
@@ -145,15 +146,18 @@ export default function StudentSchedulePage() {
   };
   const goThisWeek = () => setWeekRefDate(getTodayDateStr());
 
-  const ticks = buildTimelineTicks();
-  const WEEK_ROW_HEIGHT_PX = TIMELINE_TOTAL_MINUTES;
-  const minuteToTopPx = (minutes: number): number => {
-    const clamped = Math.min(
-      Math.max(minutes, TIMELINE_START_MINUTES),
-      TIMELINE_START_MINUTES + TIMELINE_TOTAL_MINUTES
-    );
-    return clamped - TIMELINE_START_MINUTES;
-  };
+  // Trục giờ co giãn vừa đủ cho các buổi học trong tuần, không còn 06:00 – 23:00 trống trải
+  const bounds = useMemo(() => computeTimelineBounds(weekSlots), [weekSlots]);
+  const ticks = useMemo(
+    () => buildTicksBetween(bounds.startMinutes, bounds.endMinutes, 30),
+    [bounds.startMinutes, bounds.endMinutes]
+  );
+  const PX_PER_MINUTE = 1;
+  const WEEK_ROW_HEIGHT_PX = (bounds.endMinutes - bounds.startMinutes) * PX_PER_MINUTE;
+  const minuteToTopPx = (minutes: number): number =>
+    (Math.min(Math.max(minutes, bounds.startMinutes), bounds.endMinutes) - bounds.startMinutes) *
+    PX_PER_MINUTE;
+  const boundsLabel = `${minutesTo24h(bounds.startMinutes)} – ${minutesTo24h(bounds.endMinutes)}`;
 
   return (
     <RoleGuard allowedRoles={['STUDENT', 'ADMIN']}>
@@ -254,7 +258,7 @@ export default function StudentSchedulePage() {
               <div className="p-3 bg-muted/30 border-b border-line text-xs text-muted-foreground flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Clock size={13} className="text-primary" />
-                  <span>Khung giờ từ 06:00 đến 23:00</span>
+                  <span>Khung giờ {boundsLabel}</span>
                 </div>
                 <span className="sm:hidden text-[11px] text-muted-foreground">
                   Vuốt ngang để xem đủ tuần
@@ -336,18 +340,36 @@ export default function StudentSchedulePage() {
                             className="relative"
                             style={{ height: `${WEEK_ROW_HEIGHT_PX}px` }}
                           >
-                            {daySlots.map((slot) => {
+                            {isToday && (
+                              <TimelineNowMarker
+                                startMinutes={bounds.startMinutes}
+                                endMinutes={bounds.endMinutes}
+                                pixelsPerMinute={PX_PER_MINUTE}
+                              />
+                            )}
+
+                            {layoutDaySlots(daySlots).map(({ slot, startMin, endMin, isOvernight, column, columnCount }) => {
+                              // Với học viên, hai lớp của chính mình trùng giờ luôn là vấn đề cần xử lý
+                              const hasConflict = columnCount > 1;
                               const cls = classMap.get(slot.classId);
                               const meetingLink = slot.meetingLink || cls?.meetingLink;
-                              const { startMin, endMin, isOvernight } = clampSlotToTimeline(slot);
                               const topPx = minuteToTopPx(startMin);
                               const heightPx = Math.max(minuteToTopPx(endMin) - topPx, 36);
+                              const widthPct = 100 / columnCount;
 
                               return (
                                 <div
                                   key={slot.id}
-                                  className="absolute left-1 right-1 rounded-field border border-primary/30 bg-card p-2 shadow-soft hover:shadow-pop transition overflow-hidden flex flex-col justify-between"
-                                  style={{ top: `${topPx}px`, height: `${heightPx}px` }}
+                                  className={cn(
+                                    'absolute rounded-field border border-primary/30 bg-card p-2 shadow-soft hover:shadow-pop transition overflow-hidden flex flex-col justify-between',
+                                    hasConflict && 'ring-2 ring-warning border-warning'
+                                  )}
+                                  style={{
+                                    top: `${topPx}px`,
+                                    height: `${heightPx}px`,
+                                    left: `calc(${column * widthPct}% + 4px)`,
+                                    width: `calc(${widthPct}% - 8px)`,
+                                  }}
                                 >
                                   <div>
                                     <div className="flex items-center justify-between gap-1">
@@ -357,6 +379,11 @@ export default function StudentSchedulePage() {
                                       {isOvernight && (
                                         <Badge tone="warning" className="text-[9px] px-1 py-0">
                                           qua đêm
+                                        </Badge>
+                                      )}
+                                      {hasConflict && (
+                                        <Badge tone="warning" className="text-[9px] px-1 py-0">
+                                          Trùng giờ
                                         </Badge>
                                       )}
                                     </div>
@@ -411,4 +438,3 @@ export default function StudentSchedulePage() {
     </RoleGuard>
   );
 }
-

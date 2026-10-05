@@ -9,11 +9,11 @@ import { Teacher } from '@/types/teacher';
 import { ClassEntity } from '@/types/classroom';
 import { Student } from '@/types/student';
 import { getTodayDateStr, formatTimeHM } from '@/utils/date';
-import { 
-  HorizontalTimelineAxis, 
-  TimelineGridLines, 
-  clampSlotToTimeline, 
-  minuteToPercent 
+import {
+  computeTimelineBounds,
+  buildTicksBetween,
+  layoutDaySlots,
+  TimelineNowMarker,
 } from '@/components/schedule/Timeline';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -39,8 +39,26 @@ import {
   Sparkles, 
   RefreshCw, 
   CalendarRange, 
-  Filter
+  Filter,
+  AlertTriangle,
 } from 'lucide-react';
+
+/** Đổi số phút từ đầu ngày thành chuỗi "HH:mm" để hiển thị. */
+function minutesToClock(totalMinutes: number): string {
+  const hh = Math.floor(totalMinutes / 60);
+  const mm = totalMinutes % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
+const WEEKDAY_LABELS = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+
+/** Nhãn đầy đủ của một ngày: "Thứ 5 (05/10)". */
+function dayLabelOf(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return dateStr;
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return `${WEEKDAY_LABELS[dow]} (${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')})`;
+}
 
 export default function AdminCalendarPage() {
   const toast = useToast();
@@ -88,6 +106,19 @@ export default function AdminCalendarPage() {
   const [genShiftId, setGenShiftId] = useState<number>(1);
   const [genScheduleDays, setGenScheduleDays] = useState<number[]>([2, 4, 6]);
   const [genOverwrite, setGenOverwrite] = useState(false);
+  // Mặc định tôn trọng lịch riêng của từng lớp; tắt đi thì áp chung một khung giờ cho mọi lớp
+  const [genUseClassSchedule, setGenUseClassSchedule] = useState(true);
+  const [genPreview, setGenPreview] = useState<{
+    summary: { totalAttempted: number; createdCount: number; updatedCount: number; skippedCount: number; conflictCount: number };
+    createdSlots: { id: string; date: string; classId: string; startTime: string; endTime: string }[];
+    conflicts: { classId: string; date: string; conflicts: { message: string }[] }[];
+  } | null>(null);
+  const [genPreviewLoading, setGenPreviewLoading] = useState(false);
+
+  // Đổi bất kỳ tham số sinh lịch nào thì bản xem trước cũ không còn đúng nữa
+  useEffect(() => {
+    setGenPreview(null);
+  }, [genClassId, genStartDate, genEndDate, genShiftId, genScheduleDays, genOverwrite, genUseClassSchedule]);
 
   const loadData = async (date: string) => {
     setLoading(true);
@@ -216,6 +247,33 @@ export default function AdminCalendarPage() {
       .sort((a, b) => (a.startTime || '00:00').localeCompare(b.startTime || '00:00'));
   }, [slots, statusFilter, selectedTeacher, selectedRoom, selectedShift]);
 
+  // Khung giờ hiển thị vừa đủ cho các ca trong ngày (thay vì luôn 06:00 – 23:00)
+  const bounds = useMemo(() => computeTimelineBounds(filteredSlots), [filteredSlots]);
+  const hourTicks = useMemo(
+    () => buildTicksBetween(bounds.startMinutes, bounds.endMinutes, 60),
+    [bounds.startMinutes, bounds.endMinutes]
+  );
+  // 1.15 px mỗi phút ~ 69px mỗi giờ: ca 2 tiếng cao khoảng 138px, đủ chỗ cho nút bấm.
+  const PX_PER_MINUTE = 1.15;
+  const gridHeight = (bounds.endMinutes - bounds.startMinutes) * PX_PER_MINUTE;
+  const boundsLabel = `${formatTimeHM(minutesToClock(bounds.startMinutes))} – ${formatTimeHM(minutesToClock(bounds.endMinutes))}`;
+
+  // Xếp ca trùng giờ vào các cột riêng và đánh dấu ca bị trùng
+  const laidOutSlots = useMemo(() => layoutDaySlots(filteredSlots), [filteredSlots]);
+  // Chỉ những ca trùng lớp hoặc trùng giáo viên mới coi là lỗi cần xử lý.
+  // Hai lớp khác nhau chạy song song là bình thường với trung tâm dạy online.
+  const conflictingSlotIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const item of laidOutSlots) {
+      if (item.overlap === 'conflict') ids.add(item.slot.id);
+    }
+    return ids;
+  }, [laidOutSlots]);
+  const parallelCount = useMemo(
+    () => laidOutSlots.filter((item) => item.overlap === 'parallel').length,
+    [laidOutSlots]
+  );
+
   // Xây dựng danh sách 7 ngày trong tuần
   const weekDays = useMemo(() => {
     const [y, m, d] = selectedDate.split('-').map(Number);
@@ -333,13 +391,57 @@ export default function AdminCalendarPage() {
     }
   };
 
+  /** Gửi yêu cầu xem trước: backend chỉ tính toán, không ghi dữ liệu. */
+  const requestBulkPreview = async () => {
+    if (!genStartDate || !genEndDate) {
+      toast.error('Vui lòng nhập ngày bắt đầu và kết thúc');
+      return;
+    }
+    if (!genUseClassSchedule && genScheduleDays.length === 0) {
+      toast.error('Vui lòng chọn ít nhất một thứ trong tuần');
+      return;
+    }
+    if (genEndDate < genStartDate) {
+      toast.error('Ngày kết thúc phải sau ngày bắt đầu');
+      return;
+    }
+
+    setGenPreviewLoading(true);
+    try {
+      const res = await fetch('/api/schedule/bulk-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          classIds: genClassId === 'all' ? ['all'] : [genClassId],
+          startDate: genStartDate,
+          endDate: genEndDate,
+          shiftId: genUseClassSchedule ? undefined : Number(genShiftId),
+          scheduleDays: genUseClassSchedule ? undefined : genScheduleDays,
+          overwriteExisting: genOverwrite,
+          actorId: 'ADMIN001',
+          previewOnly: true,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setGenPreview(data);
+      } else {
+        toast.error(data.error || 'Không xem trước được lịch');
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Lỗi mạng khi xem trước lịch');
+    } finally {
+      setGenPreviewLoading(false);
+    }
+  };
+
   // Xử lý gửi Sinh lịch định kỳ
   const handleBulkGenerate = async () => {
     if (!genStartDate || !genEndDate) {
       toast.error('Vui lòng nhập ngày bắt đầu và kết thúc');
       return;
     }
-    if (genScheduleDays.length === 0) {
+    if (!genUseClassSchedule && genScheduleDays.length === 0) {
       toast.error('Vui lòng chọn ít nhất một thứ trong tuần');
       return;
     }
@@ -353,8 +455,8 @@ export default function AdminCalendarPage() {
           classIds: genClassId === 'all' ? ['all'] : [genClassId],
           startDate: genStartDate,
           endDate: genEndDate,
-          shiftId: Number(genShiftId),
-          scheduleDays: genScheduleDays,
+          shiftId: genUseClassSchedule ? undefined : Number(genShiftId),
+          scheduleDays: genUseClassSchedule ? undefined : genScheduleDays,
           overwriteExisting: genOverwrite,
           actorId: 'ADMIN001',
         }),
@@ -363,6 +465,7 @@ export default function AdminCalendarPage() {
       if (res.ok && data.success) {
         toast.success(`Đã sinh thành công ${data.summary?.createdCount ?? 0} ca học mới`);
         setBulkModalType(null);
+        setGenPreview(null);
         await loadData(selectedDate);
       } else {
         toast.error(data.error || 'Sinh lịch thất bại');
@@ -429,6 +532,7 @@ export default function AdminCalendarPage() {
                     const endM = String(endD.getMonth() + 1).padStart(2, '0');
                     const endDay = String(endD.getDate()).padStart(2, '0');
                     setGenEndDate(`${endY}-${endM}-${endDay}`);
+                    setGenPreview(null);
                     setBulkModalType('generate');
                   }}
                 >
@@ -566,124 +670,188 @@ export default function AdminCalendarPage() {
             </div>
           </div>
 
-          {/* Khung Timeline hiển thị trục giờ và các khối ca học */}
-          <div className="bg-card border border-line rounded-card shadow-card p-4 sm:p-5 overflow-x-auto">
+          {/* Lưới lịch: trục giờ co giãn theo ca học thật, khối ca đúng tỉ lệ thời lượng */}
+          <div className="bg-card border border-line rounded-card shadow-card p-3 sm:p-4 overflow-x-auto">
             {loading ? (
-              <div className="p-8 space-y-3">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="h-18 rounded-field bg-muted animate-pulse" />
+              <div className="p-6 space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-16 rounded-field bg-muted animate-pulse" />
                 ))}
               </div>
             ) : filteredSlots.length > 0 ? (
-              <div className="min-w-[900px] space-y-4">
-                {/* Trục giờ ngang */}
-                <HorizontalTimelineAxis className="h-8 ml-2 mr-2 mb-2" />
+              <div className="min-w-[760px]">
+                {conflictingSlotIds.size > 0 && (
+                  <div className="mb-3 flex items-start gap-2 rounded-field border border-warning/40 bg-warning-soft px-3 py-2 text-[12px] text-foreground">
+                    <AlertTriangle size={14} className="text-warning shrink-0 mt-0.5" />
+                    <span>
+                      Có <strong>{conflictingSlotIds.size}</strong> ca bị xếp trùng giờ trong ngày này. Khối viền vàng là phần chồng lấn, nên đổi ca hoặc đổi ngày cho một trong hai.
+                    </span>
+                  </div>
+                )}
+                {parallelCount > 0 && conflictingSlotIds.size === 0 && (
+                  <div className="mb-3 flex items-start gap-2 rounded-field border border-info/40 bg-info-soft px-3 py-2 text-[12px] text-foreground">
+                    <AlertTriangle size={14} className="text-info shrink-0 mt-0.5" />
+                    <span>
+                      Có <strong>{parallelCount}</strong> ca chạy song song cùng khung giờ. Trung tâm học online nên việc này bình thường, các ca được xếp cạnh nhau để nhìn rõ.
+                    </span>
+                  </div>
+                )}
 
-                {/* Vùng lưới và các khối slot */}
-                <div className="relative min-h-[340px]">
-                  <TimelineGridLines />
-                  <div className="relative space-y-2.5">
-                    {filteredSlots.map(slot => {
-                      const cls = classMap[slot.classId];
-                      const studentCount = (cls?.studentIds || []).length;
-                      const runtimeStatus = getSlotRuntimeStatus(slot);
-                      const teacherName = teacherMap[slot.teacherId] || slot.teacherId;
-                      const { startMin, endMin, isOvernight } = clampSlotToTimeline(slot);
-                      const leftPct = minuteToPercent(startMin);
-                      const blockCls = getSlotBlockStyle(slot);
+                <div className="flex">
+                  {/* Cột mốc giờ */}
+                  <div className="w-12 shrink-0 border-r border-line bg-muted/20">
+                    <div className="h-7" />
+                    <div className="relative" style={{ height: `${gridHeight}px` }}>
+                      {hourTicks.map((t) => (
+                        <div
+                          key={t.minutes}
+                          className="absolute right-1.5 text-[10px] font-mono font-medium text-subtle-foreground whitespace-nowrap -translate-y-1/2 tabular"
+                          style={{ top: `${(t.minutes - bounds.startMinutes) * PX_PER_MINUTE}px` }}
+                        >
+                          {t.label}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
-                      return (
-                        <div key={slot.id} className="relative h-auto">
+                  {/* Cột ca học trong ngày đang chọn */}
+                  <div className="flex-1 min-w-0">
+                    <div className="h-7 border-b border-line bg-muted/40 flex items-center justify-between px-3">
+                      <span className="text-[12px] font-bold text-foreground">
+                        {dayLabelOf(selectedDate)}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground tabular">
+                        {filteredSlots.length} ca • {boundsLabel}
+                      </span>
+                    </div>
+
+                    <div className="relative" style={{ height: `${gridHeight}px` }}>
+                      {/* Lưới ngang theo giờ */}
+                      <div className="absolute inset-0 pointer-events-none">
+                        {hourTicks.map((t) => (
                           <div
+                            key={t.minutes}
+                            className="absolute left-0 right-0 border-t border-line/50"
+                            style={{ top: `${(t.minutes - bounds.startMinutes) * PX_PER_MINUTE}px` }}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Vạch đỏ báo giờ hiện tại, chỉ hiện khi xem đúng ngày hôm nay */}
+                      {selectedDate === getTodayDateStr() && (
+                        <TimelineNowMarker
+                          startMinutes={bounds.startMinutes}
+                          endMinutes={bounds.endMinutes}
+                          pixelsPerMinute={PX_PER_MINUTE}
+                        />
+                      )}
+
+                      {laidOutSlots.map(({ slot, startMin, endMin, isOvernight, column, columnCount, overlap }) => {
+                        const cls = classMap[slot.classId];
+                        const studentCount = (cls?.studentIds || []).length;
+                        const runtimeStatus = getSlotRuntimeStatus(slot);
+                        const teacherName = teacherMap[slot.teacherId] || slot.teacherId;
+                        const blockCls = getSlotBlockStyle(slot);
+                        const hasConflict = overlap === 'conflict';
+                        const isParallel = overlap === 'parallel';
+                        const topPx = (startMin - bounds.startMinutes) * PX_PER_MINUTE;
+                        const heightPx = Math.max((endMin - startMin) * PX_PER_MINUTE, 34);
+                        const widthPct = 100 / columnCount;
+                        const compact = heightPx < 74;
+
+                        return (
+                          <div
+                            key={slot.id}
                             className={cn(
-                              'relative rounded-field p-3 shadow-soft transition min-h-[74px] flex flex-col justify-center',
-                              blockCls
+                              'absolute rounded-field px-2.5 py-1.5 shadow-soft transition overflow-hidden border flex flex-col',
+                              blockCls,
+                              hasConflict && 'ring-2 ring-warning border-warning'
                             )}
                             style={{
-                              marginLeft: `${leftPct}%`,
-                              width: `min(calc(100% - ${leftPct}%), 480px)`,
-                              minWidth: '340px',
+                              top: `${topPx}px`,
+                              height: `${heightPx}px`,
+                              left: `calc(${column * widthPct}% + 4px)`,
+                              width: `calc(${widthPct}% - 8px)`,
                             }}
                           >
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <Badge tone="neutral" className="font-mono text-[10px] uppercase">
-                                  {slot.classId}
-                                </Badge>
-                                <Badge tone={runtimeStatus.tone} dot={runtimeStatus.label === 'Đang diễn ra'}>
-                                  {runtimeStatus.label}
-                                </Badge>
-                                {isOvernight && (
-                                  <Badge tone="warning">qua đêm</Badge>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-card text-foreground border border-line">
+                                    {slot.classId}
+                                  </span>
+                                  <Badge tone={runtimeStatus.tone} dot={runtimeStatus.label === 'Đang diễn ra'} className="text-[9px] py-0 px-1.5">
+                                    {runtimeStatus.label}
+                                  </Badge>
+                                  {hasConflict && (
+                                    <Badge tone="warning" className="text-[9px] py-0 px-1.5">Trùng giờ</Badge>
+                                  )}
+                                  {isParallel && (
+                                    <Badge tone="info" className="text-[9px] py-0 px-1.5">Song song</Badge>
+                                  )}
+                                  {isOvernight && (
+                                    <Badge tone="warning" className="text-[9px] py-0 px-1.5">qua đêm</Badge>
+                                  )}
+                                </div>
+                                <h4 className="font-bold text-foreground text-[13px] leading-snug truncate mt-0.5">
+                                  {cls?.name || slot.subject}
+                                </h4>
+                                {!compact && (
+                                  <p className="text-[11px] text-muted-foreground truncate">{slot.subject}</p>
                                 )}
                               </div>
-                              <span className="text-[11px] font-mono font-bold text-foreground bg-muted px-2 py-0.5 rounded-pill flex items-center gap-1 whitespace-nowrap shrink-0">
-                                <Clock size={11} className="text-muted-foreground" />
-                                {formatTimeHM(slot.startTime)} - {formatTimeHM(slot.endTime)}
+                              <span className="text-[11px] font-mono font-bold text-foreground bg-card/80 px-1.5 py-0.5 rounded-pill whitespace-nowrap shrink-0 tabular border border-line/60">
+                                {formatTimeHM(slot.startTime)} – {formatTimeHM(slot.endTime)}
                               </span>
                             </div>
 
-                            <div className="mt-1 flex items-center justify-between gap-2 flex-wrap">
-                              <div className="min-w-0">
-                                <h4 className="font-bold text-foreground text-sm leading-snug truncate">
-                                  {cls?.name || slot.subject}
-                                </h4>
-                                <p className="text-[12px] text-muted-foreground truncate">{slot.subject}</p>
-                              </div>
-                              <div className="text-[12px] text-muted-foreground flex items-center gap-2.5 flex-wrap shrink-0">
-                                <span className="flex items-center gap-1 whitespace-nowrap text-foreground font-medium">
-                                  <UserCheck size={12} className="text-primary" />
-                                  {teacherName}
-                                </span>
-                                <span className="flex items-center gap-1 whitespace-nowrap">
-                                  <MapPin size={12} className="text-subtle-foreground" />
-                                  {slot.roomId}
-                                </span>
-                                <span className="flex items-center gap-1 font-bold text-primary tabular whitespace-nowrap">
-                                  <Users size={12} />
-                                  {studentCount} HS
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="mt-2 pt-2 border-t border-line/60 flex items-center gap-2 flex-wrap">
-                              {slot.meetingLink ? (
-                                <a
-                                  href={slot.meetingLink}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex items-center gap-1 text-[11px] text-success hover:underline font-bold whitespace-nowrap"
-                                >
-                                  <Video size={12} /> Phòng online <ExternalLink size={10} />
-                                </a>
-                              ) : (
-                                <span className="text-[11px] text-subtle-foreground italic whitespace-nowrap">
-                                  Chưa gắn link online
-                                </span>
-                              )}
-
-                              <span className="flex-1" />
-
-                              <div className="flex items-center gap-1.5">
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  icon={<Users size={12} />}
-                                  onClick={() => setSelectedSlotForStudents(slot)}
-                                >
-                                  Học viên ({studentCount})
-                                </Button>
-                                <Link href={`/admin/attendance?classId=${slot.classId}&date=${selectedDate}`}>
-                                  <Button variant="primary" size="sm">
-                                    Điểm danh
+                            {!compact && (
+                              <div className="mt-auto pt-1.5 flex items-center justify-between gap-2 flex-wrap">
+                                <div className="text-[11px] text-muted-foreground flex items-center gap-2.5 flex-wrap min-w-0">
+                                  <span className="inline-flex items-center gap-1 text-foreground font-medium min-w-0">
+                                    <UserCheck size={11} className="text-primary shrink-0" />
+                                    <span className="truncate">{teacherName}</span>
+                                  </span>
+                                  <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                                    <MapPin size={11} className="text-subtle-foreground" />
+                                    {slot.roomId}
+                                  </span>
+                                  <span className="inline-flex items-center gap-1 font-bold text-primary tabular whitespace-nowrap">
+                                    <Users size={11} />
+                                    {studentCount} HS
+                                  </span>
+                                  {slot.meetingLink && (
+                                    <a
+                                      href={slot.meetingLink}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-1 text-success hover:underline font-bold whitespace-nowrap"
+                                    >
+                                      <Video size={11} /> Online <ExternalLink size={9} />
+                                    </a>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    icon={<Users size={11} />}
+                                    onClick={() => setSelectedSlotForStudents(slot)}
+                                  >
+                                    Học viên
                                   </Button>
-                                </Link>
+                                  <Link href={`/admin/attendance?classId=${slot.classId}&date=${selectedDate}`}>
+                                    <Button variant="primary" size="sm">
+                                      Điểm danh
+                                    </Button>
+                                  </Link>
+                                </div>
                               </div>
-                            </div>
+                            )}
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -781,7 +949,7 @@ export default function AdminCalendarPage() {
         {/* Hộp thoại Thao tác hàng loạt (Bulk Operations) */}
         <Sheet
           isOpen={!!bulkModalType}
-          onClose={() => setBulkModalType(null)}
+          onClose={() => { setBulkModalType(null); setGenPreview(null); }}
           title={
             bulkModalType === 'daily'
               ? 'Thao tác ca học trong ngày'
@@ -801,7 +969,7 @@ export default function AdminCalendarPage() {
             <div className="flex items-center justify-end gap-2.5 w-full">
               <Button
                 variant="secondary"
-                onClick={() => setBulkModalType(null)}
+                onClick={() => { setBulkModalType(null); setGenPreview(null); }}
                 disabled={bulkSubmitting}
               >
                 Hủy
@@ -825,13 +993,25 @@ export default function AdminCalendarPage() {
                 </Button>
               )}
               {bulkModalType === 'generate' && (
-                <Button
-                  variant="primary"
-                  loading={bulkSubmitting}
-                  onClick={handleBulkGenerate}
-                >
-                  Sinh lịch tự động
-                </Button>
+                <>
+                  <Button
+                    variant="secondary"
+                    loading={genPreviewLoading}
+                    onClick={requestBulkPreview}
+                  >
+                    Xem trước
+                  </Button>
+                  <Button
+                    variant="primary"
+                    loading={bulkSubmitting}
+                    disabled={!genPreview || genPreview.summary.createdCount + genPreview.summary.updatedCount === 0}
+                    onClick={handleBulkGenerate}
+                  >
+                    {genPreview
+                      ? `Tạo ${genPreview.summary.createdCount + genPreview.summary.updatedCount} ca`
+                      : 'Sinh lịch tự động'}
+                  </Button>
+                </>
               )}
             </div>
           }
@@ -1007,56 +1187,166 @@ export default function AdminCalendarPage() {
               </div>
 
               <Field label="Khung giờ / Ca học" required>
-                <Select
-                  value={genShiftId}
-                  onChange={e => setGenShiftId(Number(e.target.value))}
-                >
-                  {shifts.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </Select>
+                <div className="flex gap-1.5 p-1 bg-muted rounded-pill w-fit mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setGenUseClassSchedule(true)}
+                    className={cn(
+                      'px-3 h-8 rounded-pill text-[13px] font-semibold transition cursor-pointer',
+                      genUseClassSchedule ? 'bg-primary text-white shadow-primary' : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    Theo lịch riêng của lớp
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGenUseClassSchedule(false)}
+                    className={cn(
+                      'px-3 h-8 rounded-pill text-[13px] font-semibold transition cursor-pointer',
+                      !genUseClassSchedule ? 'bg-primary text-white shadow-primary' : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    Áp chung một khung giờ
+                  </button>
+                </div>
+
+                {genUseClassSchedule ? (
+                  <p className="text-[12px] text-muted-foreground">
+                    Giữ nguyên ca học và các thứ mà từng lớp đã thiết lập. Phù hợp khi mỗi lớp học lệch giờ nhau.
+                  </p>
+                ) : (
+                  <Select
+                    value={genShiftId}
+                    onChange={e => setGenShiftId(Number(e.target.value))}
+                  >
+                    {shifts.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({formatTimeHM(s.startTime)} – {formatTimeHM(s.endTime)})
+                      </option>
+                    ))}
+                  </Select>
+                )}
               </Field>
 
-              <Field label="Các thứ trong tuần" required>
-                <div className="flex gap-2 flex-wrap pt-1">
-                  {[
-                    { day: 2, label: 'Thứ 2' },
-                    { day: 3, label: 'Thứ 3' },
-                    { day: 4, label: 'Thứ 4' },
-                    { day: 5, label: 'Thứ 5' },
-                    { day: 6, label: 'Thứ 6' },
-                    { day: 7, label: 'Thứ 7' },
-                    { day: 0, label: 'Chủ nhật' },
-                  ].map(item => {
-                    const active = genScheduleDays.includes(item.day);
-                    return (
-                      <button
-                        key={item.day}
-                        type="button"
-                        onClick={() => toggleScheduleDay(item.day)}
-                        className={cn(
-                          'px-3 py-1.5 rounded-pill text-[13px] font-semibold border transition cursor-pointer',
-                          active
-                            ? 'bg-primary text-white border-primary shadow-primary'
-                            : 'bg-muted text-muted-foreground border-line hover:text-foreground'
-                        )}
-                      >
-                        {item.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </Field>
+              {!genUseClassSchedule && (
+                <Field label="Các thứ trong tuần" required>
+                  <div className="flex gap-2 flex-wrap pt-1">
+                    {[
+                      { day: 2, label: 'Thứ 2' },
+                      { day: 3, label: 'Thứ 3' },
+                      { day: 4, label: 'Thứ 4' },
+                      { day: 5, label: 'Thứ 5' },
+                      { day: 6, label: 'Thứ 6' },
+                      { day: 7, label: 'Thứ 7' },
+                      { day: 0, label: 'Chủ nhật' },
+                    ].map(item => {
+                      const active = genScheduleDays.includes(item.day);
+                      return (
+                        <button
+                          key={item.day}
+                          type="button"
+                          onClick={() => toggleScheduleDay(item.day)}
+                          className={cn(
+                            'px-3 py-1.5 rounded-pill text-[13px] font-semibold border transition cursor-pointer',
+                            active
+                              ? 'bg-primary text-white border-primary shadow-primary'
+                              : 'bg-muted text-muted-foreground border-line hover:text-foreground'
+                          )}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Field>
+              )}
 
               <label className="flex items-center gap-2.5 text-[13px] font-medium text-foreground cursor-pointer select-none pt-1">
                 <input
                   type="checkbox"
                   checked={genOverwrite}
-                  onChange={e => setGenOverwrite(e.target.checked)}
+                  onChange={e => { setGenOverwrite(e.target.checked); setGenPreview(null); }}
                   className="rounded border-line text-primary focus:ring-primary h-4 w-4"
                 />
                 <span>Ghi đè ca học trùng lịch nếu đã tồn tại</span>
               </label>
+
+              {genPreview && (
+                <div className="rounded-field border border-line bg-muted/30 p-3 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-[13px] font-bold text-foreground">Xem trước kết quả</h4>
+                    <span className="text-[11px] text-muted-foreground tabular">
+                      Quét {genPreview.summary.totalAttempted} lượt
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Badge tone="success" className="tabular">
+                      Tạo mới {genPreview.summary.createdCount}
+                    </Badge>
+                    <Badge tone="primary" className="tabular">
+                      Cập nhật {genPreview.summary.updatedCount}
+                    </Badge>
+                    <Badge tone="neutral" className="tabular">
+                      Bỏ qua {genPreview.summary.skippedCount}
+                    </Badge>
+                    {genPreview.summary.conflictCount > 0 && (
+                      <Badge tone="warning" className="tabular">
+                        Trùng lịch {genPreview.summary.conflictCount}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {genPreview.conflicts.length > 0 && (
+                    <div className="rounded-field border border-warning/40 bg-warning-soft px-3 py-2 text-[12px] text-foreground space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <AlertTriangle size={13} className="text-warning shrink-0" />
+                        {genPreview.conflicts.length} buổi bị bỏ qua vì trùng lịch
+                      </div>
+                      <ul className="space-y-0.5 text-muted-foreground">
+                        {genPreview.conflicts.slice(0, 5).map((c, i) => (
+                          <li key={i}>
+                            {dayLabelOf(c.date)} • {c.classId}: {c.conflicts[0]?.message || 'Trùng lịch'}
+                          </li>
+                        ))}
+                        {genPreview.conflicts.length > 5 && (
+                          <li>… và {genPreview.conflicts.length - 5} buổi khác</li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+
+                  {genPreview.createdSlots.length > 0 && (
+                    <div className="max-h-48 overflow-y-auto rounded-field border border-line bg-card">
+                      <table className="w-full text-[12px]">
+                        <thead className="bg-muted/40 sticky top-0">
+                          <tr>
+                            <th className="text-left px-2.5 py-1.5 font-semibold text-muted-foreground">Ngày</th>
+                            <th className="text-left px-2.5 py-1.5 font-semibold text-muted-foreground">Lớp</th>
+                            <th className="text-right px-2.5 py-1.5 font-semibold text-muted-foreground">Giờ</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {genPreview.createdSlots.slice(0, 60).map((s) => (
+                            <tr key={s.id} className="border-t border-line/60">
+                              <td className="px-2.5 py-1.5 text-foreground tabular">{s.date}</td>
+                              <td className="px-2.5 py-1.5 text-foreground">{s.classId}</td>
+                              <td className="px-2.5 py-1.5 text-right text-muted-foreground font-mono tabular">
+                                {formatTimeHM(s.startTime)} – {formatTimeHM(s.endTime)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {genPreview.createdSlots.length > 60 && (
+                        <p className="px-2.5 py-1.5 text-[11px] text-muted-foreground border-t border-line/60">
+                          Hiển thị 60 / {genPreview.createdSlots.length} ca
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </Sheet>

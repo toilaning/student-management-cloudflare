@@ -12,14 +12,13 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/Toast';
-import { getTodayDateStr, getTodayDateStrByDate, formatTimeHM } from '@/utils/date';
+import { getTodayDateStr, getTodayDateStrByDate, formatTimeHM, minutesTo24h } from '@/utils/date';
 import { formatClassTimeLabel } from '@/utils/schedule';
 import {
-  buildTimelineTicks,
-  clampSlotToTimeline,
-  TIMELINE_START_MINUTES,
-  TIMELINE_STEP_MINUTES,
-  TIMELINE_TOTAL_MINUTES,
+  computeTimelineBounds,
+  buildTicksBetween,
+  layoutDaySlots,
+  TimelineNowMarker,
 } from '@/components/schedule/Timeline';
 import {
   Calendar,
@@ -34,6 +33,7 @@ import {
   ChevronRight,
   CheckCircle2,
   Sparkles,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -216,17 +216,49 @@ export default function TeacherSchedulePage() {
     setSelectedDate(today);
   };
 
-  // Trục giờ dọc timeline: 06:00 -> 23:00 (1020 phút = 1020px)
-  const ticks = useMemo(() => buildTimelineTicks(), []);
-  const WEEK_ROW_HEIGHT_PX = TIMELINE_TOTAL_MINUTES;
+  // Trục giờ co giãn vừa đủ cho các ca dạy trong tuần, không còn 06:00 – 23:00 trống trải
+  const weekBounds = useMemo(() => computeTimelineBounds(weekSlots), [weekSlots]);
+  const ticks = useMemo(
+    () => buildTicksBetween(weekBounds.startMinutes, weekBounds.endMinutes, 30),
+    [weekBounds.startMinutes, weekBounds.endMinutes]
+  );
+  // Nhãn giờ hiển thị mỗi 60 phút để cột mốc không bị rối
+  const hourTicks = useMemo(
+    () => buildTicksBetween(weekBounds.startMinutes, weekBounds.endMinutes, 60),
+    [weekBounds.startMinutes, weekBounds.endMinutes]
+  );
+  const PX_PER_MINUTE = 1;
+  const WEEK_ROW_HEIGHT_PX = (weekBounds.endMinutes - weekBounds.startMinutes) * PX_PER_MINUTE;
+  const minuteToTopPx = (minutes: number): number =>
+    (Math.min(Math.max(minutes, weekBounds.startMinutes), weekBounds.endMinutes) - weekBounds.startMinutes) *
+    PX_PER_MINUTE;
 
-  const minuteToTopPx = (minutes: number): number => {
-    const clamped = Math.min(
-      Math.max(minutes, TIMELINE_START_MINUTES),
-      TIMELINE_START_MINUTES + TIMELINE_TOTAL_MINUTES
-    );
-    return clamped - TIMELINE_START_MINUTES;
-  };
+  // Chi tiết ngày đang chọn: dùng chung cách xếp cột với trang Admin
+  const dayDetail = useMemo(() => {
+    const daySlots = slots.filter((s) => s.date === selectedDate);
+    return { slots: daySlots, laidOut: layoutDaySlots(daySlots) };
+  }, [slots, selectedDate]);
+
+  // Trục giờ cho khung chi tiết ngày, co giãn theo ca thực tế của ngày đó
+  const dayDetailBounds = useMemo(() => computeTimelineBounds(dayDetail.slots), [dayDetail.slots]);
+  // Đếm số ca bị trùng giờ trong tuần để nhắc giáo viên xử lý sớm
+  const weekConflictCount = useMemo(() => {
+    const dates = Array.from(new Set(weekSlots.map((s) => s.date)));
+    let count = 0;
+    for (const d of dates) {
+      const laid = layoutDaySlots(weekSlots.filter((s) => s.date === d));
+      count += laid.filter((item) => item.overlap === 'conflict').length;
+    }
+    return count;
+  }, [weekSlots]);
+  const dayDetailHourTicks = useMemo(
+    () => buildTicksBetween(dayDetailBounds.startMinutes, dayDetailBounds.endMinutes, 60),
+    [dayDetailBounds.startMinutes, dayDetailBounds.endMinutes]
+  );
+  const DAY_DETAIL_PX_PER_MINUTE = 1.15;
+  const dayDetailHeight = (dayDetailBounds.endMinutes - dayDetailBounds.startMinutes) * DAY_DETAIL_PX_PER_MINUTE;
+  const dayDetailBoundsLabel = `${minutesTo24h(dayDetailBounds.startMinutes)} – ${minutesTo24h(dayDetailBounds.endMinutes)}`;
+  const weekBoundsLabel = `${minutesTo24h(weekBounds.startMinutes)} – ${minutesTo24h(weekBounds.endMinutes)}`;
 
   const todayStr = getTodayDateStr();
 
@@ -366,9 +398,18 @@ export default function TeacherSchedulePage() {
                 Lịch giảng dạy chi tiết trong tuần
               </h2>
               <span className="text-[12px] text-muted-foreground">
-                {selectedDate ? `Đang chọn ${formatDayLabel(selectedDate)}` : 'Khung giờ 06:00 – 23:00'}
+                {selectedDate ? `Đang chọn ${formatDayLabel(selectedDate)}` : `Khung giờ ${weekBoundsLabel}`}
               </span>
             </div>
+
+            {weekConflictCount > 0 && (
+              <div className="flex items-start gap-2 rounded-field border border-warning/40 bg-warning-soft px-3 py-2 text-[12px] text-foreground">
+                <AlertTriangle size={14} className="text-warning shrink-0 mt-0.5" />
+                <span>
+                  Có <strong>{weekConflictCount}</strong> ca trong tuần bị trùng giờ. Khối viền vàng là phần chồng lấn, Thầy/Cô nên báo quản trị viên đổi ca.
+                </span>
+              </div>
+            )}
 
             {loading ? (
               <div className="bg-card border border-line rounded-card shadow-card p-6 space-y-3">
@@ -432,7 +473,7 @@ export default function TeacherSchedulePage() {
                     {/* Cột nhãn giờ bên trái */}
                     <div className="w-14 shrink-0 border-r border-line bg-muted/20 relative">
                       <div className="relative" style={{ height: `${WEEK_ROW_HEIGHT_PX}px` }}>
-                        {ticks.map((t) => (
+                        {hourTicks.map((t) => (
                           <div
                             key={t.minutes}
                             className="absolute right-1.5 text-[10px] font-mono font-medium text-subtle-foreground whitespace-nowrap -translate-y-1/2"
@@ -474,22 +515,36 @@ export default function TeacherSchedulePage() {
 
                           {/* Các slot trong ngày */}
                           <div className="relative" style={{ height: `${WEEK_ROW_HEIGHT_PX}px` }}>
-                            {daySlots.map((slot) => {
+                            {isToday && (
+                              <TimelineNowMarker
+                                startMinutes={weekBounds.startMinutes}
+                                endMinutes={weekBounds.endMinutes}
+                                pixelsPerMinute={PX_PER_MINUTE}
+                              />
+                            )}
+
+                            {layoutDaySlots(daySlots).map(({ slot, startMin, endMin, isOvernight, column, columnCount, overlap }) => {
                               const cls = classMap.get(slot.classId);
                               const studentCount = cls?.studentIds?.length || 0;
                               const meetingLink = slot.meetingLink || cls?.meetingLink;
-                              const { startMin, endMin, isOvernight } = clampSlotToTimeline(slot);
                               const topPx = minuteToTopPx(startMin);
-                              const heightPx = Math.max(minuteToTopPx(endMin) - topPx, 38);
+                              const heightPx = Math.max(minuteToTopPx(endMin) - topPx, 34);
+                              const widthPct = 100 / columnCount;
 
                               return (
                                 <div
                                   key={slot.id}
                                   className={cn(
-                                    'absolute left-1 right-1 rounded-field p-2 shadow-soft hover:shadow-card transition-all overflow-hidden flex flex-col justify-between border',
-                                    'bg-primary-soft text-primary-ink border-primary/30'
+                                    'absolute rounded-field p-2 shadow-soft hover:shadow-card transition-all overflow-hidden flex flex-col justify-between border',
+                                    'bg-primary-soft text-primary-ink border-primary/30',
+                                    overlap === 'conflict' && 'ring-2 ring-warning border-warning'
                                   )}
-                                  style={{ top: `${topPx}px`, height: `${heightPx}px` }}
+                                  style={{
+                                    top: `${topPx}px`,
+                                    height: `${heightPx}px`,
+                                    left: `calc(${column * widthPct}% + 4px)`,
+                                    width: `calc(${widthPct}% - 8px)`,
+                                  }}
                                 >
                                   <div>
                                     <div className="flex items-center justify-between gap-1 flex-wrap">
@@ -509,6 +564,16 @@ export default function TeacherSchedulePage() {
                                         {isOvernight && (
                                           <Badge tone="warning" className="text-[9px] py-0 px-1.5">
                                             qua đêm
+                                          </Badge>
+                                        )}
+                                        {overlap === 'conflict' && (
+                                          <Badge tone="warning" className="text-[9px] py-0 px-1.5">
+                                            Trùng giờ
+                                          </Badge>
+                                        )}
+                                        {overlap === 'parallel' && (
+                                          <Badge tone="info" className="text-[9px] py-0 px-1.5">
+                                            Song song
                                           </Badge>
                                         )}
                                         {slot.checkinTime && (
@@ -577,6 +642,152 @@ export default function TeacherSchedulePage() {
                 </div>
               </div>
             )}
+
+            {/* Chi tiết ngày đang chọn: lưới 1 ngày, khối ca đúng tỉ lệ thời lượng */}
+            <div className="bg-card rounded-card border border-line shadow-card p-3 sm:p-4 overflow-x-auto">
+              <div className="flex items-center justify-between gap-2 mb-3 min-w-[560px]">
+                <h3 className="text-[14px] font-bold text-foreground">
+                  Chi tiết {formatDayLabel(selectedDate)}
+                </h3>
+                <span className="text-[12px] text-muted-foreground tabular">
+                  {dayDetail.slots.length} ca • {dayDetailBoundsLabel}
+                </span>
+              </div>
+
+              {dayDetail.slots.length === 0 ? (
+                <p className="text-[13px] text-muted-foreground py-6 text-center">
+                  Ngày này chưa có ca dạy nào.
+                </p>
+              ) : (
+                <div className="flex min-w-[560px]">
+                  <div className="w-12 shrink-0 border-r border-line bg-muted/20 relative" style={{ height: `${dayDetailHeight}px` }}>
+                    {dayDetailHourTicks.map((t) => (
+                      <div
+                        key={t.minutes}
+                        className="absolute right-1.5 text-[10px] font-mono font-medium text-subtle-foreground whitespace-nowrap -translate-y-1/2 tabular"
+                        style={{ top: `${(t.minutes - dayDetailBounds.startMinutes) * DAY_DETAIL_PX_PER_MINUTE}px` }}
+                      >
+                        {t.label}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex-1 relative" style={{ height: `${dayDetailHeight}px` }}>
+                    <div className="absolute inset-0 pointer-events-none">
+                      {dayDetailHourTicks.map((t) => (
+                        <div
+                          key={t.minutes}
+                          className="absolute left-0 right-0 border-t border-line/50"
+                          style={{ top: `${(t.minutes - dayDetailBounds.startMinutes) * DAY_DETAIL_PX_PER_MINUTE}px` }}
+                        />
+                      ))}
+                    </div>
+
+                    {selectedDate === todayStr && (
+                      <TimelineNowMarker
+                        startMinutes={dayDetailBounds.startMinutes}
+                        endMinutes={dayDetailBounds.endMinutes}
+                        pixelsPerMinute={DAY_DETAIL_PX_PER_MINUTE}
+                      />
+                    )}
+
+                    {dayDetail.laidOut.map(({ slot, startMin, endMin, column, columnCount, overlap }) => {
+                      const cls = classMap.get(slot.classId);
+                      const studentCount = cls?.studentIds?.length || 0;
+                      const meetingLink = slot.meetingLink || cls?.meetingLink;
+                      const topPx = (startMin - dayDetailBounds.startMinutes) * DAY_DETAIL_PX_PER_MINUTE;
+                      const heightPx = Math.max((endMin - startMin) * DAY_DETAIL_PX_PER_MINUTE, 40);
+                      const widthPct = 100 / columnCount;
+                      const compact = heightPx < 80;
+
+                      return (
+                        <div
+                          key={slot.id}
+                          className={cn(
+                            'absolute rounded-field p-2.5 shadow-soft border bg-primary-soft text-primary-ink border-primary/30 flex flex-col overflow-hidden',
+                            overlap === 'conflict' && 'ring-2 ring-warning border-warning'
+                          )}
+                          style={{
+                            top: `${topPx}px`,
+                            height: `${heightPx}px`,
+                            left: `calc(${column * widthPct}% + 4px)`,
+                            width: `calc(${widthPct}% - 8px)`,
+                          }}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-card text-foreground border border-line tabular">
+                                  {slot.classId}
+                                </span>
+                                <Badge tone="primary" className="text-[9px] py-0 px-1.5">
+                                  {slot.status}
+                                </Badge>
+                                {overlap === 'conflict' && (
+                                  <Badge tone="warning" className="text-[9px] py-0 px-1.5">
+                                    Trùng giờ
+                                  </Badge>
+                                )}
+                                {overlap === 'parallel' && (
+                                  <Badge tone="info" className="text-[9px] py-0 px-1.5">
+                                    Song song
+                                  </Badge>
+                                )}
+                                {slot.checkinTime && (
+                                  <Badge
+                                    tone={slot.checkinStatus === 'Đi muộn' ? 'warning' : 'success'}
+                                    className="text-[9px] py-0 px-1.5"
+                                  >
+                                    Vào {slot.checkinTime}
+                                  </Badge>
+                                )}
+                              </div>
+                              <h4 className="font-bold text-foreground text-[13px] leading-snug mt-0.5 truncate">
+                                {cls?.name || slot.subject}
+                              </h4>
+                            </div>
+                            <span className="text-[11px] font-mono font-bold whitespace-nowrap tabular">
+                              {formatTimeHM(slot.startTime)} – {formatTimeHM(slot.endTime)}
+                            </span>
+                          </div>
+
+                          {!compact && (
+                            <div className="mt-auto pt-1.5 flex items-center justify-between gap-2 flex-wrap">
+                              <div className="text-[11px] text-muted-foreground flex items-center gap-2.5 flex-wrap">
+                                <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                                  <MapPin size={11} />
+                                  {slot.roomId}
+                                </span>
+                                <span className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-foreground">
+                                  <Users size={11} className="text-primary" />
+                                  {studentCount} học viên
+                                </span>
+                                {meetingLink && (
+                                  <a
+                                    href={meetingLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-primary hover:underline font-semibold whitespace-nowrap"
+                                  >
+                                    <Video size={11} /> Phòng online
+                                  </a>
+                                )}
+                              </div>
+                              <Link
+                                href={`/teacher/attendance?classId=${slot.classId}&slotId=${slot.id}`}
+                                className="inline-flex items-center gap-1 py-1 px-2.5 rounded-pill bg-primary text-white text-[10px] font-bold shadow-soft hover:bg-primary-hover transition"
+                              >
+                                <CheckCircle2 size={10} /> Điểm danh
+                              </Link>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           </section>
 
           {/* Section: Ca mở chưa có GV phân công */}
