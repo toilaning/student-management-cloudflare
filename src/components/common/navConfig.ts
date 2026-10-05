@@ -83,6 +83,10 @@ export const NAV_GROUPS: Record<Role, NavGroup[]> = {
       title: 'Danh mục',
       items: [{ label: 'Lớp phụ trách', href: '/teacher/classes', icon: BookOpen }],
     },
+    {
+      title: 'Hệ thống',
+      items: [{ label: 'Cài đặt', href: '/teacher/settings', icon: Settings }],
+    },
   ],
   STUDENT: [
     {
@@ -125,7 +129,7 @@ export const MOBILE_NAV: Record<Role, NavItem[]> = {
     { label: 'Lịch dạy', href: '/teacher/schedule', icon: CalendarDays },
     { label: 'Điểm danh', href: '/teacher/attendance', icon: UserCheck },
     { label: 'Lớp', href: '/teacher/classes', icon: BookOpen },
-    { label: 'Đơn từ', href: '/teacher/requests', icon: Inbox },
+    { label: 'Cài đặt', href: '/teacher/settings', icon: Settings },
   ],
   STUDENT: [
     { label: 'Trang chủ', href: '/student/dashboard', icon: LayoutDashboard },

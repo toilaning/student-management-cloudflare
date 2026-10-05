@@ -10,6 +10,7 @@ import { Field, Input, Select } from '@/components/ui/Field';
 import { SegmentedControl } from '@/components/ui/Tabs';
 import { Avatar } from '@/components/ui/Avatar';
 import { useToast } from '@/components/ui/Toast';
+import { ChangePasswordCard } from '@/components/account/ChangePasswordCard';
 import { Student } from '@/types/student';
 import {
   Link as LinkIcon,
@@ -19,7 +20,7 @@ import {
   GraduationCap,
 } from 'lucide-react';
 
-type Tab = 'profile' | 'study';
+type Tab = 'profile' | 'study' | 'security';
 
 export default function StudentSettingsPage() {
   const { currentUser } = useApp();
@@ -181,6 +182,7 @@ export default function StudentSettingsPage() {
             items={[
               { value: 'profile', label: 'Thông tin cá nhân' },
               { value: 'study', label: 'Hồ sơ học tập' },
+              { value: 'security', label: 'Đổi mật khẩu' },
             ]}
             value={activeTab}
             onChange={setActiveTab}
@@ -340,7 +342,7 @@ export default function StudentSettingsPage() {
                 </div>
               </form>
             </Card>
-          ) : (
+          ) : activeTab === 'study' ? (
             <Card>
               <form onSubmit={handleSaveStudy} className="space-y-6">
                 <CardHeader
@@ -385,6 +387,8 @@ export default function StudentSettingsPage() {
                 </div>
               </form>
             </Card>
+          ) : (
+            <ChangePasswordCard />
           )}
         </main>
       </div>

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { Card, StatCard } from '@/components/ui/Card';
 import { Sheet } from '@/components/ui/Sheet';
+import { ChangePasswordCard } from '@/components/account/ChangePasswordCard';
 import { Field, Input, Select } from '@/components/ui/Field';
 import { useToast } from '@/components/ui/Toast';
 import { useApp } from '@/context/AppContext';
@@ -382,6 +383,9 @@ export default function AdminAccountsPage() {
         />
 
         <main className="p-4 sm:p-6 max-w-content mx-auto w-full space-y-5">
+          {/* Đổi mật khẩu cho chính tài khoản đang đăng nhập */}
+          <ChangePasswordCard />
+
           {/* Thống kê tài khoản */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <StatCard
@@ -757,4 +761,3 @@ export default function AdminAccountsPage() {
     </RoleGuard>
   );
 }
-
