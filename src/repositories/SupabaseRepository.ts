@@ -218,8 +218,9 @@ function mapScheduleSlotFromDb(row: any): ScheduleSlot {
     roomId: row.room_id,
     date: typeof row.date === 'string' ? row.date.split('T')[0] : row.date,
     shiftId: Number(row.shift_id),
-    startTime: row.start_time,
-    endTime: row.end_time,
+    // Postgres trả 'HH:mm:ss'; giao diện chỉ cần 'HH:mm'.
+    startTime: row.start_time ? String(row.start_time).substring(0, 5) : row.start_time,
+    endTime: row.end_time ? String(row.end_time).substring(0, 5) : row.end_time,
     subject: row.subject,
     topic: row.topic || undefined,
     meetingLink: row.meeting_link || undefined,

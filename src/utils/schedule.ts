@@ -1,5 +1,5 @@
 import { ClassEntity } from '@/types/classroom';
-import { TimeShift, TIME_SHIFTS } from '@/types/schedule';
+import { ScheduleSlot, TimeShift, TIME_SHIFTS } from '@/types/schedule';
 
 /** Rút gọn 'HH:mm:ss' hoặc 'HH:mm' về đúng 5 ký tự 'HH:mm'. */
 export function toHHMM(time?: string | null): string {
@@ -44,4 +44,34 @@ export function formatClassTimeLabel(
   const matchedShift = findShiftByTime(startTime, endTime, shifts);
   const timeRange = startTime && endTime ? `${startTime} – ${endTime}` : startTime || endTime || 'Chưa đặt giờ';
   return matchedShift ? `Ca ${matchedShift.id} (${timeRange})` : timeRange;
+}
+
+/**
+ * Nhãn ca của một buổi học cụ thể. Buổi học có giờ riêng nên nhãn "Ca N" chỉ
+ * hiện khi giờ của buổi khớp đúng một ca mẫu.
+ */
+export function formatSlotTimeLabel(
+  slot: Pick<ScheduleSlot, 'startTime' | 'endTime' | 'shiftId'>,
+  shifts: TimeShift[] = TIME_SHIFTS,
+): string {
+  const startTime = toHHMM(slot.startTime);
+  const endTime = toHHMM(slot.endTime);
+  const matchedShift = findShiftByTime(startTime, endTime, shifts);
+  const timeRange = startTime && endTime ? `${startTime} – ${endTime}` : startTime || endTime || 'Chưa đặt giờ';
+  return matchedShift ? `Ca ${matchedShift.id} (${timeRange})` : timeRange;
+}
+
+/**
+ * Nhãn ngắn của một buổi học cho tab, huy hiệu: "Ca 3" nếu giờ khớp ca mẫu,
+ * ngược lại hiện khung giờ "13:30 – 15:30".
+ */
+export function formatSlotShortLabel(
+  slot: Pick<ScheduleSlot, 'startTime' | 'endTime' | 'shiftId'>,
+  shifts: TimeShift[] = TIME_SHIFTS,
+): string {
+  const startTime = toHHMM(slot.startTime);
+  const endTime = toHHMM(slot.endTime);
+  const matchedShift = findShiftByTime(startTime, endTime, shifts);
+  if (matchedShift) return `Ca ${matchedShift.id}`;
+  return startTime && endTime ? `${startTime} – ${endTime}` : startTime || endTime || 'Chưa đặt giờ';
 }

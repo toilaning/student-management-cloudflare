@@ -24,6 +24,7 @@ import {
 } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { timeToMinutes, minutesTo24h } from '@/utils/date';
+import { formatSlotShortLabel } from '@/utils/schedule';
 import {
   CheckCircle2,
   Clock,
@@ -238,7 +239,7 @@ function AttendanceContent() {
     const shortDate = parts.slice(1).join('/');
     return {
       value: s.id,
-      label: `${shortDate} • Ca ${s.shiftId} (${s.classId})`,
+      label: `${shortDate} • ${formatSlotShortLabel(s)} (${s.classId})`,
     };
   });
 
@@ -443,7 +444,7 @@ function AttendanceContent() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-[15px] font-bold text-foreground">
-              Danh sách học viên ca {currentSlot?.shiftId || ''}{' '}
+              Danh sách học viên {currentSlot ? formatSlotShortLabel(currentSlot) : ''}{' '}
               {currentSlot ? `(${currentSlot.subject} • ${currentSlot.classId})` : ''}
             </h2>
             <Badge tone="neutral" dot>

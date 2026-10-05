@@ -11,6 +11,7 @@ import { Badge, AttendanceBadge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/Toast';
 import { getTodayDateStr } from '@/utils/date';
+import { formatSlotShortLabel } from '@/utils/schedule';
 import {
   CalendarDays,
   CheckCircle2,
@@ -206,7 +207,7 @@ export default function StudentDashboardPage() {
                   <Card key={slot.id} className="flex flex-col sm:flex-row sm:items-center gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Badge tone="primary">Ca {slot.shiftId}</Badge>
+                        <Badge tone="primary">{formatSlotShortLabel(slot)}</Badge>
                         <span className="text-[13px] font-semibold text-muted-foreground tabular">
                           {slot.startTime} – {slot.endTime}
                         </span>

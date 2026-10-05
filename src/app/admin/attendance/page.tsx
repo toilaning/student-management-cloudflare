@@ -1,6 +1,7 @@
 'use client';
 
 import { getTodayDateStr } from '@/utils/date';
+import { formatSlotShortLabel, formatSlotTimeLabel } from '@/utils/schedule';
 
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -641,7 +642,7 @@ function AdminAttendanceContent() {
                 ) : (
                   slots.map((s) => (
                     <option key={s.id} value={s.id}>
-                      Ca {s.shiftId} · {s.startTime}-{s.endTime} · {s.subject} ({s.classId})
+                      {formatSlotTimeLabel(s)} · {s.subject} ({s.classId})
                     </option>
                   ))
                 )}
@@ -706,7 +707,7 @@ function AdminAttendanceContent() {
             Danh sách học viên
             {currentSlot && (
               <span className="ml-2 text-[13px] font-normal text-muted-foreground">
-                Ca {currentSlot.shiftId} · {currentSlot.classId}
+                {formatSlotShortLabel(currentSlot)} · {currentSlot.classId}
               </span>
             )}
           </h2>

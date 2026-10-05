@@ -5,6 +5,7 @@ import { Header } from '@/components/common/Header';
 import { RoleGuard } from '@/components/common/RoleGuard';
 import { Student } from '@/types/student';
 import { ClassEntity } from '@/types/classroom';
+import { formatClassTimeLabel } from '@/utils/schedule';
 import {
   Card,
   Button,
@@ -1266,7 +1267,8 @@ Lưu ý: Vui lòng đăng nhập và đổi mật khẩu trong lần đầu sử
                         </span>
                       </div>
                       <div className="text-[12px] text-muted-foreground mt-0.5">
-                        Phòng: {cls.roomId} • Lịch: Thứ {cls.scheduleDays?.join(', ') || '—'} (Ca {cls.shiftId})
+                        Phòng: {cls.roomId} • Lịch: Thứ {cls.scheduleDays?.join(', ') || '—'} •{' '}
+                        {formatClassTimeLabel(cls)}
                       </div>
                     </div>
 
