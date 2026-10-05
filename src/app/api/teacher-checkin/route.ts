@@ -110,6 +110,9 @@ export async function POST(request: Request) {
       // Ca chỉ được coi là hoàn thành khi đã có đủ giờ vào và giờ ra.
       if (checkinTime && checkoutTime && slot.status === 'Đã lên lịch') {
         slot.status = 'Đã hoàn thành';
+      } else if (!checkinTime && slot.status === 'Đã hoàn thành') {
+        // Xoá giờ vào ca thì ca quay lại trạng thái chưa hoàn thành.
+        slot.status = 'Đã lên lịch';
       }
 
       const saved = await repo.updateScheduleSlot(slot);
