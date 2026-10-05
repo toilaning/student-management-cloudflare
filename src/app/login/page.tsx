@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { Button, Field, Input } from '@/components/ui';
 import {
-  Compass,
   ShieldCheck,
   UserCheck,
   Users,
@@ -83,17 +82,12 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-4">
-        <div className="text-center space-y-2">
-          <span className="w-14 h-14 rounded-card bg-primary text-white flex items-center justify-center mx-auto shadow-primary">
-            <Compass size={26} />
-          </span>
-          <div>
-            <h1 className="text-lg font-bold text-foreground">Thuyết Studio</h1>
-            <p className="text-[13px] text-muted-foreground">Luyện thi Vẽ Kiến trúc & Mỹ thuật</p>
-          </div>
-        </div>
-
         <div className="bg-card border border-line rounded-card shadow-card p-6 space-y-5">
+          <div>
+            <h1 className="text-base font-bold text-foreground">Đăng nhập</h1>
+            <p className="text-[13px] text-muted-foreground">Dùng tài khoản được cấp để vào hệ thống.</p>
+          </div>
+
           {error && (
             <div className="flex items-center gap-2 rounded-field bg-danger-soft px-3.5 py-2.5 text-[13px] text-danger">
               <AlertCircle size={16} className="shrink-0" />
