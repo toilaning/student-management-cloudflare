@@ -114,6 +114,12 @@ export class BulkScheduleService {
     const createdSlots: ScheduleSlot[] = [];
     const conflicts: BulkGenerateConflictItem[] = [];
 
+    // Giữ sẵn danh sách ca học trong bộ nhớ và cập nhật dần, tránh truy vấn lặp lại
+    // (Worker có giới hạn số subrequest cho mỗi lần chạy).
+    const workingSlots: ScheduleSlot[] = [...initialSlots];
+    const slotsToCreate: ScheduleSlot[] = [];
+    const slotsToUpdate: ScheduleSlot[] = [];
+
     // Duyệt qua từng ngày
     for (const dateStr of dateList) {
       const [y, m, d] = dateStr.split('-').map(Number);
@@ -146,9 +152,7 @@ export class BulkScheduleService {
         const slotStartTime = overrideStartTime || cls.startTime || defaultShift.startTime || '18:30';
         const slotEndTime = overrideEndTime || cls.endTime || defaultShift.endTime || '20:30';
 
-        // Lấy tất cả slot hiện có để kiểm tra lớp đã có ca ngày đó chưa
-        const currentSlots = await this.repo.getAllScheduleSlots();
-        const existingSlot = currentSlots.find(
+        const existingSlot = workingSlots.find(
           s => s.classId === cls.id && s.date === dateStr && s.status !== 'Đã hủy'
         );
 
@@ -168,7 +172,7 @@ export class BulkScheduleService {
             };
 
             // Kiểm tra xung đột trước khi update (ngoại trừ chính existingSlot.id)
-            const check = await conflictEngine.checkScheduleConflict(updatedSlot, existingSlot.id);
+            const check = await conflictEngine.checkScheduleConflict(updatedSlot, existingSlot.id, workingSlots);
             if (check.hasConflict) {
               conflictCount++;
               conflicts.push({
@@ -178,7 +182,9 @@ export class BulkScheduleService {
                 conflicts: check.conflicts,
               });
             } else {
-              await this.repo.updateScheduleSlot(updatedSlot);
+              slotsToUpdate.push(updatedSlot);
+              const idx = workingSlots.findIndex(s => s.id === existingSlot.id);
+              if (idx >= 0) workingSlots[idx] = updatedSlot;
               updatedCount++;
               createdSlots.push(updatedSlot);
             }
@@ -204,7 +210,7 @@ export class BulkScheduleService {
           status: 'Đã lên lịch',
         };
 
-        const conflictResult = await conflictEngine.checkScheduleConflict(candidateSlot);
+        const conflictResult = await conflictEngine.checkScheduleConflict(candidateSlot, undefined, workingSlots);
 
         if (conflictResult.hasConflict) {
           conflictCount++;
@@ -221,11 +227,20 @@ export class BulkScheduleService {
             id: newSlotId,
             ...candidateSlot,
           };
-          await this.repo.createScheduleSlot(newSlot);
+          slotsToCreate.push(newSlot);
+          workingSlots.push(newSlot);
           createdCount++;
           createdSlots.push(newSlot);
         }
       }
+    }
+
+    // Ghi một lượt xuống cơ sở dữ liệu thay vì gọi riêng từng ca.
+    if (slotsToCreate.length > 0) {
+      await this.repo.createScheduleSlotsBatch(slotsToCreate);
+    }
+    if (slotsToUpdate.length > 0) {
+      await this.repo.updateScheduleSlotsBatch(slotsToUpdate);
     }
 
     // Ghi nhận Audit Log tổng kết

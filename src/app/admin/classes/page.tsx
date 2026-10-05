@@ -6,7 +6,7 @@ import { RoleGuard } from '@/components/common/RoleGuard';
 import { ClassEntity } from '@/types/classroom';
 import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
-import { TIME_SHIFTS } from '@/types/schedule';
+import { TIME_SHIFTS, TimeShift } from '@/types/schedule';
 import { timeToMinutes, formatTimeHM } from '@/utils/date';
 import {
   minuteToPercent,
@@ -40,6 +40,8 @@ import {
   Clock,
   RotateCw,
   Sparkles,
+  Settings2,
+  Check,
 } from 'lucide-react';
 
 /** Nhãn thứ trong tuần theo quy ước dữ liệu: 2..7 = Thứ 2..Thứ 7, 8 = Chủ nhật. */
@@ -91,6 +93,11 @@ export default function AdminClassesPage() {
 
   const [classes, setClasses] = useState<ClassEntity[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  // Danh sách ca học lấy từ hệ thống; nếu chưa tải được thì dùng bộ ca mẫu mặc định.
+  const [shifts, setShifts] = useState<TimeShift[]>(TIME_SHIFTS);
+  const [showShiftManager, setShowShiftManager] = useState(false);
+  const [shiftDraft, setShiftDraft] = useState<TimeShift[]>([]);
+  const [savingShifts, setSavingShifts] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -125,14 +132,22 @@ export default function AdminClassesPage() {
 
   const loadData = async () => {
     try {
-      const [clsRes, tcRes] = await Promise.all([
+      const [clsRes, tcRes, shiftRes] = await Promise.all([
         fetch('/api/classes'),
         fetch('/api/teachers'),
+        fetch('/api/shifts'),
       ]);
       const clsData = await clsRes.json();
       const tcData = await tcRes.json();
       setClasses(clsData.classes || []);
       setTeachers(tcData.teachers || []);
+      try {
+        const shiftData = await shiftRes.json();
+        const loadedShifts: TimeShift[] = shiftData.shifts || [];
+        if (loadedShifts.length > 0) setShifts(loadedShifts);
+      } catch {
+        // Giữ bộ ca mẫu mặc định nếu máy chủ chưa trả về danh sách ca.
+      }
     } catch (e: any) {
       toast.error(e?.message || 'Không thể tải danh sách lớp học');
     } finally {
@@ -422,6 +437,64 @@ export default function AdminClassesPage() {
   /** Áp một ca mẫu (Ca 1..Ca 5) vào khung giờ của lớp. */
   const applyShiftPreset = (startTime: string, endTime: string) => {
     setNewClassFormData({ ...newClassFormData, startTime, endTime });
+  };
+
+  /** Mở bảng chỉnh danh sách ca học của trung tâm. */
+  const openShiftManager = () => {
+    setShiftDraft(shifts.map((s) => ({ ...s })));
+    setShowShiftManager(true);
+  };
+
+  const updateShiftDraft = (index: number, patch: Partial<TimeShift>) => {
+    setShiftDraft((prev) => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)));
+  };
+
+  const addShiftDraft = () => {
+    const nextId = shiftDraft.reduce((max, s) => Math.max(max, s.id), 0) + 1;
+    setShiftDraft((prev) => [
+      ...prev,
+      { id: nextId, name: 'Ca ' + nextId, startTime: '08:00', endTime: '10:00', isActive: true },
+    ]);
+  };
+
+  const removeShiftDraft = (index: number) => {
+    setShiftDraft((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
+  };
+
+  const saveShifts = async () => {
+    const invalid = shiftDraft.find((s) => timeToMinutes(s.endTime) <= timeToMinutes(s.startTime));
+    if (invalid) {
+      toast.error('Ca "' + invalid.name + '" cần có giờ kết thúc sau giờ bắt đầu.');
+      return;
+    }
+    setSavingShifts(true);
+    try {
+      // Xoá những ca đã bị bỏ khỏi danh sách
+      const removed = shifts.filter((s) => !shiftDraft.some((d) => d.id === s.id));
+      for (const r of removed) {
+        await fetch('/api/shifts?id=' + r.id, { method: 'DELETE' });
+      }
+
+      const res = await fetch('/api/shifts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bulkShifts: shiftDraft, syncFutureSlots: true }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const saved: TimeShift[] = data.shifts || shiftDraft;
+        setShifts(saved);
+        setShiftDraft(saved.map((s) => ({ ...s })));
+        toast.success(data.message || 'Đã lưu danh sách ca học');
+        setShowShiftManager(false);
+      } else {
+        toast.error(data.error || 'Lưu danh sách ca học thất bại');
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Lỗi mạng');
+    } finally {
+      setSavingShifts(false);
+    }
   };
 
   return (
@@ -769,9 +842,18 @@ export default function AdminClassesPage() {
 
               {/* Ca mẫu */}
               <div className="space-y-1.5">
-                <span className="text-[12px] font-medium text-muted-foreground">Chọn ca mẫu</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[12px] font-medium text-muted-foreground">Chọn ca mẫu</span>
+                  <button
+                    type="button"
+                    onClick={openShiftManager}
+                    className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary hover:text-primary-hover cursor-pointer"
+                  >
+                    <Settings2 size={13} /> Sửa ca học
+                  </button>
+                </div>
                 <div className="flex flex-wrap gap-2">
-                  {TIME_SHIFTS.map((shift) => {
+                  {shifts.map((shift) => {
                     const isActive =
                       newClassFormData.startTime === shift.startTime &&
                       newClassFormData.endTime === shift.endTime;
@@ -1260,7 +1342,7 @@ export default function AdminClassesPage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {TIME_SHIFTS.map((shift) => {
+              {shifts.map((shift) => {
                 const isActive =
                   quickScheduleStartTime === shift.startTime && quickScheduleEndTime === shift.endTime;
                 return (
@@ -1362,6 +1444,77 @@ export default function AdminClassesPage() {
               </span>
             </label>
           </form>
+        </Sheet>
+
+        {/* Sheet Xác Nhận Xoá Lớp Học */}
+        <Sheet
+          isOpen={showShiftManager}
+          onClose={() => setShowShiftManager(false)}
+          title="Danh sách ca học của trung tâm"
+          description="Thêm, sửa hoặc bớt ca. Khung giờ mới sẽ tự cập nhật cho các ca học sắp tới."
+          size="md"
+          footer={
+            <div className="flex items-center justify-between gap-2 w-full">
+              <Button variant="secondary" icon={<Plus size={14} />} onClick={addShiftDraft}>
+                Thêm ca
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" onClick={() => setShowShiftManager(false)}>
+                  Hủy
+                </Button>
+                <Button variant="primary" loading={savingShifts} icon={<Check size={15} />} onClick={saveShifts}>
+                  Lưu ca học
+                </Button>
+              </div>
+            </div>
+          }
+        >
+          <div className="space-y-3">
+            {shiftDraft.map((shift, index) => (
+              <div key={shift.id} className="rounded-card border border-line bg-muted/50 p-3 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[12px] font-mono font-bold text-muted-foreground">Ca {shift.id}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeShiftDraft(index)}
+                    disabled={shiftDraft.length <= 1}
+                    className="text-subtle-foreground hover:text-danger cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Bỏ ca này"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <Field label="Tên ca">
+                    <Input
+                      value={shift.name}
+                      onChange={(e) => updateShiftDraft(index, { name: e.target.value })}
+                      placeholder={'Ca ' + shift.id}
+                    />
+                  </Field>
+                  <Field label="Bắt đầu">
+                    <Input
+                      type="time"
+                      value={shift.startTime}
+                      onChange={(e) => updateShiftDraft(index, { startTime: e.target.value })}
+                      className="font-mono font-bold"
+                    />
+                  </Field>
+                  <Field label="Kết thúc">
+                    <Input
+                      type="time"
+                      value={shift.endTime}
+                      onChange={(e) => updateShiftDraft(index, { endTime: e.target.value })}
+                      className="font-mono font-bold"
+                    />
+                  </Field>
+                </div>
+              </div>
+            ))}
+            <p className="text-[12px] text-muted-foreground">
+              Danh sách này là các khung giờ gợi ý khi mở lớp. Mỗi lớp vẫn có thể chỉnh giờ riêng.
+            </p>
+          </div>
         </Sheet>
 
         {/* Sheet Xác Nhận Xoá Lớp Học */}

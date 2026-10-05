@@ -1339,6 +1339,32 @@ export class SupabaseRepository implements IRepository {
     }
   }
 
+  public async createScheduleSlotsBatch(slots: ScheduleSlot[]): Promise<ScheduleSlot[]> {
+    if (!slots || slots.length === 0) return [];
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+
+    const rows = slots.map(mapScheduleSlotToDb);
+    const { error } = await client.from('schedule_slots').insert(rows);
+    if (error) {
+      throw new Error(error.message);
+    }
+    return slots;
+  }
+
+  public async updateScheduleSlotsBatch(slots: ScheduleSlot[]): Promise<ScheduleSlot[]> {
+    if (!slots || slots.length === 0) return [];
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+
+    const rows = slots.map(mapScheduleSlotToDb);
+    const { error } = await client.from('schedule_slots').upsert(rows, { onConflict: 'id' });
+    if (error) {
+      throw new Error(error.message);
+    }
+    return slots;
+  }
+
   // --------------------------------------------------------------------------
   // ATTENDANCE
   // --------------------------------------------------------------------------
