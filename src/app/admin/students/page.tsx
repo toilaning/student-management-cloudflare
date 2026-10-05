@@ -29,7 +29,6 @@ import {
   Copy,
   Check,
   Minus,
-  SlidersHorizontal,
   FolderKanban,
 } from 'lucide-react';
 
@@ -98,7 +97,6 @@ export default function AdminStudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [statusTab, setStatusTab] = useState<Student['status'] | 'ALL'>('Đang học');
   const [targetUniFilter, setTargetUniFilter] = useState<string>('ALL');
-  const [quickActionId, setQuickActionId] = useState<string>('');
   const [editingSessionStudent, setEditingSessionStudent] = useState<Student | null>(null);
   const [editSessionInput, setEditSessionInput] = useState<number>(12);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
@@ -215,34 +213,6 @@ export default function AdminStudentsPage() {
       }
     } catch (e: any) {
       toast.error(e?.message || 'Lỗi mạng khi cập nhật trạng thái');
-    }
-  };
-
-  const handleQuickStatusChange = async (targetStatus: Student['status']) => {
-    if (!quickActionId.trim()) {
-      toast.error('Vui lòng nhập mã học viên cần thao tác');
-      return;
-    }
-    const cleanId = quickActionId.trim();
-    setIsUpdatingStatus(true);
-    try {
-      const res = await fetch(`/api/students/${cleanId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: targetStatus }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success(`Đã chuyển học viên ${cleanId} sang "${targetStatus}"`);
-        setQuickActionId('');
-        await loadStudents(page, pageSize, searchTerm);
-      } else {
-        toast.error(data.error || 'Thao tác thất bại');
-      }
-    } catch (e: any) {
-      toast.error(e?.message || 'Lỗi mạng');
-    } finally {
-      setIsUpdatingStatus(false);
     }
   };
 
@@ -651,38 +621,6 @@ Lưu ý: Vui lòng đăng nhập và đổi mật khẩu trong lần đầu sử
         />
 
         <main className="p-4 sm:p-6 max-w-content mx-auto w-full space-y-5">
-          {/* Thanh chuyển trạng thái nhanh */}
-          <Card padded className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3 w-full md:w-auto">
-              <span className="text-[13px] font-semibold text-muted-foreground whitespace-nowrap flex items-center gap-1.5">
-                <SlidersHorizontal size={14} className="text-muted-foreground" />
-                Chuyển trạng thái nhanh:
-              </span>
-              <Input
-                placeholder="Nhập mã học viên (ví dụ 26001)..."
-                value={quickActionId}
-                onChange={(e) => setQuickActionId(e.target.value)}
-                className="w-full sm:w-64 font-mono font-semibold"
-              />
-            </div>
-
-            <div className="flex items-center gap-2.5 w-full md:w-auto justify-end">
-              <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                {STUDENT_STATUSES.map((s) => (
-                  <Button
-                    key={s}
-                    variant={s === 'Đã nghỉ học' ? 'danger' : 'secondary'}
-                    size="sm"
-                    loading={isUpdatingStatus}
-                    onClick={() => handleQuickStatusChange(s)}
-                  >
-                    {s}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </Card>
-
           {/* Tab trạng thái học tập */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1">
             <SegmentedControl
