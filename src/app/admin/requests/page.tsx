@@ -114,6 +114,10 @@ export default function AdminRequestsPage() {
     return s ? s.name : 'Ca ' + shiftId;
   };
 
+  // Giờ thật của buổi học được ưu tiên; ca mẫu chỉ dùng khi buổi học chưa có giờ riêng.
+  const formatSlotTime = (slot: { shiftId: number; startTime?: string; endTime?: string }) =>
+    slot.startTime && slot.endTime ? `${slot.startTime} – ${slot.endTime}` : getShiftLabel(slot.shiftId);
+
   // Filtered requests
   const filteredRequests = useMemo(() => {
     return requests.filter((req) => {
@@ -268,7 +272,7 @@ export default function AdminRequestsPage() {
               {cls?.name || req.classId}
             </p>
             <p className="text-[12px] text-muted-foreground">
-              {origSlot ? formatSlotDate(origSlot.date) + ' • ' + getShiftLabel(origSlot.shiftId) : req.scheduleSlotId}
+              {origSlot ? formatSlotDate(origSlot.date) + ' • ' + formatSlotTime(origSlot) : req.scheduleSlotId}
             </p>
           </div>
         );
@@ -430,7 +434,7 @@ export default function AdminRequestsPage() {
                     </p>
                     {origSlot && (
                       <p className="text-[12px] text-muted-foreground mt-0.5">
-                        {formatSlotDate(origSlot.date)} • {getShiftLabel(origSlot.shiftId)}
+                        {formatSlotDate(origSlot.date)} • {formatSlotTime(origSlot)}
                       </p>
                     )}
                   </div>
@@ -570,7 +574,7 @@ export default function AdminRequestsPage() {
                   <div className="pt-1.5 border-t border-line text-xs space-y-1">
                     <p className="font-semibold text-foreground flex items-center gap-1.5">
                       <Calendar size={13} />
-                      {formatSlotDate(selectedSlot.date)} — {getShiftLabel(selectedSlot.shiftId)}
+                      {formatSlotDate(selectedSlot.date)} — {formatSlotTime(selectedSlot)}
                     </p>
                     <p className="text-muted-foreground">
                       Phòng: {selectedSlot.roomId} • GV: {selectedSlot.teacherId}

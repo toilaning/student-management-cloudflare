@@ -177,6 +177,7 @@ function mapClassFromDb(row: any): ClassEntity {
     teacherId: row.teacher_id,
     roomId: row.room_id,
     studentIds,
+    maxStudents: row.max_students !== null && row.max_students !== undefined ? Number(row.max_students) : 15,
     tuitionFee: Number(row.tuition_fee),
     scheduleDays: row.schedule_days || [],
     shiftId: row.shift_id ? Number(row.shift_id) : 1,
@@ -196,6 +197,7 @@ function mapClassToDb(cls: ClassEntity): any {
     subject: cls.subject,
     teacher_id: cls.teacherId,
     room_id: cls.roomId,
+    max_students: cls.maxStudents ?? 15,
     tuition_fee: cls.tuitionFee,
     schedule_days: cls.scheduleDays,
     shift_id: cls.shiftId || 1,
@@ -1070,7 +1072,13 @@ export class SupabaseRepository implements IRepository {
 
     try {
       const row = mapClassToDb(classEntity);
-      const { error: updateErr } = await client.from('classes').update(row).eq('id', classEntity.id);
+      let { error: updateErr } = await client.from('classes').update(row).eq('id', classEntity.id);
+
+      // Tương thích ngược: database cũ chưa có cột max_students thì bỏ cột này và ghi lại.
+      if (updateErr && /max_students/i.test(updateErr.message || '')) {
+        const { max_students: _omit, ...legacyRow } = row;
+        ({ error: updateErr } = await client.from('classes').update(legacyRow).eq('id', classEntity.id));
+      }
       if (updateErr) {
         throw new Error(updateErr.message);
       }
@@ -1109,7 +1117,13 @@ export class SupabaseRepository implements IRepository {
 
     try {
       const row = mapClassToDb(classEntity);
-      const { error: insertErr } = await client.from('classes').insert(row);
+      let { error: insertErr } = await client.from('classes').insert(row);
+
+      // Tương thích ngược: database cũ chưa có cột max_students thì bỏ cột này và ghi lại.
+      if (insertErr && /max_students/i.test(insertErr.message || '')) {
+        const { max_students: _omit, ...legacyRow } = row;
+        ({ error: insertErr } = await client.from('classes').insert(legacyRow));
+      }
       if (insertErr) {
         throw new Error(insertErr.message);
       }

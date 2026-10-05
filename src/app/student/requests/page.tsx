@@ -113,6 +113,10 @@ export default function StudentRequestsPage() {
     return s ? `${s.name} (${s.startTime} - ${s.endTime})` : `Ca ${shiftId}`;
   };
 
+  // Giờ thật của buổi học được ưu tiên; ca mẫu chỉ dùng khi buổi học chưa có giờ riêng.
+  const formatSlotTime = (slot: { shiftId: number; startTime?: string; endTime?: string }) =>
+    slot.startTime && slot.endTime ? `${slot.startTime} – ${slot.endTime}` : getShiftLabel(slot.shiftId);
+
   const handleClassChange = (newClassId: string) => {
     const slots = myScheduleSlots.filter(s => s.classId === newClassId);
     setForm(prev => ({
@@ -257,7 +261,7 @@ export default function StudentRequestsPage() {
                             {formatSlotDate(origSlot.date)}
                             <span className="text-muted-foreground font-normal">•</span>
                             <Clock size={13} className="text-primary shrink-0" />
-                            {getShiftLabel(origSlot.shiftId)}
+                            {formatSlotTime(origSlot)}
                           </span>
                           <div className="text-muted-foreground text-[11px] mt-0.5">
                             Môn: {origSlot.subject} | Phòng: {origSlot.roomId} | GV: {origSlot.teacherId}
@@ -377,7 +381,7 @@ export default function StudentRequestsPage() {
                   >
                     {availableMySlots.map((slot) => (
                       <option key={slot.id} value={slot.id}>
-                        {formatSlotDate(slot.date)} - [{getShiftLabel(slot.shiftId)}] - Phòng: {slot.roomId} - GV: {slot.teacherId}
+                        {formatSlotDate(slot.date)} - [{formatSlotTime(slot)}] - Phòng: {slot.roomId} - GV: {slot.teacherId}
                       </option>
                     ))}
                   </Select>

@@ -246,9 +246,9 @@ export default function StudentClassesPage() {
               icon={<Calendar size={18} />}
             />
             <StatCard
-              label="Sĩ số chuẩn"
-              value="15"
-              hint="Học viên tối đa mỗi ca"
+              label="Lớp đang mở"
+              value={classes.filter((c) => c.status === 'Đang mở').length}
+              hint="Có thể đăng ký ngay"
               tone="info"
               icon={<Users size={18} />}
               className="col-span-2 sm:col-span-1"
@@ -315,15 +315,15 @@ export default function StudentClassesPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
               {filtered.map((cls) => {
                 const isEnrolled = student?.enrolledClassIds?.includes(cls.id);
-                const maxCapacity = 15;
+                const maxCapacity = cls.maxStudents || 15;
                 const currentStudents = cls.studentIds?.length || 0;
                 const isFull = currentStudents >= maxCapacity;
 
                 const shiftInfo = shiftMap.get(cls.shiftId ?? 1);
-                const shiftName = shiftInfo?.name || `Ca ${cls.shiftId}`;
-                const shiftTime = shiftInfo
-                  ? `${shiftInfo.startTime} – ${shiftInfo.endTime}`
-                  : '08:00 – 10:00';
+                // Lớp có khung giờ riêng; chỉ dùng giờ của ca mẫu khi lớp chưa đặt giờ.
+                const startTime = cls.startTime || shiftInfo?.startTime || '08:00';
+                const endTime = cls.endTime || shiftInfo?.endTime || '10:00';
+                const shiftTime = `${startTime} – ${endTime}`;
 
                 let badge = null;
                 if (isEnrolled) {
@@ -383,7 +383,7 @@ export default function StudentClassesPage() {
                             <Clock size={14} className="text-primary shrink-0" /> Ca & khung giờ:
                           </span>
                           <span className="font-semibold text-foreground tabular">
-                            {shiftName} ({shiftTime})
+                            {shiftTime}
                           </span>
                         </div>
 
@@ -433,7 +433,7 @@ export default function StudentClassesPage() {
                         <div className="space-y-2.5">
                           <div className="flex items-center justify-between p-2.5 rounded-field bg-primary-soft text-primary-ink text-[13px] font-semibold">
                             <span className="flex items-center gap-1.5">
-                              <Check size={14} /> Ca đang học: {shiftName}
+                              <Check size={14} /> Ca đang học: {shiftTime}
                             </span>
                           </div>
 

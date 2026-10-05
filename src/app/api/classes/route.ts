@@ -42,6 +42,7 @@ export async function PUT(request: Request) {
       startTime,
       endTime,
       scheduleDays,
+      maxStudents,
       isRecurring,
       tuitionFee,
       meetingLink,
@@ -106,6 +107,10 @@ export async function PUT(request: Request) {
 
     if (scheduleDays !== undefined && Array.isArray(scheduleDays)) {
       cls.scheduleDays = scheduleDays.map(Number);
+    }
+
+    if (maxStudents !== undefined) {
+      cls.maxStudents = Math.max(1, Number(maxStudents) || 15);
     }
 
     if (isRecurring !== undefined) {
@@ -245,6 +250,7 @@ export async function POST(request: Request) {
       startTime = '18:30',
       endTime = '20:30',
       scheduleDays = [2, 4, 6],
+      maxStudents = 15,
       isRecurring = true,
       tuitionFee = 1500000,
       meetingLink = '',
@@ -294,6 +300,7 @@ export async function POST(request: Request) {
       startTime: parsedStartTime,
       endTime: parsedEndTime,
       scheduleDays: Array.isArray(scheduleDays) ? scheduleDays.map(Number) : [2, 4, 6],
+      maxStudents: Math.max(1, Number(maxStudents) || 15),
       isRecurring: parsedIsRecurring,
       tuitionFee: Number(tuitionFee) || 0,
       meetingLink: meetingLink?.trim() || '',

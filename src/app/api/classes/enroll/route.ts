@@ -139,6 +139,14 @@ export async function POST(request: Request) {
         }, { status: 409 });
       }
 
+      // Chặn ghi danh khi lớp đã đủ sĩ số
+      const capacity = cls.maxStudents || 15;
+      if (!cls.studentIds.includes(studentId) && cls.studentIds.length >= capacity) {
+        return NextResponse.json({
+          error: `Lớp ${cls.name} đã đủ sĩ số (${cls.studentIds.length}/${capacity}). Vui lòng chọn ca khác.`,
+        }, { status: 409 });
+      }
+
       if (!cls.studentIds.includes(studentId)) {
         cls.studentIds.push(studentId);
         await repo.updateClass(cls);
@@ -209,7 +217,15 @@ export async function POST(request: Request) {
         }, { status: 409 });
       }
 
-      // Chuyển học sinh: bỏ khỏi lớp cũ, thêm vào lớp đích (KHÔNG kiểm tra sĩ số)
+      // Chặn đổi ca khi lớp đích đã đủ sĩ số
+      const targetCapacity = targetClass.maxStudents || 15;
+      if (!targetClass.studentIds.includes(studentId) && targetClass.studentIds.length >= targetCapacity) {
+        return NextResponse.json({
+          error: `Lớp ${targetClass.name} đã đủ sĩ số (${targetClass.studentIds.length}/${targetCapacity}). Vui lòng chọn ca khác.`,
+        }, { status: 409 });
+      }
+
+      // Chuyển học sinh: bỏ khỏi lớp cũ, thêm vào lớp đích
       cls.studentIds = cls.studentIds.filter(id => id !== studentId);
       await repo.updateClass(cls);
 

@@ -70,6 +70,7 @@ export default function AdminClassesPage() {
     startTime: '18:30',
     endTime: '20:30',
     scheduleDays: [2, 4, 6] as number[],
+    maxStudents: 15,
     isRecurring: true,
     tuitionFee: 1500000,
     meetingLink: '',
@@ -119,6 +120,11 @@ export default function AdminClassesPage() {
   const [editingMeetClass, setEditingMeetClass] = useState<ClassEntity | null>(null);
   const [savingMeetLink, setSavingMeetLink] = useState(false);
   const [meetLinkInput, setMeetLinkInput] = useState('');
+
+  // Sheet chỉnh sĩ số tối đa của lớp
+  const [editingCapacityClass, setEditingCapacityClass] = useState<ClassEntity | null>(null);
+  const [savingCapacity, setSavingCapacity] = useState(false);
+  const [capacityInput, setCapacityInput] = useState(15);
 
   // Sheet xác nhận xoá lớp
   const [classToDelete, setClassToDelete] = useState<ClassEntity | null>(null);
@@ -187,6 +193,7 @@ export default function AdminClassesPage() {
           startTime: '18:30',
           endTime: '20:30',
           scheduleDays: [2, 4, 6],
+          maxStudents: 15,
           isRecurring: true,
           tuitionFee: 1500000,
           meetingLink: '',
@@ -375,6 +382,36 @@ export default function AdminClassesPage() {
   teachers.forEach((t) => {
     teacherMap[t.id] = t.name;
   });
+
+  const handleSaveCapacity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCapacityClass) return;
+    setSavingCapacity(true);
+    try {
+      const res = await fetch('/api/classes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          classId: editingCapacityClass.id,
+          maxStudents: capacityInput,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || 'Đã cập nhật sĩ số tối đa');
+        setClasses((prev) =>
+          prev.map((c) => (c.id === editingCapacityClass.id ? { ...c, maxStudents: capacityInput } : c))
+        );
+        setEditingCapacityClass(null);
+      } else {
+        toast.error(data.error || 'Cập nhật sĩ số thất bại');
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Lỗi mạng');
+    } finally {
+      setSavingCapacity(false);
+    }
+  };
 
   useEffect(() => {
     setCurrentPage(1);
@@ -651,9 +688,22 @@ export default function AdminClassesPage() {
                           <span className="flex items-center gap-1.5">
                             <Users size={13} /> Sĩ số:
                           </span>
-                          <span className="font-mono font-semibold text-foreground">
-                            {(cls.studentIds || []).length} học viên
-                          </span>
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono font-semibold text-foreground">
+                              {(cls.studentIds || []).length}/{cls.maxStudents || 15} học viên
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingCapacityClass(cls);
+                                setCapacityInput(cls.maxStudents || 15);
+                              }}
+                              className="text-subtle-foreground hover:text-foreground cursor-pointer p-0.5"
+                              title="Chỉnh sĩ số tối đa"
+                            >
+                              <Edit3 size={11} />
+                            </button>
+                          </div>
                         </div>
 
                         <div className="flex items-center justify-between border-t border-line/60 pt-1.5">
@@ -898,6 +948,24 @@ export default function AdminClassesPage() {
                 </Field>
               </div>
 
+              {/* Sĩ số tối đa của lớp */}
+              <Field label="Sĩ số tối đa" hint="Số học viên tối đa của lớp" required>
+                <Input
+                  type="number"
+                  min={1}
+                  max={200}
+                  required
+                  value={newClassFormData.maxStudents}
+                  onChange={(e) =>
+                    setNewClassFormData({
+                      ...newClassFormData,
+                      maxStudents: Math.max(1, Number(e.target.value) || 1),
+                    })
+                  }
+                  className="font-mono font-bold"
+                />
+              </Field>
+
               {/* Thứ trong tuần */}
               <div className="space-y-1.5">
                 <span className="text-[12px] font-medium text-muted-foreground">Học vào các thứ</span>
@@ -1092,6 +1160,57 @@ export default function AdminClassesPage() {
             <div className="p-3 bg-muted border border-line rounded-card text-xs text-muted-foreground leading-relaxed">
               Liên kết phòng học sẽ tự động hiển thị trên thời khóa biểu và giao diện vào lớp của học viên và giảng viên.
             </div>
+          </form>
+        </Sheet>
+
+        {/* Sheet Chỉnh Sĩ Số Tối Đa Của Lớp */}
+        <Sheet
+          isOpen={!!editingCapacityClass}
+          onClose={() => setEditingCapacityClass(null)}
+          title="Sĩ số tối đa của lớp"
+          description={
+            editingCapacityClass
+              ? 'Lớp: ' + editingCapacityClass.name + ' (' + editingCapacityClass.id + ')'
+              : undefined
+          }
+          size="sm"
+          footer={
+            <div className="flex items-center justify-end gap-2 w-full">
+              <Button variant="secondary" onClick={() => setEditingCapacityClass(null)}>
+                Hủy
+              </Button>
+              <Button variant="primary" loading={savingCapacity} onClick={handleSaveCapacity}>
+                Lưu sĩ số
+              </Button>
+            </div>
+          }
+        >
+          <form onSubmit={handleSaveCapacity} className="space-y-4">
+            <div className="bg-muted p-3 rounded-card border border-line text-xs space-y-1">
+              <div className="text-muted-foreground">Hiện tại:</div>
+              <div className="font-bold text-foreground font-mono">
+                {(editingCapacityClass?.studentIds || []).length}/{editingCapacityClass?.maxStudents || 15} học viên
+              </div>
+            </div>
+
+            <Field label="Sĩ số tối đa" hint="Khi đủ số này, hệ thống sẽ không nhận thêm học viên" required>
+              <Input
+                type="number"
+                min={1}
+                max={200}
+                required
+                value={capacityInput}
+                onChange={(e) => setCapacityInput(Math.max(1, Number(e.target.value) || 1))}
+                className="font-mono font-bold"
+              />
+            </Field>
+
+            {editingCapacityClass && capacityInput < (editingCapacityClass.studentIds || []).length && (
+              <p className="text-xs text-danger">
+                Lớp đang có {(editingCapacityClass.studentIds || []).length} học viên, sĩ số mới nhỏ hơn số hiện có.
+                Hệ thống vẫn lưu, nhưng sẽ không nhận thêm học viên cho tới khi sĩ số giảm xuống.
+              </p>
+            )}
           </form>
         </Sheet>
 

@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/Toast';
 import { getTodayDateStr, getTodayDateStrByDate, formatTimeHM } from '@/utils/date';
+import { formatClassTimeLabel } from '@/utils/schedule';
 import {
   buildTimelineTicks,
   clampSlotToTimeline,
@@ -167,7 +168,6 @@ export default function TeacherSchedulePage() {
   };
 
   const classMap = useMemo(() => new Map(allClasses.map((c) => [c.id, c])), [allClasses]);
-  const shiftMap = useMemo(() => new Map(shifts.map((s) => [s.id, s])), [shifts]);
 
   // Tuần hiện tại
   const weekDates = useMemo(() => getWeekDates(weekRefDate), [weekRefDate]);
@@ -596,9 +596,7 @@ export default function TeacherSchedulePage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {openClasses.map((cls) => {
-                  const shift = shiftMap.get(cls.shiftId ?? 1);
-                  const startTime = shift?.startTime || '08:00';
-                  const endTime = shift?.endTime || '10:00';
+                  const classTimeLabel = formatClassTimeLabel(cls, shifts);
 
                   return (
                     <Card key={cls.id} className="flex flex-col justify-between">
@@ -619,7 +617,7 @@ export default function TeacherSchedulePage() {
                               <Clock size={13} className="text-primary" /> Khung ca:
                             </span>
                             <span className="font-semibold tabular">
-                              Ca {cls.shiftId} ({startTime} – {endTime})
+                              {classTimeLabel}
                             </span>
                           </div>
                           <div className="flex items-center justify-between">

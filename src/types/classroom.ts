@@ -14,6 +14,7 @@ export interface ClassEntity {
   teacherId: string; // GV001..
   roomId: string; // P.101..
   studentIds: string[]; // ST001..
+  maxStudents?: number; // Sĩ số tối đa của lớp (mặc định 15 khi chưa đặt)
   tuitionFee: number; // Học phí/học viên cho khóa này
   scheduleDays: number[]; // 2, 3, 4, 5, 6, 7, 8 (Thứ 2 đến Chủ Nhật)
   shiftId?: number; // 1, 2, 3, 4, 5 (optional/legacy)

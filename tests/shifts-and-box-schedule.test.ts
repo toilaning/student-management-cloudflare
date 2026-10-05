@@ -153,6 +153,56 @@ describe('Dynamic Shifts & Schedule Box Suite', () => {
   });
 
   it('7. Luồng giáo viên nhận ca dạy (Claim Shift)', async () => {
+    // Kiểm tra chặn vượt sĩ số: lớp giới hạn 1 chỗ, học viên thứ hai phải bị từ chối.
+    const capClassId = 'CLS_CAP_TEST';
+    const firstStudent = 'ST_CAP_1';
+    const secondStudent = 'ST_CAP_2';
+
+    // Tạo trước 2 học viên để route ghi danh không trả 404 (thiếu học viên) trước khi tới bước kiểm tra sĩ số.
+    for (const [idx, studentId] of [firstStudent, secondStudent].entries()) {
+      await repo.createStudent({
+        id: studentId,
+        name: `Học viên sĩ số ${idx + 1}`,
+        phone: `090000000${idx + 1}`,
+        status: 'Đang học',
+        enrolledClassIds: [],
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    await repo.createClass({
+      id: capClassId,
+      code: 'CAP101',
+      name: 'Lớp Test Sĩ Số',
+      subject: 'Sĩ số',
+      teacherId: 'GV001',
+      roomId: 'P.101',
+      studentIds: [firstStudent],
+      maxStudents: 1,
+      tuitionFee: 0,
+      scheduleDays: [2],
+      shiftId: 1,
+      status: 'Đang mở',
+    });
+
+    const reqOverCap = new Request('http://localhost/api/classes/enroll', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        classId: capClassId,
+        studentId: secondStudent,
+        action: 'ENROLL',
+        actorId: secondStudent,
+      }),
+    });
+    const resOverCap = await enrollClass(reqOverCap);
+    const dataOverCap = await resOverCap.json();
+    assert.equal(resOverCap.status, 409, 'Phải trả về 409 khi lớp đã đủ sĩ số');
+    assert.ok(dataOverCap.error && dataOverCap.error.includes('đủ sĩ số'), 'Message lỗi phải nói rõ đủ sĩ số');
+
+    const capCls = await repo.getClassById(capClassId);
+    assert.ok(!capCls?.studentIds.includes(secondStudent), 'Học viên KHÔNG được thêm khi lớp đủ sĩ số');
+
     const testClassId = 'CLS03';
     const newTeacherId = 'GV003';
 

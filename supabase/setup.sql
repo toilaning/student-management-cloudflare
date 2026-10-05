@@ -107,6 +107,7 @@ create table if not exists public.classes (
     teacher_id   varchar(50)  references public.teachers(id) on delete set null,
     room_id      varchar(50)  references public.classrooms(id) on delete set null,
     tuition_fee  numeric(12,2) not null default 0,
+    max_students integer      not null default 15,
     schedule_days integer[]   not null default '{}',
     shift_id     integer,
     start_time   varchar(10)  default '18:30',
@@ -319,7 +320,8 @@ alter table public.students
 alter table public.classes
     add column if not exists start_time   varchar(10) default '18:30',
     add column if not exists end_time     varchar(10) default '20:30',
-    add column if not exists is_recurring boolean     default true;
+    add column if not exists is_recurring boolean     default true,
+    add column if not exists max_students integer     not null default 15;
 
 alter table public.schedule_slots
     add column if not exists checkin_time   varchar(10),

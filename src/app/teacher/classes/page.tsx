@@ -7,6 +7,7 @@ import { useApp } from '@/context/AppContext';
 import { RoleGuard } from '@/components/common/RoleGuard';
 import { ClassEntity } from '@/types/classroom';
 import { TimeShift, TIME_SHIFTS } from '@/types/schedule';
+import { formatClassTimeLabel } from '@/utils/schedule';
 import { Card, CardHeader, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -113,11 +114,6 @@ export default function TeacherClassesPage() {
       setClaimingClassId(null);
     }
   };
-
-  const shiftMap = useMemo(
-    () => new Map<number, TimeShift>(shifts.map((s) => [s.id, s])),
-    [shifts]
-  );
 
   const myClasses = useMemo(
     () => allClasses.filter((c) => c.teacherId === currentUser?.id),
@@ -321,11 +317,8 @@ export default function TeacherClassesPage() {
                   !cls.teacherId ||
                   cls.teacherId === 'CHUA_PHAN_CONG' ||
                   cls.teacherId === '';
-                const shiftInfo = shiftMap.get(cls.shiftId ?? 1);
-                const shiftTimeLabel = shiftInfo
-                  ? `${shiftInfo.startTime} – ${shiftInfo.endTime}`
-                  : 'Theo lịch ca';
-                const shiftName = shiftInfo?.name || `Ca ${cls.shiftId}`;
+                // Khung giờ thật của lớp được ưu tiên; ca mẫu chỉ là phương án dự phòng.
+                const shiftTimeLabel = formatClassTimeLabel(cls, shifts);
 
                 return (
                   <Card
@@ -363,7 +356,7 @@ export default function TeacherClassesPage() {
                             <Clock size={13} className="text-primary" /> Ca & khung giờ:
                           </span>
                           <span className="font-semibold text-foreground tabular">
-                            {shiftName} ({shiftTimeLabel})
+                            {shiftTimeLabel}
                           </span>
                         </div>
 
