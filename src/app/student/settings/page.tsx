@@ -4,15 +4,27 @@ import React, { useState, useEffect } from 'react';
 import { Header } from '@/components/common/Header';
 import { useApp } from '@/context/AppContext';
 import { RoleGuard } from '@/components/common/RoleGuard';
+import { Card, CardHeader } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Field, Input, Select } from '@/components/ui/Field';
+import { SegmentedControl } from '@/components/ui/Tabs';
+import { Avatar } from '@/components/ui/Avatar';
+import { useToast } from '@/components/ui/Toast';
+import { ChangePasswordCard } from '@/components/account/ChangePasswordCard';
 import { Student } from '@/types/student';
 import {
-  Link as LinkIcon, Save, Check, ExternalLink, User, UserRound,
+  Link as LinkIcon,
+  Save,
+  ExternalLink,
+  UserRound,
+  GraduationCap,
 } from 'lucide-react';
 
-type Tab = 'profile' | 'study';
+type Tab = 'profile' | 'study' | 'security';
 
 export default function StudentSettingsPage() {
   const { currentUser } = useApp();
+  const toast = useToast();
   const studentId = (currentUser as any)?.studentId || currentUser?.id || '';
 
   const [activeTab, setActiveTab] = useState<Tab>('profile');
@@ -39,7 +51,6 @@ export default function StudentSettingsPage() {
   });
 
   const [loading, setLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
@@ -73,20 +84,21 @@ export default function StudentSettingsPage() {
         }
       } catch (e) {
         console.error('Lỗi nạp thông tin học sinh:', e);
+        toast.error('Không thể tải thông tin học sinh.');
       } finally {
         setLoading(false);
         setInitialized(true);
       }
     }
     loadData();
-  }, [studentId, initialized]);
+  }, [studentId, initialized, toast]);
 
   const setField = (key: keyof typeof form, value: string) =>
-    setForm(prev => ({ ...prev, [key]: value }));
+    setForm((prev) => ({ ...prev, [key]: value }));
 
   const handleSaveStudy = async (e: React.FormEvent) => {
     e.preventDefault();
-    await save({ assignmentUrl: assignmentUrl.trim() }, 'Cập nhật hồ sơ học tập thành công!');
+    await save({ assignmentUrl: assignmentUrl.trim() }, 'Cập nhật hồ sơ học tập thành công.');
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -108,7 +120,7 @@ export default function StudentSettingsPage() {
         studyGoal: form.studyGoal.trim(),
         facebookUrl: form.facebookUrl.trim(),
       },
-      'Cập nhật thông tin cá nhân thành công!'
+      'Cập nhật thông tin cá nhân thành công.'
     );
   };
 
@@ -123,117 +135,155 @@ export default function StudentSettingsPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setSuccessMessage(msg);
-        setTimeout(() => setSuccessMessage(null), 3000);
+        toast.success(msg);
       } else {
-        alert(data.error || 'Cập nhật thất bại');
+        toast.error(data.error || 'Cập nhật thất bại.');
       }
     } catch (e: any) {
-      alert(e.message || 'Lỗi mạng');
+      toast.error(e.message || 'Lỗi kết nối mạng.');
     } finally {
       setLoading(false);
     }
   };
 
-  const inputCls =
-    'w-full p-3 border border-slate-200 rounded-xl focus:outline-indigo-600 text-xs bg-white';
-
   return (
     <RoleGuard allowedRoles={['STUDENT']}>
-      <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
+      <div className="flex-1 flex flex-col min-h-screen">
         <Header
-          title="Cài đặt & Hồ sơ Học viên"
-          subtitle="Chỉnh sửa, bổ sung thông tin cá nhân và hồ sơ học tập"
+          title="Cài đặt & hồ sơ"
+          subtitle="Chỉnh sửa thông tin cá nhân và hồ sơ học tập"
         />
 
-        <main className="p-6 max-w-4xl mx-auto w-full space-y-6">
-          {successMessage && (
-            <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2 font-medium animate-in fade-in">
-              <Check size={16} className="text-emerald-600 shrink-0" />
-              <span>{successMessage}</span>
-            </div>
-          )}
-
-          {/* Thanh điều hướng tab */}
-          <div className="flex items-center gap-1 bg-white rounded-xl border border-slate-200 p-1 shadow-xs w-fit">
-            <button
-              onClick={() => setActiveTab('profile')}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition ${
-                activeTab === 'profile'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <UserRound size={14} /> Thông tin cá nhân
-            </button>
-            <button
-              onClick={() => setActiveTab('study')}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition ${
-                activeTab === 'study'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <LinkIcon size={14} /> Hồ sơ học tập
-            </button>
-          </div>
-
-          {/* Card thông tin học viên */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6">
-            <div className="flex items-center gap-3 pb-5 border-b border-slate-100">
-              <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-lg">
-                {form.name?.charAt(0) || currentUser?.name?.charAt(0) || 'H'}
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-800 text-base">{form.name || currentUser?.name}</h3>
-                <span className="text-xs font-mono text-indigo-600 font-semibold">Mã học viên: {studentId}</span>
+        <main className="p-4 sm:p-6 max-w-content mx-auto w-full space-y-5">
+          {/* Thẻ định danh học viên */}
+          <Card>
+            <div className="flex items-center gap-3.5">
+              <Avatar name={form.name || currentUser?.name || 'H'} size={48} />
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-lg font-bold text-foreground truncate">
+                  {form.name || currentUser?.name || 'Học viên'}
+                </h2>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <span className="text-[12px] font-mono font-semibold text-primary">
+                    Mã học viên: {studentId}
+                  </span>
+                  {form.gradeLevel && (
+                    <span className="text-[12px] text-muted-foreground">
+                      • {form.gradeLevel}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
+          </Card>
 
-            {loading && !initialized ? (
-              <div className="p-8 text-center text-slate-400 text-sm">Đang tải thông tin...</div>
-            ) : activeTab === 'profile' ? (
-              <form onSubmit={handleSaveProfile} className="mt-6 space-y-4 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Họ và tên" required>
-                    <input className={inputCls} value={form.name} onChange={e => setField('name', e.target.value)} />
-                  </Field>
-                  <Field label="Số điện thoại">
-                    <input className={inputCls} value={form.phone} onChange={e => setField('phone', e.target.value)} placeholder="VD: 0381234567" />
-                  </Field>
-                  <Field label="Email">
-                    <input type="email" className={inputCls} value={form.email} onChange={e => setField('email', e.target.value)} placeholder="email@example.com" />
-                  </Field>
-                  <Field label="SĐT phụ huynh">
-                    <input className={inputCls} value={form.parentPhone} onChange={e => setField('parentPhone', e.target.value)} placeholder="VD: 0901234567" />
-                  </Field>
-                  <Field label="Ngày sinh">
-                    <input type="date" className={inputCls} value={form.dateOfBirth} onChange={e => setField('dateOfBirth', e.target.value)} />
-                  </Field>
-                  <Field label="Giới tính">
-                    <select className={inputCls} value={form.gender} onChange={e => setField('gender', e.target.value)}>
-                      <option value="Nam">Nam</option>
-                      <option value="Nữ">Nữ</option>
-                    </select>
-                  </Field>
-                  <div className="sm:col-span-2">
-                    <Field label="Địa chỉ">
-                      <input className={inputCls} value={form.address} onChange={e => setField('address', e.target.value)} />
+          {/* Dải chuyển tab */}
+          <SegmentedControl<Tab>
+            items={[
+              { value: 'profile', label: 'Thông tin cá nhân' },
+              { value: 'study', label: 'Hồ sơ học tập' },
+              { value: 'security', label: 'Đổi mật khẩu' },
+            ]}
+            value={activeTab}
+            onChange={setActiveTab}
+          />
+
+          {loading && !initialized ? (
+            <div className="h-96 rounded-card bg-muted animate-pulse border border-line" />
+          ) : activeTab === 'profile' ? (
+            <Card>
+              <form onSubmit={handleSaveProfile} className="space-y-6">
+                {/* Mục 1: Thông tin cơ bản */}
+                <div>
+                  <CardHeader
+                    icon={<UserRound size={18} />}
+                    title="Thông tin cơ bản"
+                    subtitle="Thông tin liên hệ và lý lịch học viên"
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Field label="Họ và tên" required>
+                      <Input
+                        value={form.name}
+                        onChange={(e) => setField('name', e.target.value)}
+                        placeholder="Nguyễn Văn A"
+                        required
+                      />
+                    </Field>
+                    <Field label="Số điện thoại">
+                      <Input
+                        value={form.phone}
+                        onChange={(e) => setField('phone', e.target.value)}
+                        placeholder="0381234567"
+                      />
+                    </Field>
+                    <Field label="Email">
+                      <Input
+                        type="email"
+                        value={form.email}
+                        onChange={(e) => setField('email', e.target.value)}
+                        placeholder="email@example.com"
+                      />
+                    </Field>
+                    <Field label="SĐT phụ huynh">
+                      <Input
+                        value={form.parentPhone}
+                        onChange={(e) => setField('parentPhone', e.target.value)}
+                        placeholder="0901234567"
+                      />
+                    </Field>
+                    <Field label="Ngày sinh">
+                      <Input
+                        type="date"
+                        value={form.dateOfBirth}
+                        onChange={(e) => setField('dateOfBirth', e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Giới tính">
+                      <Select
+                        value={form.gender}
+                        onChange={(e) => setField('gender', e.target.value as 'Nam' | 'Nữ')}
+                      >
+                        <option value="Nam">Nam</option>
+                        <option value="Nữ">Nữ</option>
+                      </Select>
+                    </Field>
+                    <Field label="Địa chỉ" className="sm:col-span-2">
+                      <Input
+                        value={form.address}
+                        onChange={(e) => setField('address', e.target.value)}
+                        placeholder="Số nhà, tên đường, phường/xã, quận/huyện..."
+                      />
+                    </Field>
+                    <Field label="Quê quán">
+                      <Input
+                        value={form.homeTown}
+                        onChange={(e) => setField('homeTown', e.target.value)}
+                        placeholder="Tỉnh/Thành phố quê quán"
+                      />
+                    </Field>
+                    <Field label="Lớp (hiện tại / thí sinh tự do)">
+                      <Input
+                        value={form.gradeLevel}
+                        onChange={(e) => setField('gradeLevel', e.target.value)}
+                        placeholder="Lớp 12, Thí sinh tự do..."
+                      />
                     </Field>
                   </div>
-                  <Field label="Quê quán">
-                    <input className={inputCls} value={form.homeTown} onChange={e => setField('homeTown', e.target.value)} />
-                  </Field>
-                  <Field label="Lớp (hiện tại / thí sinh tự do)">
-                    <input className={inputCls} value={form.gradeLevel} onChange={e => setField('gradeLevel', e.target.value)} placeholder="VD: Lớp 12, Thí sinh tự do..." />
-                  </Field>
                 </div>
 
-                <div className="pt-2 border-t border-slate-100">
-                  <p className="font-bold text-slate-700 mb-3">Mục tiêu luyện thi (Kiến trúc & Mỹ thuật)</p>
+                {/* Mục 2: Mục tiêu luyện thi */}
+                <div className="pt-5 border-t border-line">
+                  <CardHeader
+                    icon={<GraduationCap size={18} />}
+                    title="Mục tiêu luyện thi"
+                    subtitle="Định hướng trường đại học và khối thi năng khiếu"
+                  />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Field label="Trường đại học mục tiêu">
-                      <select className={inputCls} value={form.targetUniversity} onChange={e => setField('targetUniversity', e.target.value)}>
+                      <Select
+                        value={form.targetUniversity}
+                        onChange={(e) => setField('targetUniversity', e.target.value)}
+                      >
                         <option value="">— Chưa chọn —</option>
                         <option value="HAU">HAU - ĐH Kiến trúc Hà Nội</option>
                         <option value="HUCE">HUCE - ĐH Xây dựng</option>
@@ -244,103 +294,104 @@ export default function StudentSettingsPage() {
                         <option value="HOU">HOU - ĐH Mở</option>
                         <option value="VNU-SIS">VNU-SIS - ĐH Quốc gia</option>
                         <option value="KHAC">Khác</option>
-                      </select>
+                      </Select>
                     </Field>
                     <Field label="Khối thi">
-                      <select className={inputCls} value={form.examBlock} onChange={e => setField('examBlock', e.target.value)}>
+                      <Select
+                        value={form.examBlock}
+                        onChange={(e) => setField('examBlock', e.target.value as 'KHOI_V' | 'KHOI_H')}
+                      >
                         <option value="KHOI_V">Khối V (Vẽ Mỹ thuật / Tượng)</option>
                         <option value="KHOI_H">Khối H (Vẽ Bố cục / Người)</option>
-                      </select>
+                      </Select>
                     </Field>
                     {form.targetUniversity === 'KHAC' && (
                       <Field label="Tên trường (tự do)">
-                        <input className={inputCls} value={form.customUniversity} onChange={e => setField('customUniversity', e.target.value)} />
+                        <Input
+                          value={form.customUniversity}
+                          onChange={(e) => setField('customUniversity', e.target.value)}
+                          placeholder="Nhập tên trường đại học..."
+                        />
                       </Field>
                     )}
-                    <div className="sm:col-span-2">
-                      <Field label="Mục đích học">
-                        <input className={inputCls} value={form.studyGoal} onChange={e => setField('studyGoal', e.target.value)} placeholder="Thi ĐH, Năng khiếu, Bổ túc..." />
-                      </Field>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <Field label="Link Facebook">
-                        <input className={inputCls} value={form.facebookUrl} onChange={e => setField('facebookUrl', e.target.value)} placeholder="https://facebook.com/..." />
-                      </Field>
-                    </div>
+                    <Field label="Mục đích học" className="sm:col-span-2">
+                      <Input
+                        value={form.studyGoal}
+                        onChange={(e) => setField('studyGoal', e.target.value)}
+                        placeholder="Thi ĐH, Năng khiếu, Bổ túc..."
+                      />
+                    </Field>
+                    <Field label="Link Facebook" className="sm:col-span-2">
+                      <Input
+                        value={form.facebookUrl}
+                        onChange={(e) => setField('facebookUrl', e.target.value)}
+                        placeholder="https://facebook.com/..."
+                      />
+                    </Field>
                   </div>
                 </div>
 
-                <div className="pt-4 flex items-center justify-end">
-                  <button
+                <div className="pt-4 border-t border-line flex items-center justify-end">
+                  <Button
                     type="submit"
-                    disabled={loading}
-                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center gap-2 shadow-xs transition cursor-pointer disabled:opacity-50"
+                    loading={loading}
+                    icon={<Save size={16} />}
                   >
-                    <Save size={15} />
-                    <span>{loading ? 'Đang lưu...' : 'Lưu Thông Tin'}</span>
-                  </button>
+                    Lưu thông tin
+                  </Button>
                 </div>
               </form>
-            ) : (
-              <form onSubmit={handleSaveStudy} className="mt-6 space-y-5 text-xs">
-                {/* Link bài tập tổng hợp */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="font-bold text-slate-700 flex items-center gap-1.5">
-                      <LinkIcon size={14} className="text-indigo-600" />
-                      <span>Link Tổng Hợp Bài Làm (Google Drive / Notion / GitHub / Figma)</span>
-                    </label>
-                    {assignmentUrl && (
+            </Card>
+          ) : activeTab === 'study' ? (
+            <Card>
+              <form onSubmit={handleSaveStudy} className="space-y-6">
+                <CardHeader
+                  icon={<LinkIcon size={18} />}
+                  title="Hồ sơ học tập"
+                  subtitle="Lưu trữ link bài làm và sản phẩm học tập trong khóa học"
+                  action={
+                    assignmentUrl ? (
                       <a
                         href={assignmentUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-indigo-600 hover:underline flex items-center gap-1 font-semibold"
+                        className="text-[13px] font-semibold text-primary hover:text-primary-hover inline-flex items-center gap-1.5"
                       >
-                        <span>Mở link thử</span>
-                        <ExternalLink size={12} />
+                        <span>Mở link bài làm</span>
+                        <ExternalLink size={13} />
                       </a>
-                    )}
-                  </div>
-                  <input
+                    ) : undefined
+                  }
+                />
+
+                <Field
+                  label="Link tổng hợp bài làm (Google Drive / Notion / GitHub / Figma)"
+                  hint="Giảng viên sẽ bấm trực tiếp vào link này để kiểm tra và nhận xét toàn bộ bài tập của bạn trong khoá học."
+                >
+                  <Input
                     type="url"
                     placeholder="https://drive.google.com/drive/folders/... hoặc https://notion.so/..."
                     value={assignmentUrl}
-                    onChange={e => setAssignmentUrl(e.target.value)}
-                    className={inputCls}
+                    onChange={(e) => setAssignmentUrl(e.target.value)}
                   />
-                  <p className="text-[11px] text-slate-400">
-                    Thầy cô sẽ bấm trực tiếp vào link này để kiểm tra và nhận xét toàn bộ bài tập của em trong khóa học.
-                  </p>
-                </div>
+                </Field>
 
-                <div className="pt-4 flex items-center justify-end">
-                  <button
+                <div className="pt-4 border-t border-line flex items-center justify-end">
+                  <Button
                     type="submit"
-                    disabled={loading}
-                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center gap-2 shadow-xs transition cursor-pointer disabled:opacity-50"
+                    loading={loading}
+                    icon={<Save size={16} />}
                   >
-                    <Save size={15} />
-                    <span>{loading ? 'Đang lưu...' : 'Lưu Thay Đổi'}</span>
-                  </button>
+                    Lưu hồ sơ học tập
+                  </Button>
                 </div>
               </form>
-            )}
-          </div>
+            </Card>
+          ) : (
+            <ChangePasswordCard />
+          )}
         </main>
       </div>
     </RoleGuard>
-  );
-}
-
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1.5">
-      <label className="block font-bold text-slate-700">
-        {label}
-        {required && <span className="text-rose-500 ml-0.5">*</span>}
-      </label>
-      {children}
-    </div>
   );
 }

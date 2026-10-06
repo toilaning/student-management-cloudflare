@@ -39,9 +39,10 @@ export class ConflictEngine {
    */
   public async checkScheduleConflict(
     newSlot: Omit<ScheduleSlot, 'id'>, 
-    excludeSlotId?: string
+    excludeSlotId?: string,
+    preloadedSlots?: ScheduleSlot[]
   ): Promise<ConflictCheckResult> {
-    const allSlots = await this.repo.getAllScheduleSlots();
+    const allSlots = preloadedSlots ?? await this.repo.getAllScheduleSlots();
     const conflicts: ScheduleConflict[] = [];
 
     for (const slot of allSlots) {

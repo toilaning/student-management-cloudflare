@@ -4,6 +4,12 @@ import { AuthService } from '@/services/AuthService';
 
 export const dynamic = 'force-dynamic';
 
+// Không bao giờ trả passwordHash ra ngoài. Chỉ giữ lại các trường cần cho giao diện.
+function sanitizeUser<T extends { passwordHash?: string }>(user: T) {
+  const { passwordHash, ...safeUser } = user;
+  return safeUser;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const role = searchParams.get('role');
@@ -12,7 +18,7 @@ export async function GET(request: Request) {
 
   if (id) {
     const user = await repo.getUserById(id);
-    return NextResponse.json({ user });
+    return NextResponse.json({ user: user ? sanitizeUser(user) : null });
   }
 
   let users = await repo.getAllUsers();
@@ -28,7 +34,7 @@ export async function GET(request: Request) {
     );
   }
 
-  return NextResponse.json({ users });
+  return NextResponse.json({ users: users.map(sanitizeUser) });
 }
 
 export async function PUT(request: Request) {
@@ -101,7 +107,7 @@ export async function PUT(request: Request) {
 
     return NextResponse.json({
       success: true,
-      user,
+      user: sanitizeUser(user),
       message: `Cập nhật tài khoản ${user.name} (${userId}) thành công!`,
     });
   } catch (error: any) {
@@ -221,7 +227,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      user: newUser,
+      user: sanitizeUser(newUser),
       message: `Đã tạo tài khoản ${newUser.name} (${newUser.id}) thành công!`,
     });
   } catch (error: any) {

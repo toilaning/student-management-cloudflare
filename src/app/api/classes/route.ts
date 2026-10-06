@@ -36,7 +36,8 @@ export async function PUT(request: Request) {
       code,
       subject,
       teacherId,
-      roomId = "ONLINE",
+      // Không mặc định 'ONLINE': giáo viên nhận ca (chỉ gửi classId + teacherId) sẽ vô tình ghi đè phòng thật.
+      roomId,
       shiftId,
       startTime,
       endTime,
@@ -60,7 +61,22 @@ export async function PUT(request: Request) {
     let newTeacher = null;
 
     if (name !== undefined) cls.name = name.trim();
-    if (code !== undefined) cls.code = code.trim().toUpperCase();
+    if (code !== undefined) {
+      const normalizedCode = code.trim().toUpperCase();
+      const allClasses = await repo.getAllClasses();
+      const duplicated = allClasses.find(
+        (c) => c.id !== classId && String(c.code || '').trim().toUpperCase() === normalizedCode
+      );
+      if (duplicated) {
+        return NextResponse.json(
+          {
+            error: `Mã lớp "${normalizedCode}" đang được dùng cho lớp ${duplicated.name} (${duplicated.id}). Bạn đổi sang mã khác nhé.`,
+          },
+          { status: 400 }
+        );
+      }
+      cls.code = normalizedCode;
+    }
     if (subject !== undefined) cls.subject = subject.trim();
     if (tuitionFee !== undefined) cls.tuitionFee = Number(tuitionFee);
 
@@ -205,6 +221,13 @@ export async function PUT(request: Request) {
       message: `Đã cập nhật lớp ${cls.name} và đồng bộ ${syncedSlotsCount} ca học tương lai`,
     });
   } catch (error: any) {
+    const raw = String(error?.message || '');
+    if (raw.includes('duplicate key') && raw.includes('code')) {
+      return NextResponse.json(
+        { error: 'Mã lớp này đã tồn tại. Bạn chọn mã khác nhé.' },
+        { status: 400 }
+      );
+    }
     return NextResponse.json({ error: error?.message || 'Lỗi khi cập nhật lớp học' }, { status: 500 });
   }
 }
@@ -238,6 +261,14 @@ export async function POST(request: Request) {
     const parsedEndTime = (endTime || '20:30').trim();
     const parsedIsRecurring = isRecurring !== undefined ? Boolean(isRecurring) : true;
 
+    // Nếu khung giờ gửi lên khớp đúng một ca mẫu thì dùng ca đó; lớp dùng giờ
+    // riêng vẫn giữ shift_id để lọc theo ca, nhưng giao diện luôn ưu tiên giờ thật.
+    const shifts = await ShiftService.getAllShifts();
+    const matchedShift = shifts.find(
+      (s) => s.startTime === parsedStartTime && s.endTime === parsedEndTime
+    );
+    const resolvedShiftId = matchedShift ? matchedShift.id : Number(shiftId) || 1;
+
     const allClasses = await repo.getAllClasses();
     const maxNum = allClasses.reduce((max, c) => {
       const match = String(c.id || '').match(/^CLS(\d+)$/i);
@@ -246,14 +277,28 @@ export async function POST(request: Request) {
     const nextNum = maxNum + 1;
     const newId = `CLS${nextNum.toString().padStart(2, '0')}`;
 
+    // Chặn trùng mã lớp trước khi ghi vào cơ sở dữ liệu để báo lỗi rõ ràng cho người dùng.
+    const normalizedCode = code.trim().toUpperCase();
+    const duplicated = allClasses.find(
+      (c) => String(c.code || '').trim().toUpperCase() === normalizedCode
+    );
+    if (duplicated) {
+      return NextResponse.json(
+        {
+          error: `Mã lớp "${normalizedCode}" đã được dùng cho lớp ${duplicated.name} (${duplicated.id}). Bạn chọn mã khác nhé.`,
+        },
+        { status: 400 }
+      );
+    }
+
     const newClass = {
       id: newId,
-      code: code.trim().toUpperCase(),
+      code: normalizedCode,
       name: name.trim(),
       subject: subject.trim(),
       teacherId,
       roomId,
-      shiftId: Number(shiftId) || 1,
+      shiftId: resolvedShiftId,
       startTime: parsedStartTime,
       endTime: parsedEndTime,
       scheduleDays: Array.isArray(scheduleDays) ? scheduleDays.map(Number) : [2, 4, 6],
@@ -321,6 +366,13 @@ export async function POST(request: Request) {
       }`,
     });
   } catch (error: any) {
+    const raw = String(error?.message || '');
+    if (raw.includes('duplicate key') && raw.includes('code')) {
+      return NextResponse.json(
+        { error: 'Mã lớp này đã tồn tại. Bạn chọn mã khác nhé.' },
+        { status: 400 }
+      );
+    }
     return NextResponse.json({ error: error?.message || 'Lỗi khi tạo lớp học' }, { status: 500 });
   }
 }

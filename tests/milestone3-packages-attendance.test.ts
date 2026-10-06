@@ -195,7 +195,8 @@ test('Milestone 3 Suite: Quản lý Gói Buổi Học, Tự Chọn Gói, Status 
   });
 
   await t.test('4. Theo dõi lớp đang học Real-time (/api/attendance/current-session)', async () => {
-    const reqSession = new Request('http://localhost:3000/api/attendance/current-session?date=2026-09-20');
+    // 2026-09-21 là Thứ Hai, có ca học thật trong thời khóa biểu.
+    const reqSession = new Request('http://localhost:3000/api/attendance/current-session?date=2026-09-21');
     const resSession = await getCurrentSession(reqSession);
     const dataSession = await resSession.json();
 

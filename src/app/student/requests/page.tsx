@@ -4,12 +4,20 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Header } from '@/components/common/Header';
 import { useApp } from '@/context/AppContext';
 import { RoleGuard } from '@/components/common/RoleGuard';
-import { Modal } from '@/components/common/Modal';
 import { ClassRequest, RequestType, ScheduleSlot, TIME_SHIFTS } from '@/types/schedule';
-import { Inbox, Plus, Send, AlertCircle } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Sheet } from '@/components/ui/Sheet';
+import { Field, Select, Textarea } from '@/components/ui/Field';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { useToast } from '@/components/ui/Toast';
+import { Plus, Calendar, Clock, AlertCircle } from 'lucide-react';
 
 export default function StudentRequestsPage() {
   const { currentUser, isReady } = useApp();
+  const toast = useToast();
   const [requests, setRequests] = useState<ClassRequest[]>([]);
   const [studentClasses, setStudentClasses] = useState<any[]>([]);
   const [myScheduleSlots, setMyScheduleSlots] = useState<ScheduleSlot[]>([]);
@@ -105,6 +113,10 @@ export default function StudentRequestsPage() {
     return s ? `${s.name} (${s.startTime} - ${s.endTime})` : `Ca ${shiftId}`;
   };
 
+  // Giờ thật của buổi học được ưu tiên; ca mẫu chỉ dùng khi buổi học chưa có giờ riêng.
+  const formatSlotTime = (slot: { shiftId: number; startTime?: string; endTime?: string }) =>
+    slot.startTime && slot.endTime ? `${slot.startTime} – ${slot.endTime}` : getShiftLabel(slot.shiftId);
+
   const handleClassChange = (newClassId: string) => {
     const slots = myScheduleSlots.filter(s => s.classId === newClassId);
     setForm(prev => ({
@@ -147,11 +159,14 @@ export default function StudentRequestsPage() {
       if (res.ok && data.success) {
         setShowModal(false);
         setForm(prev => ({ ...prev, reason: '', targetScheduleSlotId: '' }));
+        toast.success('Đã gửi đơn xin nghỉ thành công.');
         await loadData();
       } else {
+        toast.error(data.error || 'Có lỗi xảy ra khi gửi đơn.');
         setErrorMsg(data.error || 'Có lỗi xảy ra khi gửi đơn.');
       }
     } catch (e: any) {
+      toast.error(e.message || 'Lỗi mạng hoặc hệ thống.');
       setErrorMsg(e.message || 'Lỗi mạng hoặc hệ thống.');
     } finally {
       setSubmitting(false);
@@ -165,245 +180,229 @@ export default function StudentRequestsPage() {
 
   return (
     <RoleGuard allowedRoles={['STUDENT', 'ADMIN']}>
-      <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
+      <div className="flex-1 flex flex-col min-h-screen">
         <Header 
           title="Đơn Xin Nghỉ Học" 
           subtitle="Gửi yêu cầu xin nghỉ trực tiếp tới Ban Quản lý và Giảng viên phụ trách môn học" 
         />
 
-        <main className="p-6 max-w-7xl mx-auto w-full space-y-6">
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
-            <div className="text-sm font-semibold text-slate-800">
-              Tổng số đơn đã nộp: <strong className="text-emerald-600">{requests.length}</strong> đơn
-            </div>
-            <button
-              onClick={() => {
-                setErrorMsg('');
-                if (studentClasses.length > 0 && !form.classId) {
-                  const initialClassId = studentClasses[0].id;
-                  const initialSlots = myScheduleSlots.filter(s => s.classId === initialClassId);
-                  setForm(prev => ({
-                    ...prev,
-                    classId: initialClassId,
-                    scheduleSlotId: initialSlots[0]?.id || '',
-                  }));
-                }
-                setShowModal(true);
-              }}
-              className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg transition shadow-xs cursor-pointer"
-            >
-              <Plus size={16} /> Tạo đơn mới
-            </button>
-          </div>
+        <main className="p-4 sm:p-6 max-w-content mx-auto w-full space-y-5">
+          <PageHeader
+            title="Đơn xin nghỉ học"
+            subtitle={`Tổng số đơn đã nộp: ${requests.length} đơn`}
+            action={
+              <Button
+                variant="primary"
+                icon={<Plus size={16} />}
+                onClick={() => {
+                  setErrorMsg('');
+                  if (studentClasses.length > 0 && !form.classId) {
+                    const initialClassId = studentClasses[0].id;
+                    const initialSlots = myScheduleSlots.filter((s) => s.classId === initialClassId);
+                    setForm((prev) => ({
+                      ...prev,
+                      classId: initialClassId,
+                      scheduleSlotId: initialSlots[0]?.id || '',
+                    }));
+                  }
+                  setShowModal(true);
+                }}
+              >
+                Tạo đơn
+              </Button>
+            }
+          />
 
           {/* Requests List */}
           <div className="space-y-4">
-            {requests.map(req => {
+            {loading && (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-32 rounded-card bg-muted animate-pulse border border-line" />
+                ))}
+              </div>
+            )}
+            {!loading && requests.map(req => {
               const origSlot = findSlotInfo(req.scheduleSlotId);
 
               return (
-                <div key={req.id} className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 hover:border-slate-300 transition space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <Card key={req.id} className="space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-line pb-3">
                     <div className="flex items-center gap-3">
-                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded uppercase bg-amber-100 text-amber-800">
+                      <Badge tone="warning">
                         Đơn xin nghỉ học
-                      </span>
-                      <span className="font-bold text-slate-800 text-sm">
+                      </Badge>
+                      <span className="font-bold text-foreground text-sm">
                         Mã đơn: {req.id} • Lớp {req.classId}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-400">
+                      <span className="text-xs text-muted-foreground tabular">
                         {new Date(req.createdAt).toLocaleDateString('vi-VN')}
                       </span>
-                      <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
-                        req.status === 'ĐÃ_DUYỆT'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : req.status === 'TỪ_CHỐI'
-                          ? 'bg-rose-100 text-rose-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {req.status}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Chi tiết ca học liên quan */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50/80 p-3 rounded-lg border border-slate-100 text-xs">
-                    <div>
-                      <span className="font-semibold text-slate-500">Ca xin nghỉ:</span>
-                      {origSlot ? (
-                        <div className="mt-1 text-slate-800 font-medium">
-                          📅 {formatSlotDate(origSlot.date)} - {getShiftLabel(origSlot.shiftId)}
-                          <div className="text-slate-500 text-[11px]">
-                            Môn: {origSlot.subject} | Phòng: {origSlot.roomId} | GV: {origSlot.teacherId}
-                          </div>
-                        </div>
+                      {req.status === 'ĐÃ_DUYỆT' ? (
+                        <Badge tone="success" dot>Đã duyệt</Badge>
+                      ) : req.status === 'TỪ_CHỐI' ? (
+                        <Badge tone="danger" dot>Từ chối</Badge>
                       ) : (
-                        <div className="mt-1 text-slate-600 font-medium">Mã ca: {req.scheduleSlotId}</div>
+                        <Badge tone="warning" dot>Chờ duyệt</Badge>
                       )}
                     </div>
                   </div>
 
-                  <div className="text-xs text-slate-700 space-y-1.5">
-                    <p className="p-3 bg-white rounded-lg border border-slate-100 italic text-slate-600">
-                      "{req.reason}"
+                  {/* Chi tiết ca học liên quan */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-muted rounded-field p-3 border border-line text-xs">
+                    <div>
+                      <span className="font-semibold text-muted-foreground">Ca xin nghỉ:</span>
+                      {origSlot ? (
+                        <div className="mt-1 text-foreground font-medium">
+                          <span className="flex items-center gap-1.5 tabular font-semibold">
+                            <Calendar size={13} className="text-primary shrink-0" />
+                            {formatSlotDate(origSlot.date)}
+                            <span className="text-muted-foreground font-normal">•</span>
+                            <Clock size={13} className="text-primary shrink-0" />
+                            {formatSlotTime(origSlot)}
+                          </span>
+                          <div className="text-muted-foreground text-[11px] mt-0.5">
+                            Môn: {origSlot.subject} | Phòng: {origSlot.roomId} | GV: {origSlot.teacherId}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-1 text-foreground font-medium">Mã ca: {req.scheduleSlotId}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-xs space-y-1.5">
+                    <p className="p-3 bg-background rounded-field border border-line italic text-foreground">
+                      &ldquo;{req.reason}&rdquo;
                     </p>
 
                     {req.reviewNote && (
-                      <div className="mt-2 text-xs flex items-center gap-2 p-2 bg-slate-50 rounded border border-slate-200">
-                        <span className="font-semibold text-slate-600">
+                      <div className="mt-2 text-xs flex items-center gap-2 p-2.5 bg-muted rounded-field border border-line">
+                        <span className="font-semibold text-muted-foreground">
                           Phản hồi ({req.reviewedBy || 'Ban Quản trị / Giảng viên'}):
                         </span>
-                        <span className="font-medium text-slate-800">{req.reviewNote}</span>
+                        <span className="font-medium text-foreground">{req.reviewNote}</span>
                       </div>
                     )}
                   </div>
-                </div>
+                </Card>
               );
             })}
 
-            {requests.length === 0 && (
-              <div className="py-12 text-center bg-white rounded-xl border border-slate-200 text-slate-400 text-sm">
-                Bạn chưa gửi đơn xin nghỉ học nào.
-              </div>
+            {!loading && requests.length === 0 && (
+              <Card>
+                <EmptyState
+                  title="Chưa có đơn xin nghỉ nào"
+                  description="Bạn chưa gửi đơn xin nghỉ học nào trong hệ thống."
+                  action={
+                    <Button
+                      variant="secondary"
+                      icon={<Plus size={16} />}
+                      onClick={() => setShowModal(true)}
+                    >
+                      Tạo đơn mới
+                    </Button>
+                  }
+                />
+              </Card>
             )}
           </div>
 
-          {/* Modal Tạo Đơn Mới (Dùng Modal Portal chuẩn phủ 100vw x 100vh) */}
-          <Modal
+          {/* Sheet tạo đơn mới */}
+          <Sheet
             isOpen={showModal}
             onClose={() => setShowModal(false)}
-            className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
+            title="Gửi đơn xin nghỉ học"
+            description="Gửi yêu cầu xin nghỉ tới ban quản lý và giảng viên phụ trách."
+            footer={
+              <div className="flex items-center justify-end gap-2.5 w-full">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setShowModal(false)}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  type="submit"
+                  form="student-request-form"
+                  variant="primary"
+                  loading={submitting}
+                  disabled={!form.scheduleSlotId}
+                >
+                  Gửi đơn
+                </Button>
+              </div>
+            }
           >
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
-              <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
-                <Inbox size={18} className="text-emerald-600" />
-                Gửi đơn xin phép nghỉ học
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowModal(false)}
-                className="text-slate-400 hover:text-slate-600 text-lg cursor-pointer transition p-1"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 text-sm max-h-[80vh] overflow-y-auto">
+            <form id="student-request-form" onSubmit={handleSubmit} className="space-y-4 py-2">
               {errorMsg && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs flex items-center gap-2">
+                <div className="p-3 bg-danger-soft border border-danger/30 rounded-field text-danger text-xs flex items-center gap-2">
                   <AlertCircle size={16} className="shrink-0" />
                   <span>{errorMsg}</span>
                 </div>
               )}
 
-              {/* 1. Loại yêu cầu (chỉ còn Xin nghỉ) */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Loại yêu cầu</label>
-                <div className="grid grid-cols-1 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setForm(prev => ({ ...prev, type: 'XIN_NGHI', targetScheduleSlotId: '' }));
-                      setErrorMsg('');
-                    }}
-                    className={`py-2.5 px-3 text-xs font-semibold rounded-xl border transition flex items-center justify-center gap-2 cursor-pointer ${
-                      form.type === 'XIN_NGHI'
-                        ? 'bg-amber-50 border-amber-400 text-amber-900 shadow-xs'
-                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                    Đơn xin nghỉ học
-                  </button>
+              <Field label="Loại yêu cầu">
+                <div className="p-3 rounded-field border border-primary bg-primary-soft text-primary-ink text-[13px] font-semibold flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-primary" />
+                  Đơn xin nghỉ học
                 </div>
-              </div>
+              </Field>
 
-              {/* 2. Chọn lớp học */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Chọn môn / Lớp học đang tham gia <span className="text-rose-500">*</span>
-                </label>
-                <select
+              <Field label="Lớp học" required>
+                <Select
                   value={form.classId}
-                  onChange={e => handleClassChange(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 bg-white focus:outline-emerald-600 focus:border-emerald-600"
+                  onChange={(e) => handleClassChange(e.target.value)}
                   required
                 >
-                  {studentClasses.map(c => (
+                  {studentClasses.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name} ({c.id}) - Môn: {c.subject || c.name} - GV: {c.teacherId}
                     </option>
                   ))}
-                </select>
-              </div>
+                </Select>
+              </Field>
 
-              {/* 3. Chọn ca học hiện tại */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Chọn ca học xin nghỉ <span className="text-rose-500">*</span>
-                </label>
+              <Field label="Ca học xin nghỉ" required>
                 {availableMySlots.length > 0 ? (
-                  <select
+                  <Select
                     value={form.scheduleSlotId}
-                    onChange={e => {
-                      setForm(prev => ({
+                    onChange={(e) => {
+                      setForm((prev) => ({
                         ...prev,
                         scheduleSlotId: e.target.value,
                         targetScheduleSlotId: '',
                       }));
                     }}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 bg-white focus:outline-emerald-600 focus:border-emerald-600"
                     required
                   >
-                    {availableMySlots.map(slot => (
+                    {availableMySlots.map((slot) => (
                       <option key={slot.id} value={slot.id}>
-                        {formatSlotDate(slot.date)} - [{getShiftLabel(slot.shiftId)}] - Phòng: {slot.roomId} - GV: {slot.teacherId}
+                        {formatSlotDate(slot.date)} - [{formatSlotTime(slot)}] - Phòng: {slot.roomId} - GV: {slot.teacherId}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 ) : (
-                  <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-amber-800 text-xs">
+                  <div className="p-3 bg-warning-soft rounded-field border border-warning/30 text-foreground text-xs">
                     Lớp này hiện chưa có lịch học nào được sắp xếp.
                   </div>
                 )}
-              </div>
+              </Field>
 
-              {/* 5. Lý do xin phép */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Lý do chi tiết <span className="text-rose-500">*</span>
-                </label>
-                <textarea
+              <Field label="Lý do chi tiết" required>
+                <Textarea
                   rows={3}
                   value={form.reason}
-                  onChange={e => setForm({ ...form, reason: e.target.value })}
+                  onChange={(e) => setForm({ ...form, reason: e.target.value })}
                   placeholder="Nêu rõ lý do xin nghỉ..."
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-emerald-600 focus:border-emerald-600"
                   required
-                ></textarea>
-              </div>
-
-              {/* Action buttons */}
-              <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition text-xs font-semibold cursor-pointer"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting || !form.scheduleSlotId}
-                  className="flex items-center gap-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition shadow-xs cursor-pointer"
-                >
-                  <Send size={14} /> {submitting ? 'Đang gửi...' : 'Gửi đơn phê duyệt'}
-                </button>
-              </div>
+                />
+              </Field>
             </form>
-          </Modal>
+          </Sheet>
         </main>
       </div>
     </RoleGuard>

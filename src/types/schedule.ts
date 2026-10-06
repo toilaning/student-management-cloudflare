@@ -28,7 +28,20 @@ export interface ScheduleSlot {
   topic?: string;
   meetingLink?: string; // Link phòng học online (Google Meet, Zoom...)
   status: 'Đã lên lịch' | 'Đã hoàn thành' | 'Đã hủy' | 'Đổi lịch';
+
+  // Chấm công giáo viên theo ca
+  checkinTime?: string;   // Giờ giáo viên vào ca "18:32"
+  checkoutTime?: string;  // Giờ giáo viên kết ca "20:35"
+  checkinStatus?: TeacherCheckinStatus;
+  checkinMethod?: TeacherCheckinMethod;
+  checkinNote?: string;
 }
+
+/** Trạng thái chấm công của giáo viên cho một ca dạy. */
+export type TeacherCheckinStatus = 'Chưa chấm công' | 'Đúng giờ' | 'Đi muộn';
+
+/** Nguồn ghi nhận chấm công: giáo viên tự chấm, admin chấm hộ, hoặc hệ thống tự chốt. */
+export type TeacherCheckinMethod = 'TEACHER_SELF' | 'ADMIN' | 'SYSTEM';
 
 export interface ScheduleConflict {
   type: 'TEACHER_CONFLICT' | 'ROOM_CONFLICT' | 'CLASS_CONFLICT';

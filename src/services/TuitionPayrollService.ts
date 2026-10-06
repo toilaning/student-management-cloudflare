@@ -1,6 +1,13 @@
 import { IRepository } from '@/repositories/IRepository';
 import { TuitionInvoice, PayrollRecord } from '@/types/finance';
 
+/** Tháng hiện tại theo giờ Việt Nam, dạng YYYY-MM. */
+function currentMonth(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Saigon' })
+    .format(new Date())
+    .slice(0, 7);
+}
+
 export class TuitionPayrollService {
   constructor(private repo: IRepository) {}
 
@@ -136,7 +143,7 @@ export class TuitionPayrollService {
   /**
    * Tính toán lại bảng lương tháng của Giáo viên dựa trên số buổi dạy thực tế
    */
-  public async calculateTeacherPayroll(teacherId: string, month: string = '2026-09'): Promise<PayrollRecord> {
+  public async calculateTeacherPayroll(teacherId: string, month: string = currentMonth()): Promise<PayrollRecord> {
     const teacher = await this.repo.getTeacherById(teacherId);
     if (!teacher) {
       throw new Error(`Không tìm thấy giáo viên với mã ${teacherId}`);
@@ -153,7 +160,8 @@ export class TuitionPayrollService {
     // Chuẩn thực tế Mr. Thuyết: Lương giảng viên tính cố định theo ca dạy (ratePerSession)
     const sessionRate = teacher.ratePerSession || teacher.hourlyRate || 250000;
     const grossSalary = totalSlots * sessionRate;
-    const bonus = totalSlots >= 12 ? 1000000 : 500000;
+    // Chỉ thưởng khi thực sự có ca dạy hoàn thành trong tháng.
+    const bonus = totalSlots === 0 ? 0 : totalSlots >= 12 ? 1000000 : 500000;
     const deduction = 0;
     const netSalary = grossSalary + bonus - deduction;
 

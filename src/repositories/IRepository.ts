@@ -59,6 +59,8 @@ export interface IRepository {
   getScheduleSlotsByStudentId(studentId: string): Promise<ScheduleSlot[]>;
   createScheduleSlot(slot: ScheduleSlot): Promise<ScheduleSlot>;
   updateScheduleSlot(slot: ScheduleSlot): Promise<ScheduleSlot>;
+  createScheduleSlotsBatch(slots: ScheduleSlot[]): Promise<ScheduleSlot[]>;
+  updateScheduleSlotsBatch(slots: ScheduleSlot[]): Promise<ScheduleSlot[]>;
 
   // Attendance
   getAttendanceBySlotId(slotId: string): Promise<AttendanceRecord[]>;

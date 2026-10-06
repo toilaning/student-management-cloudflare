@@ -1,16 +1,41 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { Header } from '@/components/common/Header';
 import { useApp } from '@/context/AppContext';
 import { RoleGuard } from '@/components/common/RoleGuard';
 import { ClassEntity } from '@/types/classroom';
 import { TimeShift, TIME_SHIFTS } from '@/types/schedule';
-import { BookOpen, Users, MapPin, Clock, CheckCircle2, UserCheck, AlertCircle, Sparkles, Check, ChevronRight, Plus } from 'lucide-react';
-import Link from 'next/link';
+import { formatClassTimeLabel } from '@/utils/schedule';
+import { Card, CardHeader, StatCard } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { Sheet } from '@/components/ui/Sheet';
+import { SegmentedControl } from '@/components/ui/Tabs';
+import { SearchInput } from '@/components/ui/SearchInput';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { DataTable, Column } from '@/components/ui/DataTable';
+import { Avatar } from '@/components/ui/Avatar';
+import { useToast } from '@/components/ui/Toast';
+import {
+  BookOpen,
+  Users,
+  MapPin,
+  Clock,
+  UserCheck,
+  Sparkles,
+  ChevronRight,
+  Plus,
+  Calendar,
+  Video,
+  ExternalLink,
+  Phone,
+} from 'lucide-react';
 
 export default function TeacherClassesPage() {
   const { currentUser, isReady } = useApp();
+  const toast = useToast();
   const [allClasses, setAllClasses] = useState<ClassEntity[]>([]);
   const [selectedClassForView, setSelectedClassForView] = useState<ClassEntity | null>(null);
   const [classStudents, setClassStudents] = useState<any[]>([]);
@@ -18,8 +43,8 @@ export default function TeacherClassesPage() {
   const [shifts, setShifts] = useState<TimeShift[]>(TIME_SHIFTS);
   const [loading, setLoading] = useState(true);
   const [claimingClassId, setClaimingClassId] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<'ALL' | 'MINE' | 'AVAILABLE'>('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const loadData = async () => {
     if (!isReady || !currentUser?.id) return;
@@ -36,6 +61,7 @@ export default function TeacherClassesPage() {
       if (shiftData.shifts) setShifts(shiftData.shifts);
     } catch (e) {
       console.error(e);
+      toast.error('Không thể tải dữ liệu lớp học.');
     } finally {
       setLoading(false);
     }
@@ -45,7 +71,6 @@ export default function TeacherClassesPage() {
     loadData();
   }, [currentUser, isReady]);
 
-  
   const handleOpenClassStudents = async (cls: ClassEntity) => {
     setSelectedClassForView(cls);
     setLoadingStudents(true);
@@ -53,10 +78,11 @@ export default function TeacherClassesPage() {
       const res = await fetch('/api/students?limit=1000');
       const data = await res.json();
       const allSt = data.students || [];
-      const enrolled = allSt.filter((s: any) => (cls.studentIds || []).includes(s.id));
+      const enrolled = allSt.filter((s: any) => (cls.studentIds || []).includes(s.id)).map((s: any, i: number) => ({ ...s, _idx: i + 1 }));
       setClassStudents(enrolled);
     } catch (e) {
       console.error(e);
+      toast.error('Không thể tải danh sách học viên.');
     } finally {
       setLoadingStudents(false);
     }
@@ -77,338 +103,417 @@ export default function TeacherClassesPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setActionMessage(`Thầy/Cô đã nhận ca dạy lớp ${cls.name} (${cls.code}) thành công!`);
+        toast.success(`Đã nhận ca dạy lớp ${cls.name} (${cls.code}) thành công.`);
         await loadData();
-        setTimeout(() => setActionMessage(null), 4000);
       } else {
-        alert(data.error || 'Nhận ca dạy thất bại');
+        toast.error(data.error || 'Nhận ca dạy thất bại.');
       }
     } catch (e: any) {
-      alert(e.message || 'Lỗi mạng khi nhận ca dạy');
+      toast.error(e.message || 'Lỗi kết nối khi nhận ca dạy.');
     } finally {
       setClaimingClassId(null);
     }
   };
 
-  const shiftMap = new Map<number, TimeShift>(shifts.map(s => [s.id, s]));
+  const myClasses = useMemo(
+    () => allClasses.filter((c) => c.teacherId === currentUser?.id),
+    [allClasses, currentUser?.id]
+  );
 
-  const myClasses = allClasses.filter(c => c.teacherId === currentUser?.id);
-  const availableClasses = allClasses.filter(c => !c.teacherId || c.teacherId === 'CHUA_PHAN_CONG' || c.teacherId === '');
+  const availableClasses = useMemo(
+    () =>
+      allClasses.filter(
+        (c) => !c.teacherId || c.teacherId === 'CHUA_PHAN_CONG' || c.teacherId === ''
+      ),
+    [allClasses]
+  );
 
-  const displayedClasses = allClasses.filter(c => {
-    if (filterMode === 'MINE') return c.teacherId === currentUser?.id;
-    if (filterMode === 'AVAILABLE') return !c.teacherId || c.teacherId === 'CHUA_PHAN_CONG' || c.teacherId === '';
-    return true;
-  });
+  const displayedClasses = useMemo(() => {
+    return allClasses.filter((c) => {
+      if (filterMode === 'MINE' && c.teacherId !== currentUser?.id) return false;
+      if (
+        filterMode === 'AVAILABLE' &&
+        c.teacherId &&
+        c.teacherId !== 'CHUA_PHAN_CONG' &&
+        c.teacherId !== ''
+      ) {
+        return false;
+      }
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase();
+        const matchesName = c.name?.toLowerCase().includes(q);
+        const matchesCode = c.code?.toLowerCase().includes(q);
+        const matchesSubj = c.subject?.toLowerCase().includes(q);
+        const matchesRoom = c.roomId?.toLowerCase().includes(q);
+        return matchesName || matchesCode || matchesSubj || matchesRoom;
+      }
+      return true;
+    });
+  }, [allClasses, filterMode, currentUser?.id, searchTerm]);
+
+  // Columns cho DataTable danh sách học sinh trong Sheet
+  const studentColumns: Column<any>[] = [
+    {
+      key: 'stt',
+      header: '#',
+      align: 'center',
+      className: 'w-10 text-muted-foreground font-mono text-xs',
+      render: (st: any) => st._idx ?? '',
+    },
+    {
+      key: 'student',
+      header: 'Học viên',
+      render: (st) => (
+        <div className="flex items-center gap-2.5">
+          <Avatar name={st.name} size={32} />
+          <div className="min-w-0">
+            <div className="font-bold text-foreground text-xs sm:text-sm truncate">{st.name}</div>
+            <div className="font-mono text-[11px] text-muted-foreground">{st.id}</div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'info',
+      header: 'Thông tin học tập',
+      render: (st) => (
+        <div className="space-y-0.5 text-xs text-muted-foreground">
+          <div>
+            Mục tiêu:{' '}
+            <strong className="text-foreground">
+              {st.targetUniversity === 'KHAC'
+                ? st.customUniversity || 'Khác'
+                : st.targetUniversity || 'HAU'}
+            </strong>
+            {' • '}
+            {st.examBlock === 'KHOI_H' ? 'Khối H' : 'Khối V'}
+            {' • '}
+            {st.gradeLevel || 'Lớp 12'}
+          </div>
+          {st.homeTown && <div>Quê quán: {st.homeTown}</div>}
+          {st.otherNotes && (
+            <div className="text-[11px] text-foreground bg-warning-soft px-1.5 py-0.5 rounded-field inline-block">
+              {st.otherNotes}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'sessions',
+      header: 'Buổi còn',
+      align: 'center',
+      render: (st) => (
+        <Badge tone="info" className="tabular font-bold">
+          Còn {st.remainingSessions ?? 12} buổi
+        </Badge>
+      ),
+    },
+    {
+      key: 'contact',
+      header: 'Liên hệ',
+      align: 'right',
+      render: (st) => (
+        <div className="text-xs font-mono text-muted-foreground flex items-center justify-end gap-1">
+          {st.phone ? (
+            <>
+              <Phone size={11} className="text-muted-foreground" />
+              <span>{st.phone}</span>
+            </>
+          ) : (
+            '–'
+          )}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <RoleGuard allowedRoles={['TEACHER', 'ADMIN']}>
-      <div className="flex-1 flex flex-col min-h-screen bg-slate-50/70 font-sans text-slate-800">
-        <Header 
-          title="Thời Khóa Biểu & Quản Lý Ca Dạy" 
-          subtitle={`Giảng viên: ${currentUser?.name || ''} (${currentUser?.id || ''}) - Kỳ đào tạo Tháng 09/2026`} 
+      <div className="flex-1 flex flex-col min-h-screen">
+        <Header
+          title="Lớp học & ca dạy"
+          subtitle={`Giảng viên ${currentUser?.name || ''} (${currentUser?.id || ''}) • Quản lý các lớp phụ trách`}
         />
 
-        <main className="p-6 max-w-7xl mx-auto w-full space-y-6">
-          {actionMessage && (
-            <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center justify-between shadow-xs animate-fadeIn">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                <span className="font-medium">{actionMessage}</span>
-              </div>
-              <button onClick={() => setActionMessage(null)} className="text-emerald-600 hover:underline font-bold">
-                Đóng
-              </button>
-            </div>
-          )}
+        <main className="p-4 sm:p-6 max-w-content mx-auto w-full space-y-5">
+          {/* Hàng KPI thống kê */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <StatCard
+              label="Ca bạn đang dạy"
+              value={myClasses.length}
+              hint="Lớp phụ trách trực tiếp"
+              icon={<UserCheck size={18} />}
+              tone="primary"
+            />
+            <StatCard
+              label="Ca mở chờ nhận"
+              value={availableClasses.length}
+              hint="Có thể nhận dạy thêm"
+              icon={<Sparkles size={18} />}
+              tone="success"
+            />
+            <StatCard
+              label="Tổng số lớp mở"
+              value={allClasses.length}
+              hint="Toàn bộ lớp trung tâm"
+              icon={<BookOpen size={18} />}
+              tone="info"
+            />
+          </div>
 
-          {/* Stats Bar */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
-              <div>
-                <span className="text-xs text-slate-500 font-medium">Ca bạn trực tiếp giảng dạy</span>
-                <div className="text-xl font-bold text-blue-600 mt-1">{myClasses.length} lớp / ca</div>
-              </div>
-              <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600">
-                <UserCheck size={20} />
-              </div>
-            </div>
+          {/* Thanh lọc & tìm kiếm */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <SegmentedControl
+              value={filterMode}
+              onChange={setFilterMode}
+              items={[
+                { value: 'ALL', label: 'Tất cả ca học', count: allClasses.length },
+                { value: 'MINE', label: 'Ca bạn đang dạy', count: myClasses.length },
+                { value: 'AVAILABLE', label: 'Ca mở / Trống', count: availableClasses.length },
+              ]}
+            />
 
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
-              <div>
-                <span className="text-xs text-slate-500 font-medium">Ca mở đang chờ nhận lớp</span>
-                <div className="text-xl font-bold text-emerald-600 mt-1">{availableClasses.length} ca trống</div>
-              </div>
-              <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600">
-                <Sparkles size={20} />
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
-              <div>
-                <span className="text-xs text-slate-500 font-medium">Tổng số lớp trung tâm mở</span>
-                <div className="text-xl font-bold text-slate-800 mt-1">{allClasses.length} lớp</div>
-              </div>
-              <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700">
-                <BookOpen size={20} />
-              </div>
+            <div className="w-full sm:w-72">
+              <SearchInput
+                value={searchTerm}
+                onChange={setSearchTerm}
+                placeholder="Tìm tên lớp, mã, môn học..."
+              />
             </div>
           </div>
 
-          {/* Filter & View Navigation */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setFilterMode('ALL')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                  filterMode === 'ALL' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Tất cả ca học ({allClasses.length})
-              </button>
-              <button
-                onClick={() => setFilterMode('MINE')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                  filterMode === 'MINE' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Ca bạn đang dạy ({myClasses.length})
-              </button>
-              <button
-                onClick={() => setFilterMode('AVAILABLE')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                  filterMode === 'AVAILABLE' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Ca mở / Trống ({availableClasses.length})
-              </button>
+          {/* Danh sách thẻ lớp học */}
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-64 rounded-card bg-muted animate-pulse border border-line" />
+              ))}
             </div>
+          ) : displayedClasses.length === 0 ? (
+            <Card>
+              <EmptyState
+                icon={<BookOpen size={28} />}
+                title="Không tìm thấy lớp học nào"
+                description={
+                  searchTerm
+                    ? 'Không có lớp học nào khớp với từ khóa tìm kiếm.'
+                    : 'Không có lớp học nào trong danh mục này.'
+                }
+                action={
+                  searchTerm ? (
+                    <Button variant="secondary" size="sm" onClick={() => setSearchTerm('')}>
+                      Xóa tìm kiếm
+                    </Button>
+                  ) : undefined
+                }
+              />
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {displayedClasses.map((cls) => {
+                const isMine = cls.teacherId === currentUser?.id;
+                const isOpen =
+                  !cls.teacherId ||
+                  cls.teacherId === 'CHUA_PHAN_CONG' ||
+                  cls.teacherId === '';
+                // Khung giờ thật của lớp được ưu tiên; ca mẫu chỉ là phương án dự phòng.
+                const shiftTimeLabel = formatClassTimeLabel(cls, shifts);
 
-            <div className="text-xs text-slate-500 font-medium flex items-center gap-4">
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Ca đã phân công</span>
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Ca mở / Nhận ca</span>
-            </div>
-          </div>
+                return (
+                  <Card
+                    key={cls.id}
+                    className={`flex flex-col justify-between transition-all ${
+                      isMine ? 'border-primary/40 ring-1 ring-primary/20' : ''
+                    }`}
+                  >
+                    <div className="space-y-3.5">
+                      {/* Tiêu đề thẻ & Huy hiệu trạng thái */}
+                      <CardHeader
+                        title={cls.name}
+                        subtitle={`${cls.code} • ${cls.subject}`}
+                        action={
+                          isMine ? (
+                            <Badge tone="success" dot>
+                              Đang dạy
+                            </Badge>
+                          ) : isOpen ? (
+                            <Badge tone="primary" dot>
+                              Ca mở
+                            </Badge>
+                          ) : (
+                            <Badge tone="neutral">
+                              GV: {cls.teacherId}
+                            </Badge>
+                          )
+                        }
+                      />
 
-          {/* Interactive Schedule Box Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {displayedClasses.map(cls => {
-              const isMine = cls.teacherId === currentUser?.id;
-              const isOpen = !cls.teacherId || cls.teacherId === 'CHUA_PHAN_CONG' || cls.teacherId === '';
-              const shiftInfo = shiftMap.get(cls.shiftId ?? 1);
-              const shiftTimeLabel = shiftInfo ? `${shiftInfo.startTime} - ${shiftInfo.endTime}` : 'Theo lịch ca';
-              const shiftName = shiftInfo?.name || `Ca ${cls.shiftId}`;
-
-              return (
-                <div
-                  key={cls.id}
-                  className={`rounded-2xl border p-5 shadow-xs transition-all flex flex-col justify-between ${
-                    isMine 
-                      ? 'bg-blue-50/40 border-blue-300 ring-2 ring-blue-500/20 shadow-md' 
-                      : isOpen
-                      ? 'bg-emerald-50/30 border-emerald-300 hover:border-emerald-400 hover:shadow-md'
-                      : 'bg-white border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="space-y-3.5">
-                    {/* Header Box */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white text-slate-700 border border-slate-200 shadow-2xs">
-                            {cls.code} • {cls.id}
+                      {/* Chi tiết ca học */}
+                      <div className="bg-muted rounded-field p-3.5 border border-line space-y-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
+                            <Clock size={13} className="text-primary" /> Ca & khung giờ:
                           </span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
-                            {cls.subject}
+                          <span className="font-semibold text-foreground tabular">
+                            {shiftTimeLabel}
                           </span>
                         </div>
-                        <h3 className="font-bold text-slate-900 text-base mt-2 leading-snug">{cls.name}</h3>
-                      </div>
 
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
+                            <MapPin size={13} className="text-primary" /> Phòng học:
+                          </span>
+                          <span className="font-semibold text-foreground">{cls.roomId}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
+                            <Calendar size={13} className="text-primary" /> Lịch trong tuần:
+                          </span>
+                          <span className="font-semibold text-foreground">
+                            Thứ {cls.scheduleDays.join(', ')}
+                          </span>
+                        </div>
+
+                        {/* Bấm xem sĩ số / danh sách học sinh */}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenClassStudents(cls)}
+                          className="flex items-center justify-between w-full pt-2 border-t border-line hover:text-primary transition cursor-pointer text-left"
+                          title="Bấm để xem danh sách học viên"
+                        >
+                          <span className="text-muted-foreground font-medium flex items-center gap-1.5">
+                            <Users size={13} className="text-primary" /> Sĩ số đăng ký:
+                          </span>
+                          <span className="font-bold text-primary-ink bg-primary-soft px-2 py-0.5 rounded-pill text-xs flex items-center gap-1 tabular">
+                            {cls.studentIds.length} học viên <ChevronRight size={12} />
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Nút thao tác dưới thẻ */}
+                    <div className="pt-4 border-t border-line mt-4">
                       {isMine ? (
-                        <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-blue-600 text-white shadow-2xs flex items-center gap-1 shrink-0">
-                          <Check size={12} /> Đang dạy
-                        </span>
+                        <Link href={`/teacher/attendance?classId=${cls.id}`} className="block w-full">
+                          <Button
+                            variant="primary"
+                            size="md"
+                            fullWidth
+                            icon={<UserCheck size={16} />}
+                          >
+                            Sổ điểm danh & Đánh giá
+                          </Button>
+                        </Link>
                       ) : isOpen ? (
-                        <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-emerald-600 text-white shadow-2xs flex items-center gap-1 shrink-0 animate-pulse">
-                          <Sparkles size={12} /> Ca mở
-                        </span>
+                        <Button
+                          variant="primary"
+                          size="md"
+                          fullWidth
+                          loading={claimingClassId === cls.id}
+                          onClick={() => handleClaimShift(cls)}
+                          icon={<Plus size={16} />}
+                        >
+                          Nhận ca dạy này
+                        </Button>
                       ) : (
-                        <span className="text-[11px] px-2 py-0.5 rounded-full font-medium bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
-                          GV: {cls.teacherId}
-                        </span>
+                        <div className="w-full py-2.5 bg-muted text-muted-foreground rounded-pill text-xs font-semibold text-center border border-line">
+                          Đã phân công: <strong className="text-foreground">{cls.teacherId}</strong>
+                        </div>
                       )}
                     </div>
-
-                    {/* Box Details: Ca học, Khung giờ, Phòng, Thứ */}
-                    <div className="bg-white rounded-xl p-3 border border-slate-100/80 shadow-2xs space-y-2 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500 flex items-center gap-1.5"><Clock size={13} className="text-indigo-500" /> Ca học:</span>
-                        <span className="font-bold text-slate-800">{shiftName}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500 flex items-center gap-1.5"><Clock size={13} className="text-slate-400" /> Khung giờ:</span>
-                        <span className="font-semibold text-indigo-600">{shiftTimeLabel}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500 flex items-center gap-1.5"><MapPin size={13} className="text-slate-400" /> Phòng học:</span>
-                        <span className="font-semibold text-slate-700">{cls.roomId}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500">Lịch trong tuần:</span>
-                        <span className="font-semibold text-emerald-700">Thứ {cls.scheduleDays.join(', ')}</span>
-                      </div>
-                      <div 
-                        onClick={() => handleOpenClassStudents(cls)}
-                        className="flex items-center justify-between pt-1 border-t border-slate-100 hover:bg-slate-50 p-1 rounded-lg cursor-pointer transition"
-                        title="Bấm để xem danh sách học sinh của lớp"
-                      >
-                        <span className="text-slate-600 font-medium flex items-center gap-1.5">
-                          <Users size={13} className="text-blue-600" /> Sĩ số đăng ký:
-                        </span>
-                        <span className="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded text-xs hover:underline flex items-center gap-1">
-                          {cls.studentIds.length} học viên <ChevronRight size={12} />
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Footer Actions */}
-                  <div className="pt-4 border-t border-slate-100 mt-4 flex items-center justify-between gap-2">
-                    {isMine ? (
-                      <Link
-                        href={`/teacher/attendance?classId=${cls.id}`}
-                        className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs"
-                      >
-                        <UserCheck size={14} /> Sổ điểm danh & Đánh giá
-                      </Link>
-                    ) : isOpen ? (
-                      <button
-                        onClick={() => handleClaimShift(cls)}
-                        disabled={claimingClassId === cls.id}
-                        className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
-                      >
-                        <Plus size={14} /> {claimingClassId === cls.id ? 'Đang xử lý...' : 'Nhận ca dạy này'}
-                      </button>
-                    ) : (
-                      <div className="w-full py-2 bg-slate-100 text-slate-500 rounded-xl text-xs font-semibold text-center">
-                        Đã phân công giảng viên: <strong>{cls.teacherId}</strong>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </main>
-      </div>
-    
-      {/* Modal Giáo viên xem chi tiết Lớp học & Danh sách học sinh */}
-      {selectedClassForView && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 font-mono">
-                    {selectedClassForView.code} • {selectedClassForView.id}
-                  </span>
-                  <h3 className="font-bold text-slate-900 text-base">{selectedClassForView.name}</h3>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  Môn học: <strong className="text-slate-800">{selectedClassForView.subject}</strong> • Khung giờ: <strong className="text-slate-800">{selectedClassForView.startTime || '18:30'} - {selectedClassForView.endTime || '20:30'}</strong> • Thứ: <strong className="text-slate-800">{selectedClassForView.scheduleDays?.join(', ')}</strong>
-                </p>
-              </div>
-              <button 
-                onClick={() => setSelectedClassForView(null)}
-                className="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 cursor-pointer"
-              >
-                ✕
-              </button>
+                  </Card>
+                );
+              })}
             </div>
+          )}
+        </main>
 
-            <div className="p-5 flex-1 overflow-y-auto space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Danh sách học sinh đang học ({classStudents.length} học viên)
-                </span>
-                {selectedClassForView.meetingLink && (
+        {/* Sheet xem danh sách học sinh của lớp */}
+        <Sheet
+          isOpen={!!selectedClassForView}
+          onClose={() => setSelectedClassForView(null)}
+          title={selectedClassForView ? `Danh sách học viên: ${selectedClassForView.name}` : ''}
+          description={
+            selectedClassForView
+              ? `Mã lớp: ${selectedClassForView.code} • Môn: ${selectedClassForView.subject} • Phòng: ${selectedClassForView.roomId} • Thứ ${selectedClassForView.scheduleDays?.join(', ')}`
+              : ''
+          }
+          size="lg"
+          footer={
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 w-full">
+              <span className="text-xs text-muted-foreground">
+                Xem chi tiết từng buổi và điểm danh tại mục <strong>Sổ điểm danh</strong>.
+              </span>
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => setSelectedClassForView(null)}
+              >
+                Đóng
+              </Button>
+            </div>
+          }
+        >
+          {selectedClassForView && (
+            <div className="space-y-4 py-1">
+              {selectedClassForView.meetingLink && (
+                <div className="flex items-center justify-between p-3 rounded-field bg-primary-soft text-primary-ink text-xs font-semibold">
+                  <span>Phòng học trực tuyến Discord/Meet</span>
                   <a
                     href={selectedClassForView.meetingLink}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1"
+                    className="inline-flex items-center gap-1 text-primary hover:underline font-bold"
                   >
-                    Vào phòng học online ↗
+                    <Video size={13} /> Vào phòng online <ExternalLink size={11} />
                   </a>
-                )}
-              </div>
-
-              {loadingStudents ? (
-                <div className="p-8 text-center text-xs text-slate-400">Đang tải danh sách học sinh...</div>
-              ) : classStudents.length === 0 ? (
-                <div className="p-8 bg-slate-50 border border-slate-100 rounded-xl text-center text-xs text-slate-400">
-                  Lớp học này hiện chưa có học sinh nào đăng ký.
                 </div>
-              ) : (
-                <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 text-xs">
-                  {classStudents.map((st, idx) => (
-                    <div key={st.id} className="p-3 hover:bg-slate-50 flex items-center justify-between gap-3 transition">
-                      <div className="flex items-center gap-3">
-                        <span className="text-slate-400 font-mono text-[11px] w-5 text-center">{idx + 1}</span>
-                        <div>
-                          <div className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                            <span>{st.name}</span>
-                            <span className="font-mono text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
-                              {st.id}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5 flex-wrap">
-                            <span>Mục tiêu: <strong>{st.targetUniversity === 'KHAC' ? (st.customUniversity || 'Trường khác') : (st.targetUniversity || 'HAU')}</strong></span>
-                            <span>• Khối: <strong className="text-indigo-700">{st.examBlock === 'KHOI_H' ? 'Khối H' : 'Khối V'}</strong></span>
-                            <span>• {st.gradeLevel || 'Lớp 12'}</span>
-                            {st.homeTown && <span>• Quê: {st.homeTown}</span>}
-                          </div>
-                          {st.otherNotes && (
-                            <div className="text-[10px] text-amber-800 italic mt-0.5 bg-amber-50/60 px-1.5 py-0.5 rounded inline-block">
-                              Ghi chú: {st.otherNotes}
-                            </div>
-                          )}
-                        </div>
-                      </div>
+              )}
 
-                      <div className="text-right shrink-0">
-                        <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
-                          Còn {st.remainingSessions ?? 12} buổi
+              <DataTable
+                columns={studentColumns}
+                rows={classStudents}
+                rowKey={(st) => st.id}
+                loading={loadingStudents}
+                emptyTitle="Lớp chưa có học viên nào đăng ký"
+                emptyDescription="Hiện chưa có học viên nào được ghi danh vào lớp học này."
+                emptyIcon={<Users size={24} />}
+                renderMobile={(st) => (
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <Avatar name={st.name} size={32} />
+                      <div className="min-w-0 space-y-1">
+                        <div className="font-bold text-foreground text-sm leading-tight truncate">
+                          {st.name}
+                        </div>
+                        <div className="font-mono text-[11px] text-muted-foreground">{st.id}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Mục tiêu:{' '}
+                          {st.targetUniversity === 'KHAC'
+                            ? st.customUniversity || 'Khác'
+                            : st.targetUniversity || 'HAU'}{' '}
+                          • {st.examBlock === 'KHOI_H' ? 'Khối H' : 'Khối V'}
                         </div>
                         {st.phone && (
-                          <div className="text-[11px] text-slate-400 mt-1 font-mono">
-                            {st.phone}
+                          <div className="text-xs font-mono text-muted-foreground flex items-center gap-1">
+                            <Phone size={10} />
+                            <span>{st.phone}</span>
                           </div>
                         )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                    <Badge tone="info" className="tabular shrink-0">
+                      Còn {st.remainingSessions ?? 12} buổi
+                    </Badge>
+                  </div>
+                )}
+              />
             </div>
-
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-              <span className="text-xs text-slate-500">
-                Thầy/Cô có thể điểm danh và đánh giá buổi học trong mục <strong>Sổ điểm danh</strong>.
-              </span>
-              <button
-                type="button"
-                onClick={() => setSelectedClassForView(null)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+          )}
+        </Sheet>
+      </div>
     </RoleGuard>
   );
 }

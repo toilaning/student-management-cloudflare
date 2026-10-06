@@ -280,6 +280,20 @@ export class LocalRepository implements IRepository {
     return slot;
   }
 
+  public async createScheduleSlotsBatch(slots: ScheduleSlot[]): Promise<ScheduleSlot[]> {
+    for (const slot of slots) {
+      this.scheduleSlots.set(slot.id, { ...slot });
+    }
+    return slots;
+  }
+
+  public async updateScheduleSlotsBatch(slots: ScheduleSlot[]): Promise<ScheduleSlot[]> {
+    for (const slot of slots) {
+      this.scheduleSlots.set(slot.id, { ...slot });
+    }
+    return slots;
+  }
+
   // Attendance
   public async getAttendanceBySlotId(slotId: string): Promise<AttendanceRecord[]> {
     return Array.from(this.attendanceRecords.values()).filter(a => a.scheduleSlotId === slotId);

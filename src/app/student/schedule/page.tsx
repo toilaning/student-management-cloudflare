@@ -1,15 +1,35 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { Header } from '@/components/common/Header';
 import { useApp } from '@/context/AppContext';
 import { RoleGuard } from '@/components/common/RoleGuard';
 import { ScheduleSlot, TimeShift, TIME_SHIFTS } from '@/types/schedule';
 import { ClassEntity } from '@/types/classroom';
-import { Clock, MapPin, UserCheck, BookOpen, Video, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
-import Link from 'next/link';
-import { getTodayDateStr, getTodayDateStrByDate } from '@/utils/date';
-import { buildTimelineTicks, clampSlotToTimeline, TIMELINE_START_MINUTES, TIMELINE_STEP_MINUTES, TIMELINE_TOTAL_MINUTES } from '@/components/schedule/Timeline';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { EmptyState } from '@/components/ui/EmptyState';
+import {
+  Clock,
+  MapPin,
+  UserCheck,
+  BookOpen,
+  Video,
+  ExternalLink,
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
+} from 'lucide-react';
+import { getTodayDateStr, getTodayDateStrByDate, minutesTo24h } from '@/utils/date';
+import { cn } from '@/lib/cn';
+import {
+  computeTimelineBounds,
+  buildTicksBetween,
+  layoutDaySlots,
+  TimelineNowMarker,
+} from '@/components/schedule/Timeline';
 
 const DAY_LABELS: Record<number, string> = {
   2: 'Thứ 2',
@@ -18,40 +38,35 @@ const DAY_LABELS: Record<number, string> = {
   5: 'Thứ 5',
   6: 'Thứ 6',
   7: 'Thứ 7',
-  8: 'Chủ Nhật',
+  8: 'Chủ nhật',
 };
-/** Số ngày hiển thị trong timeline tuần (Thứ 2 -> CN). */
+
 const WEEK_DAYS = 7;
 
-/** Từ chuỗi date YYYY-MM-DD -> số thứ trong tuần (2=T2 ... 8=CN) */
 function dayOfWeekNumber(dateStr: string): number {
   const d = new Date(dateStr + 'T00:00:00+07:00');
-  const g = d.getDay(); // 0=CN, 1=T2 .. 6=T7
+  const g = d.getDay();
   return g === 0 ? 8 : g + 1;
 }
 
-/** Format hiển thị ngày: `Thứ N - DD/MM` (hoặc CN) */
 function formatDayLabel(dateStr: string): string {
   const day = dayOfWeekNumber(dateStr);
   const [, m, dd] = dateStr.split('-');
   return `${DAY_LABELS[day]} (${dd}/${m})`;
 }
 
-/** Từ chuỗi date YYYY-MM-DD -> Date tại 00:00 theo Asia/Saigon. */
 function toSaigonDate(dateStr: string): Date {
   return new Date(dateStr + 'T00:00:00+07:00');
 }
 
-/** Tìm ngày Thứ Hai (đầu tuần) của một ngày bất kỳ. */
 function getMonday(dateStr: string): Date {
   const d = toSaigonDate(dateStr);
-  const g = d.getDay(); // 0=CN, 1=T2 .. 6=T7
+  const g = d.getDay();
   const offset = g === 0 ? -6 : 1 - g;
   d.setDate(d.getDate() + offset);
   return d;
 }
 
-/** Danh sách 7 ngày (Thứ 2 -> CN) dạng YYYY-MM-DD cho tuần chứa ngày tham chiếu. */
 function getWeekDates(refDateStr: string): string[] {
   const monday = getMonday(refDateStr);
   const dates: string[] = [];
@@ -63,14 +78,13 @@ function getWeekDates(refDateStr: string): string[] {
   return dates;
 }
 
-/** Format range ngày của tuần: `DD/MM - DD/MM`. */
 function formatWeekRange(weekDates: string[]): string {
   if (weekDates.length === 0) return '';
   const first = weekDates[0];
   const last = weekDates[weekDates.length - 1];
   const [, fm, fdd] = first.split('-');
   const [, lm, ldd] = last.split('-');
-  return `${fdd}/${fm} - ${ldd}/${lm}`;
+  return `${fdd}/${fm} – ${ldd}/${lm}`;
 }
 
 export default function StudentSchedulePage() {
@@ -79,7 +93,6 @@ export default function StudentSchedulePage() {
   const [classes, setClasses] = useState<ClassEntity[]>([]);
   const [shifts, setShifts] = useState<TimeShift[]>(TIME_SHIFTS);
   const [loading, setLoading] = useState(true);
-  // Ngày tham chiếu cho tuần hiện tại (mặc định hôm nay theo Asia/Saigon)
   const [weekRefDate, setWeekRefDate] = useState(getTodayDateStr());
 
   useEffect(() => {
@@ -109,15 +122,13 @@ export default function StudentSchedulePage() {
     load();
   }, [currentUser, isReady]);
 
-  const classMap = new Map(classes.map(c => [c.id, c]));
+  const classMap = new Map(classes.map((c) => [c.id, c]));
 
-  // Tính tuần hiện tại và 7 ngày (Thứ 2 -> CN)
   const weekDates = getWeekDates(weekRefDate);
   const weekDateSet = new Set(weekDates);
 
-  // Slot trong tuần, sắp theo ngày rồi giờ bắt đầu
   const weekSlots = slots
-    .filter(s => weekDateSet.has(s.date))
+    .filter((s) => weekDateSet.has(s.date))
     .sort((a, b) => {
       if (a.date !== b.date) return a.date.localeCompare(b.date);
       return (a.startTime || '00:00').localeCompare(b.startTime || '00:00');
@@ -135,198 +146,292 @@ export default function StudentSchedulePage() {
   };
   const goThisWeek = () => setWeekRefDate(getTodayDateStr());
 
-  // Trục giờ dọc (12:00 -> 24:00, bước 30 phút)
-  const ticks = buildTimelineTicks();
-  // Chiều cao hàng (px) tương ứng 720 phút (12h). 48px mỗi giờ => 576px, chọn 60px/giờ = 720px.
-  const WEEK_ROW_HEIGHT_PX = TIMELINE_TOTAL_MINUTES; // 1 phút = 1px (720px cho 12h)
-  const minuteToTopPx = (minutes: number): number => {
-    const clamped = Math.min(Math.max(minutes, TIMELINE_START_MINUTES), TIMELINE_START_MINUTES + TIMELINE_TOTAL_MINUTES);
-    return clamped - TIMELINE_START_MINUTES;
-  };
+  // Trục giờ co giãn vừa đủ cho các buổi học trong tuần, không còn 06:00 – 23:00 trống trải
+  const bounds = useMemo(() => computeTimelineBounds(weekSlots), [weekSlots]);
+  const ticks = useMemo(
+    () => buildTicksBetween(bounds.startMinutes, bounds.endMinutes, 30),
+    [bounds.startMinutes, bounds.endMinutes]
+  );
+  const PX_PER_MINUTE = 1;
+  const WEEK_ROW_HEIGHT_PX = (bounds.endMinutes - bounds.startMinutes) * PX_PER_MINUTE;
+  const minuteToTopPx = (minutes: number): number =>
+    (Math.min(Math.max(minutes, bounds.startMinutes), bounds.endMinutes) - bounds.startMinutes) *
+    PX_PER_MINUTE;
+  const boundsLabel = `${minutesTo24h(bounds.startMinutes)} – ${minutesTo24h(bounds.endMinutes)}`;
 
   return (
     <RoleGuard allowedRoles={['STUDENT', 'ADMIN']}>
-      <div className="flex-1 flex flex-col min-h-screen bg-slate-50/70 font-sans text-slate-800">
+      <div className="flex-1 flex flex-col min-h-screen">
         <Header
-          title="Thời Khóa Biểu & Box Lịch Học Viên"
-          subtitle={`Lịch học chi tiết của ${currentUser?.name || ''} (${currentUser?.id || ''}) - xem theo tuần (Thứ 2 -> CN)`}
+          title="Thời khóa biểu"
+          subtitle={`Lịch học theo tuần của học viên ${currentUser?.name || ''} (${currentUser?.id || ''})`}
         />
 
-        <main className="p-6 max-w-7xl mx-auto w-full space-y-6">
-          <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <main className="p-4 sm:p-6 max-w-content mx-auto w-full space-y-5">
+          {/* Thanh tổng quan & nút chuyển tới lớp học */}
+          <Card padded className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <div className="text-sm font-semibold text-slate-800">
-                Tổng số buổi học trong kỳ: <strong className="text-emerald-600 text-base font-bold">{slots.length}</strong> buổi
-              </div>
-              <div className="text-xs text-slate-500 mt-0.5">
-                Lịch học theo <strong>tuần</strong>, mỗi buổi vẽ đúng vị trí theo ngày + giờ thực tế trên khung 12:00 - 24:00
-              </div>
+              <h3 className="text-[15px] font-bold text-foreground">
+                Tổng số buổi học trong kỳ:{' '}
+                <span className="text-primary text-base font-extrabold tabular">
+                  {slots.length}
+                </span>{' '}
+                buổi
+              </h3>
+              <p className="text-[13px] text-muted-foreground mt-0.5">
+                Hiển thị lịch học theo tuần từ Thứ 2 đến Chủ nhật theo khung giờ thực tế
+              </p>
             </div>
-            <Link
-              href="/student/classes"
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
-            >
-              <BookOpen size={14} /> Tra cứu & Đổi ca học
+            <Link href="/student/classes" className="shrink-0 w-full sm:w-auto">
+              <Button variant="secondary" icon={<BookOpen size={15} />} fullWidth className="sm:w-auto">
+                Tra cứu & đổi ca học
+              </Button>
             </Link>
-          </div>
+          </Card>
 
           {/* Bộ điều hướng tuần */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
-                <button
+          <Card padded className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 bg-muted p-1 rounded-field border border-line">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
                   onClick={goPrevWeek}
-                  className="p-1 hover:bg-white rounded-lg text-slate-600 transition cursor-pointer"
-                  title="Tuần trước"
+                  aria-label="Tuần trước"
                 >
-                  <ChevronLeft size={18} />
-                </button>
-                <button
+                  <ChevronLeft size={16} />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
                   onClick={goNextWeek}
-                  className="p-1 hover:bg-white rounded-lg text-slate-600 transition cursor-pointer"
-                  title="Tuần sau"
+                  aria-label="Tuần sau"
                 >
-                  <ChevronRight size={18} />
-                </button>
+                  <ChevronRight size={16} />
+                </Button>
               </div>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={goThisWeek}
-                className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl transition border border-emerald-200 shadow-2xs cursor-pointer flex items-center gap-1"
+                icon={<CalendarDays size={14} />}
               >
-                📍 Tuần này
-              </button>
+                Tuần này
+              </Button>
             </div>
 
-            <div className="text-xs text-slate-500 font-medium">
-              Tuần{' '}
-              <strong className="text-slate-800 font-bold">{formatWeekRange(weekDates)}</strong>{' '}
-              • <span className="text-sm font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">{weekSlots.length} buổi</span>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Tuần</span>
+              <strong className="text-foreground text-sm font-bold tabular">
+                {formatWeekRange(weekDates)}
+              </strong>
+              <Badge tone="primary" className="tabular">
+                {weekSlots.length} buổi
+              </Badge>
             </div>
-          </div>
+          </Card>
 
           {loading ? (
-            <div className="p-12 text-center text-slate-400 text-sm">Đang tải lịch học...</div>
+            <Card padded className="space-y-3">
+              <div className="h-6 w-48 bg-muted rounded-field animate-pulse" />
+              <div className="h-64 bg-muted rounded-field animate-pulse" />
+            </Card>
+          ) : slots.length === 0 ? (
+            <Card padded>
+              <EmptyState
+                icon={<CalendarDays size={32} />}
+                title="Chưa có lịch học nào trong kỳ này"
+                description="Hệ thống chưa ghi nhận lịch học của bạn. Bạn có thể tra cứu và đăng ký ca học phù hợp."
+                action={
+                  <Link href="/student/classes">
+                    <Button variant="primary" icon={<BookOpen size={15} />}>
+                      Đăng ký ca học ngay
+                    </Button>
+                  </Link>
+                }
+              />
+            </Card>
           ) : (
-            <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-x-auto">
-              <div className="min-w-[980px]">
-                {/* Header 7 cột ngày + trục giờ dọc */}
-                <div className="flex">
-                  {/* Cột nhãn giờ (góc trái) */}
-                  <div className="w-14 shrink-0" />
-                  {weekDates.map(d => {
-                    const isToday = d === getTodayDateStr();
-                    return (
-                      <div key={d} className={`flex-1 min-w-[120px] text-center px-2 py-2 border-b border-slate-200 ${isToday ? 'bg-emerald-50/60' : ''}`}>
-                        <div className={`text-xs font-bold ${isToday ? 'text-emerald-700' : 'text-slate-700'}`}>{formatDayLabel(d)}</div>
-                        <div className="text-[10px] font-mono text-slate-400">{d}</div>
-                      </div>
-                    );
-                  })}
+            <Card padded={false} className="overflow-hidden">
+              <div className="p-3 bg-muted/30 border-b border-line text-xs text-muted-foreground flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Clock size={13} className="text-primary" />
+                  <span>Khung giờ {boundsLabel}</span>
                 </div>
+                <span className="sm:hidden text-[11px] text-muted-foreground">
+                  Vuốt ngang để xem đủ tuần
+                </span>
+              </div>
 
-                {/* Thân timeline: 7 cột, trục dọc = giờ */}
-                <div className="flex">
-                  {/* Cột nhãn giờ trái */}
-                  <div className="w-14 shrink-0">
-                    <div className="relative" style={{ height: `${WEEK_ROW_HEIGHT_PX}px` }}>
-                      {ticks.map(t => (
+              <div className="overflow-x-auto">
+                <div className="min-w-[960px]">
+                  {/* Hàng Header ngày */}
+                  <div className="flex border-b border-line bg-muted/40">
+                    <div className="w-14 shrink-0 border-r border-line" />
+                    {weekDates.map((d) => {
+                      const isToday = d === getTodayDateStr();
+                      return (
                         <div
-                          key={t.minutes}
-                          className="absolute right-1 text-[9px] font-mono font-semibold text-slate-400 whitespace-nowrap -translate-y-1/2"
-                          style={{ top: minuteToTopPx(t.minutes) }}
+                          key={d}
+                          className={`flex-1 min-w-[125px] text-center px-2 py-2.5 border-l border-line first:border-l-0 ${
+                            isToday ? 'bg-primary-soft/50 text-primary-ink' : 'text-foreground'
+                          }`}
                         >
-                          {t.label}
+                          <div
+                            className={`text-[12px] font-bold ${
+                              isToday ? 'text-primary-ink' : 'text-foreground'
+                            }`}
+                          >
+                            {formatDayLabel(d)}
+                          </div>
+                          <div className="text-[10px] font-mono text-muted-foreground mt-0.5">
+                            {d}
+                          </div>
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
 
-                  {/* 7 cột ngày */}
-                  {weekDates.map(d => {
-                    const isToday = d === getTodayDateStr();
-                    const daySlots = weekSlots.filter(s => s.date === d);
-                    return (
-                      <div key={d} className={`flex-1 min-w-[120px] border-l border-slate-100 relative ${isToday ? 'bg-emerald-50/40' : ''}`}>
-                        {/* Lưới giờ ngang */}
-                        <div className="absolute inset-0 pointer-events-none">
-                          {ticks.map(t => (
-                            <div
-                              key={t.minutes}
-                              className={`absolute left-0 right-0 h-px ${t.minutes === TIMELINE_START_MINUTES ? 'bg-slate-200' : 'bg-slate-100'}`}
-                              style={{ top: minuteToTopPx(t.minutes) }}
-                            />
-                          ))}
-                        </div>
-
-                        <div className="relative" style={{ height: `${WEEK_ROW_HEIGHT_PX}px` }}>
-                          {daySlots.map(slot => {
-                            const cls = classMap.get(slot.classId);
-                            const meetingLink = slot.meetingLink || cls?.meetingLink;
-                            const { startMin, endMin, isOvernight } = clampSlotToTimeline(slot);
-                            const topPx = minuteToTopPx(startMin);
-                            const heightPx = Math.max(minuteToTopPx(endMin) - topPx, 26);
-
-                            return (
-                              <div
-                                key={slot.id}
-                                className="absolute left-1 right-1 rounded-lg border border-emerald-200 bg-emerald-50 p-1.5 shadow-xs hover:shadow-md transition overflow-hidden"
-                                style={{ top: `${topPx}px`, height: `${heightPx}px` }}
-                              >
-                                <div className="flex items-center justify-between gap-1">
-                                  <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 truncate">
-                                    {slot.classId}
-                                  </span>
-                                  {isOvernight && (
-                                    <span className="text-[9px] font-bold px-1 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 whitespace-nowrap">qua đêm</span>
-                                  )}
-                                </div>
-                                <div className="text-[9px] font-mono font-bold text-indigo-700 mt-0.5">
-                                  {slot.startTime} - {slot.endTime}
-                                </div>
-                                <div className="text-[11px] font-bold text-slate-800 leading-tight mt-0.5 truncate">{slot.subject}</div>
-                                <div className="text-[9px] text-slate-500 flex items-center gap-1 mt-0.5">
-                                  <UserCheck size={9} className="shrink-0 text-indigo-500" />
-                                  <span className="truncate">{slot.teacherId}</span>
-                                </div>
-                                <div className="text-[9px] text-slate-500 flex items-center gap-1 mt-0.5">
-                                  <MapPin size={9} className="shrink-0 text-slate-400" />
-                                  <span className="truncate">{slot.roomId}</span>
-                                </div>
-                                {meetingLink ? (
-                                  <a
-                                    href={meetingLink}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-0.5 text-[9px] text-emerald-600 hover:text-emerald-700 font-bold mt-0.5"
-                                  >
-                                    <Video size={9} /> Phòng online
-                                  </a>
-                                ) : (
-                                  <div className="text-[9px] text-slate-400 italic mt-0.5">Chưa có link</div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
+                  {/* Thân Timeline */}
+                  <div className="flex">
+                    {/* Cột nhãn giờ bên trái */}
+                    <div className="w-14 shrink-0 border-r border-line bg-muted/20">
+                      <div className="relative" style={{ height: `${WEEK_ROW_HEIGHT_PX}px` }}>
+                        {ticks.map((t) => (
+                          <div
+                            key={t.minutes}
+                            className="absolute right-1.5 text-[10px] font-mono font-medium text-muted-foreground whitespace-nowrap -translate-y-1/2"
+                            style={{ top: minuteToTopPx(t.minutes) }}
+                          >
+                            {t.label}
+                          </div>
+                        ))}
                       </div>
-                    );
-                  })}
+                    </div>
+
+                    {/* 7 cột ngày */}
+                    {weekDates.map((d) => {
+                      const isToday = d === getTodayDateStr();
+                      const daySlots = weekSlots.filter((s) => s.date === d);
+                      return (
+                        <div
+                          key={d}
+                          className={`flex-1 min-w-[125px] border-l border-line relative first:border-l-0 ${
+                            isToday ? 'bg-primary-soft/10' : ''
+                          }`}
+                        >
+                          {/* Lưới giờ ngang */}
+                          <div className="absolute inset-0 pointer-events-none">
+                            {ticks.map((t) => (
+                              <div
+                                key={t.minutes}
+                                className={`absolute left-0 right-0 h-px ${
+                                  t.minutes % 60 === 0 ? 'bg-line' : 'bg-line/40'
+                                }`}
+                                style={{ top: minuteToTopPx(t.minutes) }}
+                              />
+                            ))}
+                          </div>
+
+                          {/* Khối slot trong ngày */}
+                          <div
+                            className="relative"
+                            style={{ height: `${WEEK_ROW_HEIGHT_PX}px` }}
+                          >
+                            {isToday && (
+                              <TimelineNowMarker
+                                startMinutes={bounds.startMinutes}
+                                endMinutes={bounds.endMinutes}
+                                pixelsPerMinute={PX_PER_MINUTE}
+                              />
+                            )}
+
+                            {layoutDaySlots(daySlots).map(({ slot, startMin, endMin, isOvernight, column, columnCount }) => {
+                              // Với học viên, hai lớp của chính mình trùng giờ luôn là vấn đề cần xử lý
+                              const hasConflict = columnCount > 1;
+                              const cls = classMap.get(slot.classId);
+                              const meetingLink = slot.meetingLink || cls?.meetingLink;
+                              const topPx = minuteToTopPx(startMin);
+                              const heightPx = Math.max(minuteToTopPx(endMin) - topPx, 36);
+                              const widthPct = 100 / columnCount;
+
+                              return (
+                                <div
+                                  key={slot.id}
+                                  className={cn(
+                                    'absolute rounded-field border border-primary/30 bg-card p-2 shadow-soft hover:shadow-pop transition overflow-hidden flex flex-col justify-between',
+                                    hasConflict && 'ring-2 ring-warning border-warning'
+                                  )}
+                                  style={{
+                                    top: `${topPx}px`,
+                                    height: `${heightPx}px`,
+                                    left: `calc(${column * widthPct}% + 4px)`,
+                                    width: `calc(${widthPct}% - 8px)`,
+                                  }}
+                                >
+                                  <div>
+                                    <div className="flex items-center justify-between gap-1">
+                                      <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-pill bg-primary-soft text-primary-ink truncate max-w-[80px]">
+                                        {slot.classId}
+                                      </span>
+                                      {isOvernight && (
+                                        <Badge tone="warning" className="text-[9px] px-1 py-0">
+                                          qua đêm
+                                        </Badge>
+                                      )}
+                                      {hasConflict && (
+                                        <Badge tone="warning" className="text-[9px] px-1 py-0">
+                                          Trùng giờ
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div className="text-[11px] font-mono font-bold text-primary tabular mt-1">
+                                      {slot.startTime} – {slot.endTime}
+                                    </div>
+                                    <div className="text-[12px] font-bold text-foreground leading-tight mt-0.5 truncate">
+                                      {slot.subject}
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-0.5 mt-1 pt-1 border-t border-line/60">
+                                    <div className="text-[11px] text-muted-foreground flex items-center gap-1">
+                                      <UserCheck size={11} className="shrink-0 text-primary" />
+                                      <span className="truncate">{slot.teacherId}</span>
+                                    </div>
+                                    <div className="text-[11px] text-muted-foreground flex items-center gap-1">
+                                      <MapPin size={11} className="shrink-0 text-muted-foreground" />
+                                      <span className="truncate">{slot.roomId}</span>
+                                    </div>
+                                    {meetingLink ? (
+                                      <a
+                                        href={meetingLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                                      >
+                                        <Video size={11} />
+                                        <span>Phòng online</span>
+                                        <ExternalLink size={9} />
+                                      </a>
+                                    ) : (
+                                      <div className="text-[10px] text-muted-foreground italic">
+                                        Trực tiếp
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-
-          {slots.length === 0 && !loading && (
-            <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 text-sm space-y-3">
-              <p>Bạn chưa có lịch học nào trong kỳ này.</p>
-              <Link
-                href="/student/classes"
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700"
-              >
-                Đăng ký ca học ngay
-              </Link>
-            </div>
+            </Card>
           )}
         </main>
       </div>

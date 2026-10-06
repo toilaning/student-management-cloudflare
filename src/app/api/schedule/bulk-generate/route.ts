@@ -12,9 +12,12 @@ export async function POST(request: Request) {
       startDate,
       endDate,
       shiftId,
+      startTime,
+      endTime,
       scheduleDays,
       overwriteExisting = false,
       actorId = 'ADMIN001',
+      previewOnly = false,
     } = body;
 
     if (!classIds || !Array.isArray(classIds) || classIds.length === 0) {
@@ -37,10 +40,22 @@ export async function POST(request: Request) {
       startDate,
       endDate,
       shiftId: shiftId ? Number(shiftId) : undefined,
+      startTime: startTime || undefined,
+      endTime: endTime || undefined,
       scheduleDays: Array.isArray(scheduleDays) ? scheduleDays.map(Number) : undefined,
       overwriteExisting: Boolean(overwriteExisting),
       actorId,
+      previewOnly: Boolean(previewOnly),
     });
+
+    if (previewOnly) {
+      return NextResponse.json({
+        success: true,
+        preview: true,
+        message: `Xem trước: sẽ tạo ${result.summary.createdCount} ca mới, cập nhật ${result.summary.updatedCount} ca, bỏ qua ${result.summary.skippedCount} ca, ${result.summary.conflictCount} ca bị trùng lịch.`,
+        ...result,
+      });
+    }
 
     return NextResponse.json({
       success: true,

@@ -7,6 +7,13 @@ export const dynamic = 'force-dynamic';
 
 const VALID_STATUSES: TuitionStatus[] = ['Đã nộp', 'Còn nợ', 'Quá hạn', 'Miễn giảm'];
 
+/** Chuẩn hoá trạng thái cũ (DA_NOP/CON_NO) về giá trị tiếng Việt dùng thống nhất trên giao diện. */
+function normalizeInvoiceStatus<T extends { status: TuitionStatus }>(inv: T): T {
+  if ((inv.status as string) === 'DA_NOP') return { ...inv, status: 'Đã nộp' };
+  if ((inv.status as string) === 'CON_NO') return { ...inv, status: 'Còn nợ' };
+  return inv;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const studentId = searchParams.get('studentId');
@@ -20,11 +27,11 @@ export async function GET(request: Request) {
       return NextResponse.json(data);
     }
     const invoices = await repo.getTuitionInvoicesByStudentId(studentId);
-    return NextResponse.json({ invoices });
+    return NextResponse.json({ invoices: invoices.map(normalizeInvoiceStatus) });
   }
 
   const invoices = await repo.getAllTuitionInvoices();
-  return NextResponse.json({ invoices });
+  return NextResponse.json({ invoices: invoices.map(normalizeInvoiceStatus) });
 }
 
 export async function POST(request: Request) {

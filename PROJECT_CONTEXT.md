@@ -66,7 +66,6 @@ src/
 │   ├── IRepository.ts          # interface chuẩn (hợp đồng dữ liệu)
 │   ├── SupabaseRepository.ts   # impl production (Supabase)
 │   ├── LocalRepository.ts      # impl in-memory (test offline)
-│   ├── GoogleAppsScriptRepository.ts  # impl legacy GAS
 │   └── index.ts                # chọn impl theo DATA_SOURCE
 ├── services/               # Business logic
 │   ├── AuthService · StudentService · ConflictEngine · BulkScheduleService
@@ -79,19 +78,17 @@ src/
 
 tests/                      # 19 test files (node:test)
 discord-bot/src/            # bot: api.js, commands/, events/, cron/, config.js
-scripts/seed-gas.ts         # seed dữ liệu từ Google Apps Script
-supabase/                   # 11 SQL scripts (schema, migrations, rebuild master)
-*.md                        # 19 SPEC files (đặc tả tính năng)
+supabase/setup.sql          # script duy nhất dựng database Supabase (idempotent)
+docs/archive/               # 19 SPEC files cũ (đặc tả tính năng, giữ làm lịch sử)
 ```
 
 ---
 
 ## 4. Kiến trúc dữ liệu (Repository Pattern)
 
-- **Có 3 implementation của `IRepository`**, chọn qua env `DATA_SOURCE`:
+- **Có 2 implementation của `IRepository`**, chọn qua env `DATA_SOURCE`:
   - `supabase` → `SupabaseRepository` (production, Supabase Cloud)
   - `local` → `LocalRepository` (in-memory, test/offline)
-  - Legacy: `GoogleAppsScriptRepository`
 - **Thêm/sửa field dữ liệu** thường phải sync 3 nơi: `types/`, `IRepository.ts`, `SupabaseRepository.ts` (+ `LocalRepository.ts` nếu test dùng).
 - Có **2-way sync** user↔student↔teacher ở DB level (Postgres trigger).
 
@@ -158,8 +155,8 @@ users/                 route.ts
 | Truy vấn DB X | `src/repositories/SupabaseRepository.ts` (+ `IRepository.ts`) |
 | Kiểu dữ liệu X | `src/types/X.ts` |
 | UI component X | `src/components/<domain>/...` |
-| Schema/migration | `supabase/*.sql` |
-| Đặc tả tính năng | `*_SPEC.md` (tên file = tên tính năng) |
+| Schema database | `supabase/setup.sql` |
+| Đặc tả tính năng cũ | `docs/archive/*_SPEC.md` |
 | Test tính năng X | `tests/*X*.test.ts` |
 | Discord bot | `discord-bot/src/...` |
 | State toàn cục | `src/context/AppContext.tsx` |

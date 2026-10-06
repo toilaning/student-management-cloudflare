@@ -42,6 +42,31 @@ export async function POST(request: Request) {
       existing.reviewNote = body.reviewNote;
       const updated = await repo.updateRequest(existing);
 
+      // Duyệt đơn xin nghỉ: tự động ghi 'Vắng có phép' vào sổ điểm danh của ca tương ứng.
+      if (body.status === 'ĐÃ_DUYỆT' && existing.scheduleSlotId) {
+        try {
+          const slot = await repo.getScheduleSlotById(existing.scheduleSlotId);
+          if (slot) {
+            const records = await repo.getAttendanceBySlotId(slot.id);
+            const found = records.find((r) => r.studentId === existing.studentId);
+            await repo.saveAttendanceRecord({
+              id: found?.id || `ATT_EXCUSED_${slot.id}_${existing.studentId}`,
+              scheduleSlotId: slot.id,
+              classId: slot.classId,
+              studentId: existing.studentId,
+              date: slot.date,
+              status: 'Vắng có phép',
+              note: `Nghỉ có phép theo đơn ${existing.id}`,
+              method: 'SYSTEM',
+              updatedBy: body.reviewerId || reviewerRole,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        } catch (attErr) {
+          console.warn('[REQUEST-DECIDE] Không ghi được điểm danh vắng có phép:', attErr);
+        }
+      }
+
       await repo.addAuditLog({
         userId: body.reviewerId || reviewerRole,
         userName: reviewerName,
@@ -49,7 +74,7 @@ export async function POST(request: Request) {
         action: 'REQUEST_DECIDE',
         targetResource: 'REQUEST',
         targetId: existing.id,
-        details: `${body.status === 'ĐÃ_DUYỆT' ? 'Duyệt' : 'Từ chối'} đơn ${existing.type === 'XIN_NGHI' ? 'xin nghỉ' : 'đổi ca'} của học viên ${existing.studentId}`,
+        details: `${body.status === 'ĐÃ_DUYỆT' ? 'Duyệt' : 'Từ chối'} đơn xin nghỉ của học viên ${existing.studentId}`,
       });
 
       return NextResponse.json({ success: true, request: updated });
@@ -78,7 +103,7 @@ export async function POST(request: Request) {
       action: 'CREATE',
       targetResource: 'REQUEST',
       targetId: newId,
-      details: `Gửi đơn ${body.type === 'XIN_NGHI' ? 'xin nghỉ học' : 'đề xuất đổi lịch'} lớp ${body.classId}`,
+      details: `Gửi đơn xin nghỉ học lớp ${body.classId}`,
     });
 
     return NextResponse.json({ success: true, request: saved });
