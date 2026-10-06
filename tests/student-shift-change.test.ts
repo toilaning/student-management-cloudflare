@@ -66,7 +66,7 @@ describe('Học sinh đổi ca học', () => {
     await enrollStudentInClass(studentId, 'CLS93');
 
     const res = await enrollClass(
-      enrollRequest({ classId: 'CLS93', studentId, action: 'CHANGE_SHIFT', targetShiftId: 2 })
+      enrollRequest({ classId: 'CLS93', studentId, action: 'CHANGE_SHIFT', targetShiftId: 2, actorId: studentId, actorRole: 'STUDENT' })
     );
     const data = await res.json();
     assert.ok(data.success, 'Đổi ca phải thành công: ' + JSON.stringify(data));
@@ -89,7 +89,7 @@ describe('Học sinh đổi ca học', () => {
     await enrollStudentInClass(studentId, source.id);
 
     const res = await enrollClass(
-      enrollRequest({ classId: 'CLS90', studentId, action: 'CHANGE_SHIFT', targetShiftId: 4 })
+      enrollRequest({ classId: 'CLS90', studentId, action: 'CHANGE_SHIFT', targetShiftId: 4, actorId: studentId, actorRole: 'STUDENT' })
     );
     const data = await res.json();
     assert.ok(data.success, 'Đổi ca phải thành công: ' + JSON.stringify(data));
@@ -117,7 +117,7 @@ describe('Học sinh đổi ca học', () => {
     );
   });
 
-  it('3. Từ chối đổi sang ca trùng giờ với lớp khác đang học', async () => {
+  it('3. Học sinh vẫn đổi được sang ca trùng giờ với lớp khác đang học', async () => {
     // Lớp nguồn Toán ca 1, học sinh còn học lớp Tiếng Anh ca 2 cùng ngày.
     const source = await createClass('CLS91', 'TESTC2', 1);
     await createClass('CLS92', 'TESTC3', 2, 'Tiếng Anh Giao Tiếp & IELTS');
@@ -126,20 +126,24 @@ describe('Học sinh đổi ca học', () => {
     await enrollStudentInClass(studentId, source.id);
     await enrollStudentInClass(studentId, 'CLS92');
 
-    const idsBefore = new Set((await repo.getAllClasses()).map(c => c.id));
-
-    // Đổi sang ca 2: chưa có lớp Toán ca 2, nhưng giờ ca 2 trùng lớp Tiếng Anh -> chặn.
+    // Đổi sang ca 2: chưa có lớp Toán ca 2, giờ ca 2 trùng lớp Tiếng Anh. Học sinh tự đổi nên vẫn được phép.
     const res = await enrollClass(
-      enrollRequest({ classId: 'CLS91', studentId, action: 'CHANGE_SHIFT', targetShiftId: 2 })
+      enrollRequest({ classId: 'CLS91', studentId, action: 'CHANGE_SHIFT', targetShiftId: 2, actorId: studentId, actorRole: 'STUDENT' })
     );
-    assert.equal(res.status, 409, 'Trùng giờ với lớp ca 2 phải bị chặn 409');
+    const data = await res.json();
+    assert.equal(res.status, 200, 'Học sinh tự đổi ca không bị chặn vì trùng giờ: ' + JSON.stringify(data));
+    assert.ok(data.success);
 
-    const classesAfter = await repo.getAllClasses();
-    const newClasses = classesAfter.filter(c => !idsBefore.has(c.id));
-    assert.deepEqual(newClasses, [], 'Không được mở lớp mới khi ca bị chặn');
+    const targetAfter = await repo.getClassById(data.targetClassId);
+    assert.ok(targetAfter?.studentIds.includes(studentId), 'Học sinh phải có trong lớp ca mới');
+    assert.equal(Number(targetAfter?.shiftId), 2, 'Lớp mới đúng ca mục tiêu');
 
     const sourceAfter = await repo.getClassById('CLS91');
-    assert.ok(sourceAfter?.studentIds.includes(studentId), 'Học sinh vẫn ở lớp cũ khi đổi ca thất bại');
+    assert.ok(!sourceAfter?.studentIds.includes(studentId), 'Học sinh rời lớp cũ');
+
+    // Vẫn giữ lớp Tiếng Anh trùng giờ vì học sinh được phép học chồng giờ.
+    const englishAfter = await repo.getClassById('CLS92');
+    assert.ok(englishAfter?.studentIds.includes(studentId), 'Vẫn giữ lớp trùng giờ khác');
   });
 
   it('4. Từ chối đổi sang chính ca đang học', async () => {
@@ -150,5 +154,32 @@ describe('Học sinh đổi ca học', () => {
     const data = await res.json();
     assert.equal(res.status, 400);
     assert.match(String(data.error), /đang học đúng ca này/);
+  });
+
+  it('5. Quản trị viên vẫn bị chặn khi đổi ca trùng giờ (giữ an toàn xếp lớp)', async () => {
+    const source = await createClass('CLS95', 'TESTC5', 1);
+    await createClass('CLS96', 'TESTC6', 2, 'Tiếng Anh Giao Tiếp & IELTS');
+    const studentId = 'ST023';
+    await enrollStudentInClass(studentId, source.id);
+    await enrollStudentInClass(studentId, 'CLS96');
+
+    const idsBefore = new Set((await repo.getAllClasses()).map(c => c.id));
+
+    const res = await enrollClass(
+      enrollRequest({
+        classId: 'CLS95',
+        studentId,
+        action: 'CHANGE_SHIFT',
+        targetShiftId: 2,
+        actorId: 'ADMIN001',
+      })
+    );
+    assert.equal(res.status, 409, 'Quản trị viên phải bị chặn 409 khi trùng giờ');
+
+    const newClasses = (await repo.getAllClasses()).filter(c => !idsBefore.has(c.id));
+    assert.deepEqual(newClasses, [], 'Không được mở lớp mới khi ca bị chặn');
+
+    const sourceAfter = await repo.getClassById('CLS95');
+    assert.ok(sourceAfter?.studentIds.includes(studentId), 'Học sinh vẫn ở lớp cũ khi đổi ca thất bại');
   });
 });

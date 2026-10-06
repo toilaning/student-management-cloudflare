@@ -92,6 +92,7 @@ export default function StudentClassesPage() {
     className: string;
     targetShiftId: number;
     opensNewClass: boolean;
+    conflictClassName?: string;
   } | null>(null);
 
   const loadData = async () => {
@@ -158,7 +159,7 @@ export default function StudentClassesPage() {
     );
   };
 
-  /** Ca mục tiêu có trùng giờ với lớp khác học sinh đang học không. */
+  /** Ca mục tiêu có trùng giờ với lớp khác học sinh đang học không (chỉ để cảnh báo, không chặn). */
   const conflictForShift = (
     fromClass: ClassEntity,
     targetShiftId: number
@@ -188,7 +189,7 @@ export default function StudentClassesPage() {
     return null;
   };
 
-  /** Các ca có thể chuyển sang: bỏ ca đang học, bỏ ca trùng giờ. */
+  /** Các ca có thể chuyển sang: bỏ ca đang học. Ca trùng giờ vẫn chọn được, chỉ cảnh báo. */
   const shiftOptionsFor = (cls: ClassEntity) => {
     const current = getClassTimeRange(cls, shifts);
     return shifts
@@ -219,6 +220,7 @@ export default function StudentClassesPage() {
           studentId: currentUser.id,
           action: 'ENROLL',
           actorId: currentUser.id,
+          actorRole: 'STUDENT',
         }),
       });
       const data = await res.json();
@@ -249,6 +251,7 @@ export default function StudentClassesPage() {
           action: 'CHANGE_SHIFT',
           targetShiftId,
           actorId: currentUser?.id || '',
+          actorRole: 'STUDENT',
         }),
       });
       const data = await res.json();
@@ -353,12 +356,12 @@ export default function StudentClassesPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {options.map(({ shift, opensNewClass, conflict }) => {
             const isSelected = selected === shift.id;
-            const disabled = !!conflict;
+            const disabled = actionLoadingId === cls.id;
             return (
               <button
                 key={shift.id}
                 type="button"
-                disabled={disabled || actionLoadingId === cls.id}
+                disabled={disabled}
                 onClick={() => {
                   setTargetShiftByClass((prev) => {
                     const next = { ...prev };
@@ -367,12 +370,14 @@ export default function StudentClassesPage() {
                     return next;
                   });
                 }}
-                title={conflict ? 'Trùng giờ với lớp ' + conflict.className + ' bạn đang học' : undefined}
+                title={conflict ? 'Ca này trùng giờ với lớp ' + conflict.className + ' bạn đang học' : undefined}
                 className={cn(
                   'relative px-3 py-2.5 rounded-field text-[12px] border transition text-left leading-tight cursor-pointer',
                   'disabled:opacity-45 disabled:cursor-not-allowed',
                   isSelected
                     ? 'border-primary bg-primary-soft ring-2 ring-primary/25'
+                    : conflict
+                    ? 'border-warning bg-warning-soft hover:bg-warning-soft/70'
                     : 'border-line bg-card hover:bg-muted'
                 )}
               >
@@ -380,11 +385,11 @@ export default function StudentClassesPage() {
                   <span className="font-bold text-foreground">
                     {shift.startTime} – {shift.endTime}
                   </span>
-                  {isSelected && !disabled && <Check size={14} className="text-primary shrink-0" />}
+                  {isSelected && <Check size={14} className="text-primary shrink-0" />}
                 </span>
                 <span className="block text-[11px] text-muted-foreground mt-0.5">
                   {conflict
-                    ? 'Trùng giờ lớp ' + conflict.className
+                    ? 'Trùng giờ lớp ' + conflict.className + ' – vẫn chuyển được'
                     : opensNewClass
                     ? 'Trung tâm sẽ mở lớp cho ca này'
                     : 'Đã có lớp ở ca này'}
@@ -492,6 +497,7 @@ export default function StudentClassesPage() {
                                     className: cls.name,
                                     targetShiftId: selected,
                                     opensNewClass: !!selectedOption?.opensNewClass,
+                                    conflictClassName: selectedOption?.conflict?.className,
                                   });
                                 }}
                                 icon={<RefreshCw size={14} />}
@@ -618,6 +624,13 @@ export default function StudentClassesPage() {
                   ? 'Chưa có lớp nào ở ca này. Trung tâm sẽ mở lớp mới cùng môn, cùng ngày học cho bạn và giữ nguyên giảng viên.'
                   : 'Hệ thống chuyển bạn sang lớp đang mở ở ca này ngay lập tức.'}
               </p>
+              {pendingChange.conflictClassName && (
+                <p className="text-[12px] text-warning flex items-start gap-1.5">
+                  <AlertCircle size={13} className="shrink-0 mt-0.5" />
+                  Ca này trùng giờ với lớp <strong>{pendingChange.conflictClassName}</strong> bạn đang học. Bạn vẫn
+                  chuyển được, nhưng hai lớp sẽ chồng giờ nhau.
+                </p>
+              )}
             </div>
           )}
         </Sheet>

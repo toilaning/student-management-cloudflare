@@ -162,7 +162,7 @@ function buildNextClassId(allClasses: ClassEntity[]): string {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { classId, studentId, action, actorId = 'ADMIN001', targetShiftId } = body;
+    const { classId, studentId, action, actorId = 'ADMIN001', actorRole, targetShiftId } = body;
 
     if (!classId || !studentId || !action) {
       return NextResponse.json({ error: 'Thiếu thông tin classId, studentId hoặc action' }, { status: 400 });
@@ -180,13 +180,23 @@ export async function POST(request: Request) {
 
     const shifts = await ShiftService.getAllShifts();
 
+    // Học sinh tự đăng ký/đổi ca thì không bị chặn vì trùng giờ; chỉ quản trị viên mới bị chặn
+    // để tránh xếp lớp chồng lấn ngoài ý muốn.
+    // Ưu tiên tra vai trò thật từ tài khoản, chỉ dùng actorRole client gửi lên khi không tra được.
+    let actorRoleResolved = typeof actorRole === 'string' ? actorRole : '';
+    const actorUser = actorId ? await repo.getUserById(String(actorId)) : null;
+    if (actorUser?.role) actorRoleResolved = actorUser.role;
+    const isStudentSelfService = actorRoleResolved === 'STUDENT';
+
     if (action === 'ENROLL') {
-      // Kiểm tra trùng giờ với các lớp khác học sinh đã enrolled (trước khi thực hiện thay đổi)
-      const enrollOverlap = await findOverlappingEnrollment(studentId, cls, shifts);
-      if (enrollOverlap) {
-        return NextResponse.json({
-          error: `Ca học này trùng giờ với lớp ${enrollOverlap.className} bạn đã đăng ký (${enrollOverlap.dayName}, ${enrollOverlap.startLabel}-${enrollOverlap.endLabel}). Vui lòng chọn ca khác.`,
-        }, { status: 409 });
+      if (!isStudentSelfService) {
+        // Kiểm tra trùng giờ với các lớp khác học sinh đã enrolled (trước khi thực hiện thay đổi)
+        const enrollOverlap = await findOverlappingEnrollment(studentId, cls, shifts);
+        if (enrollOverlap) {
+          return NextResponse.json({
+            error: `Ca học này trùng giờ với lớp ${enrollOverlap.className} bạn đã đăng ký (${enrollOverlap.dayName}, ${enrollOverlap.startLabel}-${enrollOverlap.endLabel}). Vui lòng chọn ca khác.`,
+          }, { status: 409 });
+        }
       }
 
       if (!cls.studentIds.includes(studentId)) {
@@ -260,21 +270,24 @@ export async function POST(request: Request) {
         sameScheduleDays(c.scheduleDays, cls.scheduleDays)
       ) || null;
 
-      // Lớp đích dự kiến: dùng lớp đang có ở ca này, hoặc tạm lấy khung giờ của ca để kiểm tra trùng.
-      const prospectiveTarget: ClassEntity = targetClass || {
-        ...cls,
-        id: '__SHIFT_TARGET__',
-        shiftId: shiftNum,
-        startTime: targetShift.startTime,
-        endTime: targetShift.endTime,
-      };
+      // Quản trị viên: kiểm tra trùng giờ trước khi tạo lớp, tránh mở lớp thừa khi ca bị chặn.
+      // Học sinh tự đổi ca thì bỏ qua bước này.
+      if (!isStudentSelfService) {
+        // Lớp đích dự kiến: dùng lớp đang có ở ca này, hoặc tạm lấy khung giờ của ca để kiểm tra trùng.
+        const prospectiveTarget: ClassEntity = targetClass || {
+          ...cls,
+          id: '__SHIFT_TARGET__',
+          shiftId: shiftNum,
+          startTime: targetShift.startTime,
+          endTime: targetShift.endTime,
+        };
 
-      // Kiểm tra trùng giờ trước khi tạo lớp, tránh mở lớp thừa khi ca bị chặn.
-      const changeOverlap = await findOverlappingEnrollment(studentId, prospectiveTarget, shifts, [classId]);
-      if (changeOverlap) {
-        return NextResponse.json({
-          error: `Ca học này trùng giờ với lớp ${changeOverlap.className} bạn đã đăng ký (${changeOverlap.dayName}, ${changeOverlap.startLabel}-${changeOverlap.endLabel}). Vui lòng chọn ca khác.`,
-        }, { status: 409 });
+        const changeOverlap = await findOverlappingEnrollment(studentId, prospectiveTarget, shifts, [classId]);
+        if (changeOverlap) {
+          return NextResponse.json({
+            error: `Ca học này trùng giờ với lớp ${changeOverlap.className} bạn đã đăng ký (${changeOverlap.dayName}, ${changeOverlap.startLabel}-${changeOverlap.endLabel}). Vui lòng chọn ca khác.`,
+          }, { status: 409 });
+        }
       }
 
       // Chưa có lớp ở ca này -> mở lớp mới cùng môn/ngày học, giữ nguyên giảng viên và học phí

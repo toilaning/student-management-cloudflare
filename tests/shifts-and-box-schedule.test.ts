@@ -130,7 +130,7 @@ describe('Dynamic Shifts & Schedule Box Suite', () => {
     assert.ok(!clsAfterUnenroll?.studentIds.includes(testStudentId), 'Học viên phải được xoá khỏi lớp');
   });
 
-  it('6b. Từ chối đăng ký ca học TRÙNG GIỜ với lớp đã enrolled', async () => {
+  it('6b. Học sinh tự đăng ký ca TRÙNG GIỜ với lớp đã enrolled vẫn được phép', async () => {
     const testStudentId = 'ST003';
     // ST003 theo seed học CLS01 (Toán, Thứ 2-4-6, Ca 1). CLS02 (Tiếng Anh) trùng ngày + trùng giờ.
     const reqEnroll = new Request('http://localhost/api/classes/enroll', {
@@ -141,11 +141,42 @@ describe('Dynamic Shifts & Schedule Box Suite', () => {
         studentId: testStudentId,
         action: 'ENROLL',
         actorId: testStudentId,
+        actorRole: 'STUDENT',
       }),
     });
     const resEnroll = await enrollClass(reqEnroll);
     const dataEnroll = await resEnroll.json();
-    assert.equal(resEnroll.status, 409, 'Phải trả về 409 khi trùng giờ');
+    assert.equal(resEnroll.status, 200, 'Học sinh tự đăng ký không bị chặn vì trùng giờ');
+    assert.ok(dataEnroll.success, 'Đăng ký phải thành công: ' + JSON.stringify(dataEnroll));
+
+    const cls = await repo.getClassById('CLS02');
+    assert.ok(cls?.studentIds.includes(testStudentId), 'Học viên phải được thêm vào lớp');
+
+    // Dọn dẹp để không ảnh hưởng các test sau.
+    const cleanup = new Request('http://localhost/api/classes/enroll', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ classId: 'CLS02', studentId: testStudentId, action: 'UNENROLL' }),
+    });
+    await enrollClass(cleanup);
+  });
+
+  it('6c. Quản trị viên vẫn bị chặn khi thêm học viên vào lớp TRÙNG GIỜ', async () => {
+    const testStudentId = 'ST004';
+    // ST004 theo seed học CLS01 (Toán, Thứ 2-4-6, Ca 1). CLS02 (Tiếng Anh) trùng ngày + trùng giờ.
+    const reqEnroll = new Request('http://localhost/api/classes/enroll', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        classId: 'CLS02',
+        studentId: testStudentId,
+        action: 'ENROLL',
+        actorId: 'ADMIN001',
+      }),
+    });
+    const resEnroll = await enrollClass(reqEnroll);
+    const dataEnroll = await resEnroll.json();
+    assert.equal(resEnroll.status, 409, 'Quản trị viên phải bị chặn 409 khi trùng giờ');
     assert.ok(dataEnroll.error && dataEnroll.error.includes('trùng giờ'), 'Message lỗi phải nói rõ trùng giờ');
 
     const cls = await repo.getClassById('CLS02');
