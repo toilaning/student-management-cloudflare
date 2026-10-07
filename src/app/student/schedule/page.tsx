@@ -9,6 +9,7 @@ import { ScheduleSlot, TimeShift, TIME_SHIFTS } from '@/types/schedule';
 import { ClassEntity } from '@/types/classroom';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { LinkButton } from '@/components/ui/LinkButton';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Sheet } from '@/components/ui/Sheet';
@@ -229,11 +230,15 @@ export default function StudentSchedulePage() {
                 Hiển thị lịch học theo tuần từ Thứ 2 đến Chủ nhật theo khung giờ thực tế
               </p>
             </div>
-            <Link href="/student/classes" className="shrink-0 w-full sm:w-auto">
-              <Button variant="secondary" icon={<BookOpen size={15} />} fullWidth className="sm:w-auto">
-                Tra cứu & đổi ca học
-              </Button>
-            </Link>
+            <LinkButton
+              href="/student/classes"
+              variant="secondary"
+              icon={<BookOpen size={15} />}
+              fullWidth
+              className="shrink-0 w-full sm:w-auto"
+            >
+              Tra cứu & đổi ca học
+            </LinkButton>
           </Card>
 
           {/* Bộ điều hướng tuần */}
@@ -292,11 +297,9 @@ export default function StudentSchedulePage() {
                 title="Chưa có lịch học nào trong kỳ này"
                 description="Hệ thống chưa ghi nhận lịch học của bạn. Bạn có thể tra cứu và đăng ký ca học phù hợp."
                 action={
-                  <Link href="/student/classes">
-                    <Button variant="primary" icon={<BookOpen size={15} />}>
-                      Đăng ký ca học ngay
-                    </Button>
-                  </Link>
+                  <LinkButton href="/student/classes" variant="primary" icon={<BookOpen size={15} />}>
+                    Đăng ký ca học ngay
+                  </LinkButton>
                 }
               />
             </Card>
@@ -401,7 +404,9 @@ export default function StudentSchedulePage() {
                               const cls = classMap.get(slot.classId);
                               const meetingLink = slot.meetingLink || cls?.meetingLink;
                               const topPx = minuteToTopPx(startMin);
-                              const heightPx = Math.max(minuteToTopPx(endMin) - topPx, 36);
+                              const rawHeightPx = minuteToTopPx(endMin) - topPx;
+                              const isShortSlot = rawHeightPx < 160;
+                              const heightPx = Math.max(rawHeightPx, isShortSlot ? 160 : 36);
                               const widthPct = 100 / columnCount;
 
                               return (
@@ -442,7 +447,7 @@ export default function StudentSchedulePage() {
                                     </div>
                                   </div>
 
-                                  <div className="space-y-0.5 mt-1 pt-1 border-t border-line/60">
+                                  <div className="flex-1 min-h-0 overflow-hidden space-y-0.5 mt-1 pt-1 border-t border-line/60">
                                     <div className="text-[11px] text-muted-foreground flex items-center gap-1">
                                       <UserCheck size={11} className="shrink-0 text-primary" />
                                       <span className="truncate">{slot.teacherId}</span>
@@ -468,17 +473,17 @@ export default function StudentSchedulePage() {
                                       </div>
                                     )}
                                   </div>
-                                    <div className="flex items-center gap-1.5 pt-1.5 mt-1 border-t border-line/40">
+                                    <div className="shrink-0 flex flex-col gap-1 pt-1.5 mt-1 border-t border-line/40">
                                       <button
                                         onClick={() => openAbsenceModal(slot)}
-                                        className="inline-flex items-center gap-1 rounded-pill border border-line px-2 py-1 text-[10px] font-semibold text-danger hover:bg-danger hover:text-white transition"
+                                        className="inline-flex w-full flex-nowrap whitespace-nowrap items-center justify-center gap-1 rounded-pill border border-line px-2 py-0.5 text-[10px] font-semibold text-danger hover:bg-danger hover:text-white transition"
                                       >
                                         <CalendarX2 size={11} />
                                         Xin vắng
                                       </button>
                                       <Link
                                         href="/student/classes"
-                                        className="inline-flex items-center gap-1 rounded-pill border border-line px-2 py-1 text-[10px] font-semibold text-primary hover:bg-primary-soft transition"
+                                        className="inline-flex w-full flex-nowrap whitespace-nowrap items-center justify-center gap-1 rounded-pill border border-line px-2 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary-soft transition"
                                       >
                                         <ArrowRightLeft size={11} />
                                         Đổi ca

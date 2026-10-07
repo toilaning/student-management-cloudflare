@@ -4,8 +4,8 @@ import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
-type Size = 'sm' | 'md' | 'lg' | 'icon';
+export type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
+export type Size = 'sm' | 'md' | 'lg' | 'icon';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
@@ -32,6 +32,28 @@ const sizes: Record<Size, string> = {
   icon: 'h-11 w-11 justify-center',
 };
 
+/** Tổng hợp class ngoại hình nút, dùng chung cho <button> và link có kiểu nút. */
+export function buttonStyles({
+  variant = 'primary',
+  size = 'md',
+  fullWidth = false,
+  className,
+}: {
+  variant?: Variant;
+  size?: Size;
+  fullWidth?: boolean;
+  className?: string;
+} = {}) {
+  return cn(
+    'inline-flex items-center justify-center rounded-pill font-semibold transition-all duration-150 cursor-pointer select-none whitespace-nowrap',
+    'disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100',
+    variants[variant],
+    sizes[size],
+    fullWidth && 'w-full',
+    className
+  );
+}
+
 export const Button: React.FC<ButtonProps> = ({
   variant = 'primary',
   size = 'md',
@@ -48,14 +70,7 @@ export const Button: React.FC<ButtonProps> = ({
     <button
       type={type}
       disabled={disabled || loading}
-      className={cn(
-        'inline-flex items-center justify-center rounded-pill font-semibold transition-all duration-150 cursor-pointer select-none whitespace-nowrap',
-        'disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100',
-        variants[variant],
-        sizes[size],
-        fullWidth && 'w-full',
-        className
-      )}
+      className={buttonStyles({ variant, size, fullWidth, className })}
       {...rest}
     >
       {loading ? (

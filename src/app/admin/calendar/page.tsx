@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import Link from 'next/link';
 import { Header } from '@/components/common/Header';
 import { RoleGuard } from '@/components/common/RoleGuard';
 import { ScheduleSlot, TimeShift, TIME_SHIFTS } from '@/types/schedule';
@@ -18,6 +17,7 @@ import {
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { LinkButton } from '@/components/ui/LinkButton';
 import { Badge } from '@/components/ui/Badge';
 import { Field, Input, Select } from '@/components/ui/Field';
 import { Sheet } from '@/components/ui/Sheet';
@@ -824,7 +824,7 @@ export default function AdminCalendarPage() {
                                     <a
                                       href={slot.meetingLink}
                                       target="_blank"
-                                      rel="noreferrer"
+                                      rel="noopener noreferrer"
                                       className="inline-flex items-center gap-1 text-success hover:underline font-bold whitespace-nowrap"
                                     >
                                       <Video size={11} /> Online <ExternalLink size={9} />
@@ -840,11 +840,13 @@ export default function AdminCalendarPage() {
                                   >
                                     Học viên
                                   </Button>
-                                  <Link href={`/admin/attendance?classId=${slot.classId}&date=${selectedDate}`}>
-                                    <Button variant="primary" size="sm">
-                                      Điểm danh
-                                    </Button>
-                                  </Link>
+                                  <LinkButton
+                                    href={`/admin/attendance?classId=${slot.classId}&date=${selectedDate}`}
+                                    variant="primary"
+                                    size="sm"
+                                  >
+                                    Điểm danh
+                                  </LinkButton>
                                 </div>
                               </div>
                             )}
@@ -897,11 +899,12 @@ export default function AdminCalendarPage() {
                 Đóng
               </Button>
               {selectedSlotForStudents && (
-                <Link href={`/admin/attendance?classId=${selectedSlotForStudents.classId}&date=${selectedDate}`}>
-                  <Button variant="primary">
-                    Điểm danh ca này
-                  </Button>
-                </Link>
+                <LinkButton
+                  href={`/admin/attendance?classId=${selectedSlotForStudents.classId}&date=${selectedDate}`}
+                  variant="primary"
+                >
+                  Điểm danh ca này
+                </LinkButton>
               )}
             </div>
           }

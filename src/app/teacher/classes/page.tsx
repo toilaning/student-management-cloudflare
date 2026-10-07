@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import Link from 'next/link';
 import { Header } from '@/components/common/Header';
 import { useApp } from '@/context/AppContext';
 import { RoleGuard } from '@/components/common/RoleGuard';
@@ -11,6 +10,7 @@ import { formatClassTimeLabel } from '@/utils/schedule';
 import { QuickStudentModal } from '@/components/common/QuickStudentModal';
 import { Card, CardHeader, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { LinkButton } from '@/components/ui/LinkButton';
 import { Badge } from '@/components/ui/Badge';
 import { Sheet } from '@/components/ui/Sheet';
 import { SegmentedControl } from '@/components/ui/Tabs';
@@ -403,16 +403,16 @@ export default function TeacherClassesPage() {
                     {/* Nút thao tác dưới thẻ */}
                     <div className="pt-4 border-t border-line mt-4">
                       {isMine ? (
-                        <Link href={`/teacher/attendance?classId=${cls.id}`} className="block w-full">
-                          <Button
-                            variant="primary"
-                            size="md"
-                            fullWidth
-                            icon={<UserCheck size={16} />}
-                          >
-                            Sổ điểm danh & Đánh giá
-                          </Button>
-                        </Link>
+                        <LinkButton
+                          href={`/teacher/attendance?classId=${cls.id}`}
+                          variant="primary"
+                          size="md"
+                          fullWidth
+                          icon={<UserCheck size={16} />}
+                          className="block w-full"
+                        >
+                          Sổ điểm danh & Đánh giá
+                        </LinkButton>
                       ) : isOpen ? (
                         <Button
                           variant="primary"
@@ -471,7 +471,7 @@ export default function TeacherClassesPage() {
                   <a
                     href={selectedClassForView.meetingLink}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-primary hover:underline font-bold"
                   >
                     <Video size={13} /> Vào phòng online <ExternalLink size={11} />

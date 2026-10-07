@@ -8,6 +8,7 @@ import { BankWebhookSimulator } from '@/components/tuition/BankWebhookSimulator'
 import { TuitionInvoice } from '@/types/finance';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { LinkButton } from '@/components/ui/LinkButton';
 import { Badge } from '@/components/ui/Badge';
 import { SegmentedControl, TabItem } from '@/components/ui/Tabs';
 import { useToast } from '@/components/ui/Toast';
@@ -84,11 +85,9 @@ function AdminGuidesContent() {
             onChange={(v) => setActiveTab(v)}
           />
 
-          <Link href="/admin/tuition" className="self-end sm:self-auto">
-            <Button variant="secondary" size="sm" icon={<ArrowRight size={15} />}>
-              Quản lý học phí
-            </Button>
-          </Link>
+          <LinkButton href="/admin/tuition" variant="secondary" size="sm" icon={<ArrowRight size={15} />} className="self-end sm:self-auto">
+            Quản lý học phí
+          </LinkButton>
         </div>
 
         {/* TAB 1: QUẢN TRỊ VIÊN & CỔNG THANH TOÁN */}
@@ -139,6 +138,7 @@ function AdminGuidesContent() {
                       /api/payment/webhook
                     </span>
                     <button
+                      type="button"
                       onClick={() => handleCopy('/api/payment/webhook', 'url')}
                       className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
                       aria-label="Sao chép địa chỉ webhook"

@@ -802,7 +802,7 @@ export default function AdminClassesPage() {
                               <a
                                 href={cls.meetingLink}
                                 target="_blank"
-                                rel="noreferrer"
+                                rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline max-w-[120px] truncate"
                                 title={cls.meetingLink}
                               >
@@ -829,60 +829,62 @@ export default function AdminClassesPage() {
                     </div>
 
                     {/* Nút hành động ở chân thẻ */}
-                    <div className="pt-3 border-t border-line flex items-center gap-2 mt-3">
+                    <div className="pt-3 border-t border-line mt-3 space-y-2">
                       <Button
                         size="sm"
                         variant="primary"
                         icon={<Users size={13} />}
-                        className="flex-1"
+                        fullWidth
                         onClick={() => openClassStudentsModal(cls)}
                       >
                         Quản lý ({(cls.studentIds || []).length})
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        icon={<Calendar size={13} />}
-                        onClick={() => {
-                          setQuickScheduleClass(cls);
-                          const now = new Date();
-                          setQuickScheduleStartDate(now.toISOString().split('T')[0]);
-                          const later = new Date(now);
-                          later.setMonth(later.getMonth() + 3);
-                          setQuickScheduleEndDate(later.toISOString().split('T')[0]);
-                          const clsTime = getClassTimeRange(cls, shifts);
-                          setQuickScheduleStartTime(clsTime.startTime || '18:30');
-                          setQuickScheduleEndTime(clsTime.endTime || '20:30');
-                          setQuickScheduleDays(
-                            cls.scheduleDays && cls.scheduleDays.length > 0 ? cls.scheduleDays : [2, 4, 6]
-                          );
-                          setQuickScheduleOverwrite(false);
-                        }}
-                        title="Lên lịch học cho lớp"
-                      >
-                        Lịch
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        icon={<Edit3 size={13} />}
-                        onClick={() => {
-                          setChangingTeacherClass(cls);
-                          setNewTeacherId(cls.teacherId);
-                        }}
-                        title="Đổi giáo viên phụ trách"
-                      >
-                        Đổi GV
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        icon={<Settings2 size={13} />}
-                        onClick={() => openClassEditModal(cls)}
-                        title="Sửa thông tin / thời gian lớp học"
-                      >
-                        Sửa
-                      </Button>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          icon={<Calendar size={13} />}
+                          onClick={() => {
+                            setQuickScheduleClass(cls);
+                            const now = new Date();
+                            setQuickScheduleStartDate(now.toISOString().split('T')[0]);
+                            const later = new Date(now);
+                            later.setMonth(later.getMonth() + 3);
+                            setQuickScheduleEndDate(later.toISOString().split('T')[0]);
+                            const clsTime = getClassTimeRange(cls, shifts);
+                            setQuickScheduleStartTime(clsTime.startTime || '18:30');
+                            setQuickScheduleEndTime(clsTime.endTime || '20:30');
+                            setQuickScheduleDays(
+                              cls.scheduleDays && cls.scheduleDays.length > 0 ? cls.scheduleDays : [2, 4, 6]
+                            );
+                            setQuickScheduleOverwrite(false);
+                          }}
+                          title="Lên lịch học cho lớp"
+                        >
+                          Lịch
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          icon={<Edit3 size={13} />}
+                          onClick={() => {
+                            setChangingTeacherClass(cls);
+                            setNewTeacherId(cls.teacherId);
+                          }}
+                          title="Đổi giáo viên phụ trách"
+                        >
+                          Đổi GV
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          icon={<Settings2 size={13} />}
+                          onClick={() => openClassEditModal(cls)}
+                          title="Sửa thông tin / thời gian lớp học"
+                        >
+                          Sửa
+                        </Button>
+                      </div>
                     </div>
                   </Card>
                 );

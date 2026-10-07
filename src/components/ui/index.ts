@@ -1,5 +1,7 @@
 export { Button } from './Button';
 export type { ButtonProps } from './Button';
+export { LinkButton } from './LinkButton';
+export type { LinkButtonProps } from './LinkButton';
 export { Card, CardHeader, StatCard } from './Card';
 export { Badge, AttendanceBadge, TuitionBadge, ATTENDANCE_TONE, TUITION_TONE } from './Badge';
 export { Field, Input, Textarea, Select } from './Field';

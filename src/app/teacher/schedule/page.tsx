@@ -9,6 +9,7 @@ import { ScheduleSlot, TimeShift, TIME_SHIFTS } from '@/types/schedule';
 import { ClassEntity } from '@/types/classroom';
 import { Card, CardHeader, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { LinkButton } from '@/components/ui/LinkButton';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/Toast';
@@ -337,11 +338,9 @@ export default function TeacherSchedulePage() {
               <Badge tone="primary" className="tabular">
                 {weekSlots.length} ca
               </Badge>
-              <Link href="/teacher/classes">
-                <Button size="sm" variant="ghost" icon={<BookOpen size={14} />}>
-                  Danh mục lớp
-                </Button>
-              </Link>
+              <LinkButton href="/teacher/classes" size="sm" variant="ghost" icon={<BookOpen size={14} />}>
+                Danh mục lớp
+              </LinkButton>
             </div>
           </Card>
 

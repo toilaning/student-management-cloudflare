@@ -7,6 +7,7 @@ import { useApp } from '@/context/AppContext';
 import { RoleGuard } from '@/components/common/RoleGuard';
 import { Card, CardHeader, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { LinkButton } from '@/components/ui/LinkButton';
 import { Badge, AttendanceBadge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/Toast';
@@ -194,9 +195,9 @@ export default function StudentDashboardPage() {
                   title="Hôm nay bạn không có ca học"
                   description="Xem thời khoá biểu để biết các buổi sắp tới."
                   action={
-                    <Button variant="secondary" onClick={undefined}>
-                      <Link href="/student/schedule">Xem thời khoá biểu</Link>
-                    </Button>
+                    <LinkButton href="/student/schedule" variant="secondary">
+                      Xem thời khoá biểu
+                    </LinkButton>
                   }
                 />
               </Card>
@@ -322,7 +323,7 @@ export default function StudentDashboardPage() {
                         <a
                           href={slot.meetingLink}
                           target="_blank"
-                          rel="noreferrer"
+                          rel="noopener noreferrer"
                           className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-pill bg-primary-soft text-primary-ink text-[12px] font-semibold hover:bg-primary/15 transition"
                         >
                           <Video size={14} /> Vào lớp <ExternalLink size={11} />
@@ -349,32 +350,32 @@ export default function StudentDashboardPage() {
                     <span className="text-[13px] text-muted-foreground">Buổi còn lại</span>
                     <span className="text-lg font-extrabold tabular text-foreground">{remaining}</span>
                   </div>
-                  <Link href="/student/tuition" className="block">
-                    <Button variant="secondary" fullWidth icon={<Receipt size={16} />}>
-                      Chọn gói & thanh toán
-                    </Button>
-                  </Link>
+                  <LinkButton href="/student/tuition" variant="secondary" fullWidth icon={<Receipt size={16} />} className="block">
+                    Chọn gói & thanh toán
+                  </LinkButton>
                 </div>
               </Card>
 
               <Card>
                 <CardHeader
                   icon={<Inbox size={18} />}
-                  title="Đơn từ"
+                  title="Yêu cầu của tôi"
                   action={
                     <Link href="/student/schedule" className="text-[13px] font-semibold text-primary">
-                      Gửi đơn
+                      Gửi yêu cầu
                     </Link>
                   }
                 />
                 {pendingRequests.length === 0 ? (
-                  <p className="text-[13px] text-muted-foreground">Bạn không có đơn nào đang chờ duyệt.</p>
+                  <p className="text-[13px] text-muted-foreground">
+                    Bạn không có yêu cầu vắng mặt/đổi ca nào đang chờ duyệt.
+                  </p>
                 ) : (
                   <div className="space-y-2">
                     {pendingRequests.slice(0, 3).map((r) => (
                       <div key={r.id} className="flex items-center justify-between gap-2 p-2.5 rounded-field bg-muted">
                         <span className="text-[13px] font-medium text-foreground truncate">
-                          Xin nghỉ học
+                          {r.type === 'DOI_CA' ? 'Đổi ca học' : 'Xin vắng mặt'}
                         </span>
                         <Badge tone="warning">Chờ duyệt</Badge>
                       </div>

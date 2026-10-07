@@ -1,13 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { Header } from '@/components/common/Header';
 import { RoleGuard } from '@/components/common/RoleGuard';
 import { LiveSessionTracker } from '@/components/attendance/LiveSessionTracker';
 import { TeacherCheckinCard } from '@/components/attendance/TeacherCheckinCard';
 import { useApp } from '@/context/AppContext';
-import { StatCard, Card, CardHeader, Badge, Button, EmptyState } from '@/components/ui';
+import { StatCard, Card, CardHeader, Badge, Button, EmptyState, LinkButton } from '@/components/ui';
 import { BookOpen, CheckCircle2, Inbox, Clock, CalendarDays, ArrowRight, Headphones } from 'lucide-react';
 
 export default function TeacherDashboardPage() {
@@ -117,11 +116,9 @@ export default function TeacherDashboardPage() {
                 title="Lịch dạy sắp tới"
                 subtitle="Các ca học gần nhất cần chuẩn bị bài giảng"
                 action={
-                  <Link href="/teacher/schedule">
-                    <Button variant="ghost" size="sm" icon={<ArrowRight size={14} />}>
-                      Xem tất cả ({slots.length})
-                    </Button>
-                  </Link>
+                  <LinkButton href="/teacher/schedule" variant="ghost" size="sm" icon={<ArrowRight size={14} />}>
+                    Xem tất cả ({slots.length})
+                  </LinkButton>
                 }
               />
 
@@ -174,7 +171,7 @@ export default function TeacherDashboardPage() {
                             <a
                               href={slot.meetingLink}
                               target="_blank"
-                              rel="noreferrer"
+                              rel="noopener noreferrer"
                               className="px-2.5 h-8 rounded-pill bg-primary-soft text-primary-ink font-semibold transition text-[12px] inline-flex items-center gap-1.5 hover:brightness-95"
                               title="Vào phòng học trực tuyến"
                             >
@@ -188,13 +185,13 @@ export default function TeacherDashboardPage() {
                           >
                             {slot.status}
                           </Badge>
-                          <Link
+                          <LinkButton
                             href={`/teacher/attendance?slotId=${slot.id}&classId=${slot.classId}`}
+                            variant="secondary"
+                            size="sm"
                           >
-                            <Button variant="secondary" size="sm">
-                              Điểm danh
-                            </Button>
-                          </Link>
+                            Điểm danh
+                          </LinkButton>
                         </div>
                       </div>
                     );
@@ -209,11 +206,9 @@ export default function TeacherDashboardPage() {
                 title="Yêu cầu từ học viên"
                 subtitle="Đơn xin nghỉ mới nhất"
                 action={
-                  <Link href="/teacher/requests">
-                    <Button variant="ghost" size="sm" icon={<ArrowRight size={14} />}>
-                      Xem tất cả
-                    </Button>
-                  </Link>
+                  <LinkButton href="/teacher/requests" variant="ghost" size="sm" icon={<ArrowRight size={14} />}>
+                    Xem tất cả
+                  </LinkButton>
                 }
               />
 

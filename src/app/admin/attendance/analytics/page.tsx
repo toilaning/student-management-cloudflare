@@ -9,6 +9,7 @@ import {
   CardHeader,
   DataTable,
   Field,
+  LinkButton,
   Pager,
   SearchInput,
   Select,
@@ -18,7 +19,6 @@ import {
 } from '@/components/ui';
 import { ClassEntity } from '@/types/classroom';
 import { BarChart3, CheckCircle2, Clock, AlertCircle, RotateCw, Percent, CalendarDays } from 'lucide-react';
-import Link from 'next/link';
 
 interface StudentAttendanceSummary {
   studentId: string;
@@ -232,11 +232,9 @@ export default function AttendanceAnalyticsPage() {
                   >
                     Làm mới
                   </Button>
-                  <Link href="/admin/attendance">
-                    <Button variant="ghost" size="sm">
-                      Sổ điểm danh
-                    </Button>
-                  </Link>
+                  <LinkButton href="/admin/attendance" variant="ghost" size="sm">
+                    Sổ điểm danh
+                  </LinkButton>
                 </div>
               }
             />

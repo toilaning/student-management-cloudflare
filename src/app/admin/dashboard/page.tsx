@@ -9,6 +9,7 @@ import { QuickStudentModal } from '@/components/common/QuickStudentModal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card, CardHeader, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { LinkButton } from '@/components/ui/LinkButton';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getTodayDateStr } from '@/utils/date';
@@ -130,16 +131,12 @@ export default function AdminDashboardPage() {
             subtitle={currentDate ? `${currentDate} • ${currentTime}` : 'Đang cập nhật thời gian...'}
             action={
               <div className="flex items-center gap-2">
-                <Link href="/admin/calendar">
-                  <Button variant="secondary" size="md" icon={<CalendarDays size={16} />}>
-                    Lịch dạy
-                  </Button>
-                </Link>
-                <Link href="/admin/attendance">
-                  <Button variant="primary" size="md" icon={<Clock size={16} />}>
-                    Điểm danh
-                  </Button>
-                </Link>
+                <LinkButton href="/admin/calendar" variant="secondary" size="md" icon={<CalendarDays size={16} />}>
+                  Lịch dạy
+                </LinkButton>
+                <LinkButton href="/admin/attendance" variant="primary" size="md" icon={<Clock size={16} />}>
+                  Điểm danh
+                </LinkButton>
               </div>
             }
           />
@@ -220,11 +217,9 @@ export default function AdminDashboardPage() {
                     icon={<CalendarCheck2 size={18} />}
                     className="mb-0"
                   />
-                  <Link href="/admin/calendar">
-                    <Button variant="ghost" size="sm" icon={<ArrowUpRight size={14} />}>
-                      Xem toàn bộ lịch
-                    </Button>
-                  </Link>
+                  <LinkButton href="/admin/calendar" variant="ghost" size="sm" icon={<ArrowUpRight size={14} />}>
+                    Xem toàn bộ lịch
+                  </LinkButton>
                 </div>
                 {isLoading ? (
                   <div className="p-5 space-y-3">
@@ -257,11 +252,13 @@ export default function AdminDashboardPage() {
                           <Badge tone={slot.status === 'Đã hoàn thành' ? 'success' : slot.status === 'Đã hủy' ? 'danger' : 'primary'}>
                             {slot.status || 'Kế hoạch'}
                           </Badge>
-                          <Link href={`/admin/attendance?classId=${slot.classId}&date=${getTodayDateStr()}`}>
-                            <Button variant="secondary" size="sm">
-                              Điểm danh
-                            </Button>
-                          </Link>
+                          <LinkButton
+                            href={`/admin/attendance?classId=${slot.classId}&date=${getTodayDateStr()}`}
+                            variant="secondary"
+                            size="sm"
+                          >
+                            Điểm danh
+                          </LinkButton>
                         </div>
                       </div>
                     ))}
@@ -336,11 +333,9 @@ export default function AdminDashboardPage() {
                     icon={<ShieldCheck size={18} />}
                     className="mb-0"
                   />
-                  <Link href="/admin/audit">
-                    <Button variant="ghost" size="sm">
-                      Toàn bộ
-                    </Button>
-                  </Link>
+                  <LinkButton href="/admin/audit" variant="ghost" size="sm">
+                    Toàn bộ
+                  </LinkButton>
                 </div>
                 <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
                   {isLoading ? (
