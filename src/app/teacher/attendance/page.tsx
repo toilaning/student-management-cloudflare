@@ -25,6 +25,7 @@ import {
 import { cn } from '@/lib/cn';
 import { timeToMinutes, minutesTo24h } from '@/utils/date';
 import { formatSlotShortLabel } from '@/utils/schedule';
+import { QuickStudentModal } from '@/components/common/QuickStudentModal';
 import {
   CheckCircle2,
   Clock,
@@ -53,6 +54,7 @@ function AttendanceContent() {
   const [students, setStudents] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [quickStudentId, setQuickStudentId] = useState<string | null>(null);
 
   // Modal / Sheet điểm danh bù
   const [makeupSheetOpen, setMakeupSheetOpen] = useState(false);
@@ -266,7 +268,11 @@ function AttendanceContent() {
           <div className="flex items-center gap-3 min-w-[160px]">
             <Avatar name={student?.name || r.studentId} size={36} />
             <div className="min-w-0">
-              <p className="font-semibold text-foreground text-sm truncate">
+              <p
+                className="font-semibold text-foreground text-sm truncate cursor-pointer hover:text-primary transition-colors"
+                onClick={() => setQuickStudentId(r.studentId)}
+                title="Xem thông tin học sinh"
+              >
                 {student ? student.name : `Học viên ${r.studentId}`}
               </p>
               <p className="text-[12px] text-muted-foreground tabular">{r.studentId}</p>
@@ -468,7 +474,11 @@ function AttendanceContent() {
                     <div className="flex items-center gap-2.5 min-w-0">
                       <Avatar name={student?.name || r.studentId} size={36} />
                       <div className="min-w-0">
-                        <p className="font-semibold text-foreground text-sm truncate">
+                        <p
+                          className="font-semibold text-foreground text-sm truncate cursor-pointer hover:text-primary transition-colors"
+                          onClick={() => setQuickStudentId(r.studentId)}
+                          title="Xem thông tin học sinh"
+                        >
                           {student ? student.name : `Học viên ${r.studentId}`}
                         </p>
                         <p className="text-[12px] text-muted-foreground tabular">{r.studentId}</p>
@@ -645,6 +655,8 @@ function AttendanceContent() {
           </Field>
         </div>
       </Sheet>
+
+      <QuickStudentModal studentId={quickStudentId} onClose={() => setQuickStudentId(null)} />
     </div>
   );
 }

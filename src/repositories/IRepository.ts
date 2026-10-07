@@ -2,7 +2,7 @@ import { AppNotification } from '@/types/notification';
 import { User } from '@/types/auth';
 import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
-import { Classroom, ClassEntity } from '@/types/classroom';
+import { Classroom, ClassEntity, ClassSection } from '@/types/classroom';
 import { ScheduleSlot, ClassRequest, TimeShift } from '@/types/schedule';
 import { AttendanceRecord } from '@/types/attendance';
 import { TuitionInvoice, PayrollRecord } from '@/types/finance';
@@ -50,6 +50,16 @@ export interface IRepository {
   updateClass(classEntity: ClassEntity): Promise<ClassEntity>;
   createClass(classEntity: ClassEntity): Promise<ClassEntity>;
   deleteClass(id: string): Promise<boolean>;
+
+  // Class Sections (một lớp có nhiều ca học)
+  getClassSections(classId: string): Promise<ClassSection[]>;
+  getSectionById(id: string): Promise<ClassSection | null>;
+  getSectionsByStudentId(studentId: string): Promise<ClassSection[]>;
+  createClassSection(section: ClassSection): Promise<ClassSection>;
+  updateClassSection(section: ClassSection): Promise<ClassSection>;
+  deleteClassSection(id: string): Promise<boolean>;
+  addStudentToSection(sectionId: string, studentId: string): Promise<void>;
+  removeStudentFromSection(sectionId: string, studentId: string): Promise<void>;
 
   // Schedule
   getAllScheduleSlots(): Promise<ScheduleSlot[]>;
@@ -108,4 +118,8 @@ export interface IRepository {
 
   // Reset/Re-seed
   resetData(): Promise<void>;
+
+  // App Settings (key -> jsonb), dùng lưu cấu hình ngân hàng nhận học phí
+  getAppSetting<T = any>(key: string): Promise<T | null>;
+  setAppSetting(key: string, value: any): Promise<void>;
 }

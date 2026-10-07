@@ -83,6 +83,13 @@ export class BulkScheduleService {
 
     const conflictEngine = new ConflictEngine(this.repo);
     const shifts = await ShiftService.getAllShifts();
+
+    // Mỗi lớp sẽ tạo buổi gắn vào ca học mặc định (ca đầu tiên) của lớp đó.
+    const classSectionMap = new Map<string, string>();
+    for (const cls of targetClasses) {
+      const sections = await this.repo.getClassSections(cls.id);
+      if (sections.length > 0) classSectionMap.set(cls.id, sections[0].id);
+    }
     const shiftMap = new Map<number, (typeof shifts)[0]>();
     shifts.forEach(s => shiftMap.set(s.id, s));
 
@@ -201,6 +208,7 @@ export class BulkScheduleService {
         // Trường hợp chưa có slot: Kiểm tra xung đột
         const candidateSlot: Omit<ScheduleSlot, 'id'> = {
           classId: cls.id,
+          sectionId: classSectionMap.get(cls.id),
           teacherId: cls.teacherId,
           roomId: cls.roomId,
           date: dateStr,

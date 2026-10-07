@@ -55,18 +55,9 @@ export default function StudentTuitionPage() {
       const data = await res.json();
       if (data.success && data.bankConfig) {
         setBankConfig(data.bankConfig);
-        try {
-          localStorage.setItem('admin_bank_config', JSON.stringify(data.bankConfig));
-        } catch {}
-      } else {
-        const local = localStorage.getItem('admin_bank_config');
-        if (local) setBankConfig(JSON.parse(local));
       }
-    } catch {
-      try {
-        const local = localStorage.getItem('admin_bank_config');
-        if (local) setBankConfig(JSON.parse(local));
-      } catch {}
+    } catch (e) {
+      console.error('Không thể tải thông tin ngân hàng:', e);
     }
   };
 
@@ -212,9 +203,10 @@ export default function StudentTuitionPage() {
       render: (inv) => (
         <div>
           <div className="font-semibold text-foreground">{inv.title}</div>
-          {inv.packageId && (
+          {inv.packageName && (
             <span className="inline-block text-[11px] font-mono text-primary bg-primary-soft px-2 py-0.5 rounded-pill mt-0.5">
-              Gói: {inv.packageId}
+              Gói: {inv.packageName}
+              {inv.packagePrice != null ? ' • ' + money(inv.packagePrice) : ''}
             </span>
           )}
         </div>
@@ -432,9 +424,10 @@ export default function StudentTuitionPage() {
                       <div>
                         <span className="font-mono font-bold text-xs text-muted-foreground">{inv.id}</span>
                         <h4 className="font-semibold text-foreground text-sm mt-0.5">{inv.title}</h4>
-                        {inv.packageId && (
+                        {inv.packageName && (
                           <span className="inline-block text-[11px] font-mono text-primary bg-primary-soft px-2 py-0.5 rounded-pill mt-0.5">
-                            Gói: {inv.packageId}
+                            Gói: {inv.packageName}
+                            {inv.packagePrice != null ? ' • ' + money(inv.packagePrice) : ''}
                           </span>
                         )}
                       </div>

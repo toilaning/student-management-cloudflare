@@ -5,6 +5,8 @@ export interface TuitionInvoice {
   studentId: string;
   classId: string;
   packageId?: string; // Mã gói buổi học (nếu mua theo gói)
+  packageName?: string; // Tên gói học sinh đã chọn (VD: Gói Cơ Bản (10 buổi))
+  packagePrice?: number; // Giá gói tại thời điểm mua (snapshot, đơn vị VNĐ)
   sessionCount?: number; // Số buổi học tương ứng (10, 20, 30...)
   usedSessions?: number; // Số buổi đã dùng
   title: string; // "Học phí môn Lập trình React tháng 09/2026"

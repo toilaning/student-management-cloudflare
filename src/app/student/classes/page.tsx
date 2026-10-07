@@ -11,7 +11,7 @@ import { SearchInput } from '@/components/ui/SearchInput';
 import { Sheet } from '@/components/ui/Sheet';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/Toast';
-import { ClassEntity } from '@/types/classroom';
+import { ClassEntity, ClassSection } from '@/types/classroom';
 import { TimeShift, TIME_SHIFTS } from '@/types/schedule';
 import { getClassTimeRange } from '@/utils/schedule';
 import { cn } from '@/lib/cn';
@@ -70,12 +70,6 @@ function formatDays(days: number[] = []): string {
     .join(' · ');
 }
 
-function sameDays(a: number[] = [], b: number[] = []): boolean {
-  const setA = Array.from(new Set(a.map(Number))).sort((x, y) => x - y);
-  const setB = Array.from(new Set(b.map(Number))).sort((x, y) => x - y);
-  return setA.length === setB.length && setA.every((v, i) => v === setB[i]);
-}
-
 export default function StudentClassesPage() {
   const { currentUser, isReady } = useApp();
   const toast = useToast();
@@ -85,13 +79,15 @@ export default function StudentClassesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [sectionsMap, setSectionsMap] = useState<Record<string, ClassSection[]>>({});
+  const [currentSectionByClass, setCurrentSectionByClass] = useState<Record<string, string>>({});
   // Ca mới học sinh muốn chuyển sang, tính theo từng lớp đang học.
-  const [targetShiftByClass, setTargetShiftByClass] = useState<Record<string, number>>({});
+  const [targetSectionByClass, setTargetSectionByClass] = useState<Record<string, string>>({});
   const [pendingChange, setPendingChange] = useState<{
     classId: string;
     className: string;
-    targetShiftId: number;
-    opensNewClass: boolean;
+    targetSectionId: string;
+    targetSectionName: string;
     conflictClassName?: string;
   } | null>(null);
 
@@ -111,6 +107,24 @@ export default function StudentClassesPage() {
       setClasses(clsData.classes || []);
       setStudent(stData.student || null);
       if (shiftData.shifts) setShifts(shiftData.shifts);
+
+      const enrolledIds = (stData.student?.enrolledClassIds || []) as string[];
+      const secResults = await Promise.all(
+        enrolledIds.map(async (id) => {
+          const res = await fetch('/api/classes/sections?classId=' + id);
+          const data = await res.json();
+          return { id, sections: (data.sections || []) as ClassSection[] };
+        })
+      );
+      const nextMap: Record<string, ClassSection[]> = {};
+      const nextCurrent: Record<string, string> = {};
+      for (const item of secResults) {
+        nextMap[item.id] = item.sections;
+        const mine = item.sections.find((sec) => (sec.studentIds || []).includes(currentUser.id));
+        if (mine) nextCurrent[item.id] = mine.id;
+      }
+      setSectionsMap(nextMap);
+      setCurrentSectionByClass(nextCurrent);
     } catch (e) {
       console.error(e);
       toast.error('Không tải được dữ liệu lớp học.');
@@ -123,12 +137,6 @@ export default function StudentClassesPage() {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, isReady]);
-
-  const shiftMap = useMemo(() => {
-    const map = new Map<number, TimeShift>();
-    shifts.forEach((s) => map.set(s.id, s));
-    return map;
-  }, [shifts]);
 
   const classRange = (cls: ClassEntity): { start: number; end: number } => {
     const { startTime, endTime } = getClassTimeRange(cls, shifts);
@@ -145,36 +153,20 @@ export default function StudentClassesPage() {
     [classes, student]
   );
 
-  /** Lớp cùng môn, cùng ngày học, đang chạy ở ca chỉ định (nếu có). */
-  const findClassAtShift = (fromClass: ClassEntity, shiftId: number): ClassEntity | null => {
-    const subject = (fromClass.subject || '').trim().toLowerCase();
-    return (
-      classes.find(
-        (c) =>
-          c.id !== fromClass.id &&
-          (c.subject || '').trim().toLowerCase() === subject &&
-          Number(c.shiftId) === shiftId &&
-          sameDays(c.scheduleDays, fromClass.scheduleDays)
-      ) || null
-    );
+  const sectionRange = (sec: ClassSection) => {
+    return { start: toMinutes(sec.startTime), end: toMinutes(sec.endTime) };
   };
 
-  /** Ca mục tiêu có trùng giờ với lớp khác học sinh đang học không (chỉ để cảnh báo, không chặn). */
-  const conflictForShift = (
-    fromClass: ClassEntity,
-    targetShiftId: number
+  /** Ca mục tiêu có trùng giờ với lớp khác học sinh đang học không (chỉ cảnh báo, không chặn). */
+  const conflictForSection = (
+    cls: ClassEntity,
+    sec: ClassSection
   ): { className: string; timeLabel: string } | null => {
-    const existing = findClassAtShift(fromClass, targetShiftId);
-    const shift = shiftMap.get(targetShiftId) || TIME_SHIFTS.find((s) => s.id === targetShiftId);
-    if (!shift && !existing) return null;
-
-    const target = existing
-      ? classRange(existing)
-      : { start: toMinutes(shift?.startTime), end: toMinutes(shift?.endTime) };
-    const targetDays = new Set(fromClass.scheduleDays || []);
+    const target = sectionRange(sec);
+    const targetDays = new Set(sec.scheduleDays?.length ? sec.scheduleDays : (cls.scheduleDays || []));
 
     for (const other of enrolledClasses) {
-      if (other.id === fromClass.id) continue;
+      if (other.id === cls.id) continue;
       const otherDays = new Set(other.scheduleDays || []);
       if (!Array.from(targetDays).some((d) => otherDays.has(d))) continue;
 
@@ -182,30 +174,11 @@ export default function StudentClassesPage() {
       if (rangesOverlap(target.start, target.end, otherRange.start, otherRange.end)) {
         return {
           className: other.name,
-          timeLabel: getClassTimeRange(other, shifts).startTime + ' – ' + getClassTimeRange(other, shifts).endTime,
+          timeLabel: (sec.startTime || '') + ' – ' + (sec.endTime || ''),
         };
       }
     }
     return null;
-  };
-
-  /** Các ca có thể chuyển sang: bỏ ca đang học. Ca trùng giờ vẫn chọn được, chỉ cảnh báo. */
-  const shiftOptionsFor = (cls: ClassEntity) => {
-    const current = getClassTimeRange(cls, shifts);
-    return shifts
-      .filter((s) => {
-        const sameTime = s.startTime === current.startTime && s.endTime === current.endTime;
-        return !sameTime && Number(cls.shiftId) !== s.id;
-      })
-      .map((s) => {
-        const existing = findClassAtShift(cls, s.id);
-        const conflict = conflictForShift(cls, s.id);
-        return {
-          shift: s,
-          opensNewClass: !existing,
-          conflict,
-        };
-      });
   };
 
   const handleEnroll = async (classId: string, className: string) => {
@@ -239,7 +212,7 @@ export default function StudentClassesPage() {
 
   const handleConfirmShiftChange = async () => {
     if (!pendingChange) return;
-    const { classId, targetShiftId } = pendingChange;
+    const { classId, targetSectionId } = pendingChange;
     setActionLoadingId(classId);
     try {
       const res = await fetch('/api/classes/enroll', {
@@ -247,9 +220,10 @@ export default function StudentClassesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           classId,
+          sectionId: currentSectionByClass[classId],
+          targetSectionId,
           studentId: currentUser?.id || '',
           action: 'CHANGE_SHIFT',
-          targetShiftId,
           actorId: currentUser?.id || '',
           actorRole: 'STUDENT',
         }),
@@ -257,7 +231,7 @@ export default function StudentClassesPage() {
       const data = await res.json();
       if (res.ok) {
         toast.success(data.message || 'Đổi ca thành công.');
-        setTargetShiftByClass((prev) => {
+        setTargetSectionByClass((prev) => {
           const next = { ...prev };
           delete next[classId];
           return next;
@@ -277,7 +251,7 @@ export default function StudentClassesPage() {
   const keyword = searchTerm.trim().toLowerCase();
   const matchesKeyword = (cls: ClassEntity) =>
     !keyword ||
-    [cls.name, cls.code, cls.subject, cls.teacherId, formatDays(cls.scheduleDays)]
+    [cls.name, cls.subject, cls.teacherId, formatDays(cls.scheduleDays)]
       .join(' ')
       .toLowerCase()
       .includes(keyword);
@@ -336,14 +310,16 @@ export default function StudentClassesPage() {
     );
   };
 
-  const renderShiftPicker = (cls: ClassEntity) => {
-    const options = shiftOptionsFor(cls);
-    const selected = targetShiftByClass[cls.id];
+  const renderSectionPicker = (cls: ClassEntity) => {
+    const sections = sectionsMap[cls.id] || [];
+    const currentSectionId = currentSectionByClass[cls.id];
+    const selected = targetSectionByClass[cls.id];
+    const options = sections.filter((sec) => sec.id !== currentSectionId);
 
     if (options.length === 0) {
       return (
         <p className="text-[12px] text-muted-foreground">
-          Trung tâm chưa cấu hình ca nào khác cho môn này.
+          Trung tâm chưa cấu hình ca nào khác cho lớp này.
         </p>
       );
     }
@@ -354,23 +330,24 @@ export default function StudentClassesPage() {
           <RefreshCw size={12} /> Chọn ca muốn chuyển sang
         </span>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {options.map(({ shift, opensNewClass, conflict }) => {
-            const isSelected = selected === shift.id;
+          {options.map((sec) => {
+            const isSelected = selected === sec.id;
             const disabled = actionLoadingId === cls.id;
+            const conflict = conflictForSection(cls, sec);
             return (
               <button
-                key={shift.id}
+                key={sec.id}
                 type="button"
                 disabled={disabled}
                 onClick={() => {
-                  setTargetShiftByClass((prev) => {
+                  setTargetSectionByClass((prev) => {
                     const next = { ...prev };
-                    if (next[cls.id] === shift.id) delete next[cls.id];
-                    else next[cls.id] = shift.id;
+                    if (next[cls.id] === sec.id) delete next[cls.id];
+                    else next[cls.id] = sec.id;
                     return next;
                   });
                 }}
-                title={conflict ? 'Ca này trùng giờ với lớp ' + conflict.className + ' bạn đang học' : undefined}
+                title={conflict ? 'Ca này trùng giờ với lớp ' + conflict.className + ' bạn đang học' : sec.name}
                 className={cn(
                   'relative px-3 py-2.5 rounded-field text-[12px] border transition text-left leading-tight cursor-pointer',
                   'disabled:opacity-45 disabled:cursor-not-allowed',
@@ -383,16 +360,12 @@ export default function StudentClassesPage() {
               >
                 <span className="flex items-center justify-between gap-2">
                   <span className="font-bold text-foreground">
-                    {shift.startTime} – {shift.endTime}
+                    {sec.startTime} – {sec.endTime}
                   </span>
                   {isSelected && <Check size={14} className="text-primary shrink-0" />}
                 </span>
                 <span className="block text-[11px] text-muted-foreground mt-0.5">
-                  {conflict
-                    ? 'Trùng giờ lớp ' + conflict.className + ' – vẫn chuyển được'
-                    : opensNewClass
-                    ? 'Trung tâm sẽ mở lớp cho ca này'
-                    : 'Đã có lớp ở ca này'}
+                  {conflict ? 'Trùng giờ lớp ' + conflict.className + ' – vẫn chuyển được' : sec.name}
                 </span>
               </button>
             );
@@ -428,7 +401,7 @@ export default function StudentClassesPage() {
           <SearchInput
             value={searchTerm}
             onChange={setSearchTerm}
-            placeholder="Tìm theo môn học, tên lớp, mã lớp hoặc giảng viên"
+            placeholder="Tìm theo môn học, tên lớp hoặc giảng viên"
           />
 
           {loading ? (
@@ -456,16 +429,16 @@ export default function StudentClassesPage() {
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
                     {visibleEnrolledClasses.map((cls) => {
-                      const selected = targetShiftByClass[cls.id];
-                      const options = shiftOptionsFor(cls);
-                      const selectedOption = options.find((o) => o.shift.id === selected);
+                      const sections = sectionsMap[cls.id] || [];
+                      const currentSection = sections.find((sec) => sec.id === currentSectionByClass[cls.id]);
+                      const selectedSection = sections.find((sec) => sec.id === targetSectionByClass[cls.id]);
                       return (
                         <Card key={cls.id} className="border-primary ring-1 ring-primary/15">
                           <div className="space-y-3.5">
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <Badge tone="info">{cls.code}</Badge>
+                                  <Badge tone="info">{currentSection?.name || 'Ca học'}</Badge>
                                   <Badge tone="primary">{cls.subject}</Badge>
                                 </div>
                                 <h3 className="text-base font-bold text-foreground mt-2 leading-snug truncate">
@@ -480,24 +453,26 @@ export default function StudentClassesPage() {
                             {renderClassInfo(cls)}
 
                             <div className="pt-3 border-t border-line space-y-3">
-                              {renderShiftPicker(cls)}
+                              {renderSectionPicker(cls)}
                               <Button
                                 variant="secondary"
                                 size="md"
                                 fullWidth
                                 loading={actionLoadingId === cls.id}
-                                disabled={!selected}
+                                disabled={!selectedSection}
                                 onClick={() => {
-                                  if (!selected) {
+                                  if (!selectedSection) {
                                     toast.error('Chọn ca học mới trước khi đổi.');
                                     return;
                                   }
                                   setPendingChange({
                                     classId: cls.id,
                                     className: cls.name,
-                                    targetShiftId: selected,
-                                    opensNewClass: !!selectedOption?.opensNewClass,
-                                    conflictClassName: selectedOption?.conflict?.className,
+                                    targetSectionId: selectedSection.id,
+                                    targetSectionName:
+                                      selectedSection.name ||
+                                      (selectedSection.startTime || '') + ' – ' + (selectedSection.endTime || ''),
+                                    conflictClassName: conflictForSection(cls, selectedSection)?.className,
                                   });
                                 }}
                                 icon={<RefreshCw size={14} />}
@@ -561,7 +536,6 @@ export default function StudentClassesPage() {
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <Badge tone="info">{cls.code}</Badge>
                                 <Badge tone="primary">{cls.subject}</Badge>
                               </div>
                               <h3 className="text-base font-bold text-foreground mt-2 leading-snug truncate">
@@ -611,18 +585,12 @@ export default function StudentClassesPage() {
           {pendingChange && (
             <div className="space-y-3 py-2 text-[13px]">
               <p className="text-foreground">
-                Đổi lớp <strong className="text-primary">{pendingChange.className}</strong> sang ca{' '}
-                <strong>
-                  {shiftMap.get(pendingChange.targetShiftId)?.startTime} –{' '}
-                  {shiftMap.get(pendingChange.targetShiftId)?.endTime}
-                </strong>
-                ?
+                Đổi lớp <strong className="text-primary">{pendingChange.className}</strong> sang ca mới{' '}
+                <strong>{pendingChange.targetSectionName}</strong>?
               </p>
               <p className="text-[12px] text-muted-foreground flex items-start gap-1.5">
                 <AlertCircle size={13} className="shrink-0 mt-0.5" />
-                {pendingChange.opensNewClass
-                  ? 'Chưa có lớp nào ở ca này. Trung tâm sẽ mở lớp mới cùng môn, cùng ngày học cho bạn và giữ nguyên giảng viên.'
-                  : 'Hệ thống chuyển bạn sang lớp đang mở ở ca này ngay lập tức.'}
+                Hệ thống sẽ chuyển bạn sang ca học mới đã chọn trong cùng lớp. Lịch học của bạn được cập nhật ngay.
               </p>
               {pendingChange.conflictClassName && (
                 <p className="text-[12px] text-warning flex items-start gap-1.5">

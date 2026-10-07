@@ -140,5 +140,5 @@ export class LedgerService {
  */
 function isSessionPayable(slot: { checkinTime?: string; status: string }): boolean {
   if (slot.status === 'Đã hủy') return false;
-  return !!slot.checkinTime || slot.status === 'Đã hoàn thành';
+  return slot.status === 'Đã hoàn thành';
 }

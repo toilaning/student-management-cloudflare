@@ -11,6 +11,9 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Sheet } from '@/components/ui/Sheet';
+import { Field, Textarea } from '@/components/ui/Field';
+import { useToast } from '@/components/ui/Toast';
 import {
   Clock,
   MapPin,
@@ -21,6 +24,8 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarDays,
+  CalendarX2,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { getTodayDateStr, getTodayDateStrByDate, minutesTo24h } from '@/utils/date';
 import { cn } from '@/lib/cn';
@@ -94,6 +99,10 @@ export default function StudentSchedulePage() {
   const [shifts, setShifts] = useState<TimeShift[]>(TIME_SHIFTS);
   const [loading, setLoading] = useState(true);
   const [weekRefDate, setWeekRefDate] = useState(getTodayDateStr());
+  const toast = useToast();
+  const [absenceSlot, setAbsenceSlot] = useState<ScheduleSlot | null>(null);
+  const [absenceReason, setAbsenceReason] = useState('');
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
 
   useEffect(() => {
     if (!isReady || !currentUser?.id) return;
@@ -145,6 +154,44 @@ export default function StudentSchedulePage() {
     setWeekRefDate(getTodayDateStrByDate(d));
   };
   const goThisWeek = () => setWeekRefDate(getTodayDateStr());
+
+  const openAbsenceModal = (slot: ScheduleSlot) => {
+    setAbsenceSlot(slot);
+    setAbsenceReason('');
+  };
+  const submitAbsenceRequest = async () => {
+    if (!absenceSlot || !currentUser?.id) return;
+    if (!absenceReason.trim()) {
+      toast.error('Vui lòng nhập lý do xin vắng mặt.');
+      return;
+    }
+    setRequestSubmitting(true);
+    try {
+      const res = await fetch('/api/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: currentUser.id,
+          classId: absenceSlot.classId,
+          scheduleSlotId: absenceSlot.id,
+          type: 'XIN_NGHI',
+          reason: absenceReason.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Đã gửi đơn xin vắng mặt.');
+        setAbsenceSlot(null);
+        setAbsenceReason('');
+      } else {
+        toast.error(data.error || 'Gửi đơn thất bại.');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Lỗi kết nối mạng.');
+    } finally {
+      setRequestSubmitting(false);
+    }
+  };
 
   // Trục giờ co giãn vừa đủ cho các buổi học trong tuần, không còn 06:00 – 23:00 trống trải
   const bounds = useMemo(() => computeTimelineBounds(weekSlots), [weekSlots]);
@@ -421,6 +468,22 @@ export default function StudentSchedulePage() {
                                       </div>
                                     )}
                                   </div>
+                                    <div className="flex items-center gap-1.5 pt-1.5 mt-1 border-t border-line/40">
+                                      <button
+                                        onClick={() => openAbsenceModal(slot)}
+                                        className="inline-flex items-center gap-1 rounded-pill border border-line px-2 py-1 text-[10px] font-semibold text-danger hover:bg-danger hover:text-white transition"
+                                      >
+                                        <CalendarX2 size={11} />
+                                        Xin vắng
+                                      </button>
+                                      <Link
+                                        href="/student/classes"
+                                        className="inline-flex items-center gap-1 rounded-pill border border-line px-2 py-1 text-[10px] font-semibold text-primary hover:bg-primary-soft transition"
+                                      >
+                                        <ArrowRightLeft size={11} />
+                                        Đổi ca
+                                      </Link>
+                                    </div>
                                 </div>
                               );
                             })}
@@ -433,6 +496,53 @@ export default function StudentSchedulePage() {
               </div>
             </Card>
           )}
+        <Sheet
+          isOpen={!!absenceSlot}
+          onClose={() => {
+            if (!requestSubmitting) setAbsenceSlot(null);
+          }}
+          title="Xin vắng mặt"
+          description={
+            absenceSlot
+              ? absenceSlot.subject + ' - ' + absenceSlot.date + ' (' + absenceSlot.startTime + ' - ' + absenceSlot.endTime + ')'
+              : undefined
+          }
+          size="sm"
+          footer={
+            <Button variant="primary" fullWidth loading={requestSubmitting} onClick={submitAbsenceRequest}>
+              Gửi đơn xin phép
+            </Button>
+          }
+        >
+          {absenceSlot && (
+            <div className="space-y-4">
+              <div className="rounded-field bg-muted border border-line p-3 text-[13px] space-y-1.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Lớp</span>
+                  <span className="font-semibold">{absenceSlot.classId}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Buổi học</span>
+                  <span className="font-semibold tabular">{absenceSlot.date}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Khung giờ</span>
+                  <span className="font-semibold tabular">
+                    {absenceSlot.startTime} – {absenceSlot.endTime}
+                  </span>
+                </div>
+              </div>
+              <Field label="Lý do xin vắng" required>
+                <Textarea
+                  value={absenceReason}
+                  onChange={(e) => setAbsenceReason(e.target.value)}
+                  placeholder="VD: Bận việc gia đình, ốm đau..."
+                />
+              </Field>
+            </div>
+          )}
+        </Sheet>
+
         </main>
       </div>
     </RoleGuard>

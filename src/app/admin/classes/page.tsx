@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from '@/components/common/Header';
 import { RoleGuard } from '@/components/common/RoleGuard';
-import { ClassEntity } from '@/types/classroom';
+import { ClassEntity, ClassSection } from '@/types/classroom';
 import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
 import { TIME_SHIFTS, TimeShift } from '@/types/schedule';
@@ -63,7 +63,6 @@ export default function AdminClassesPage() {
   const [addClassLoading, setAddClassLoading] = useState(false);
   const [newClassFormData, setNewClassFormData] = useState({
     name: '',
-    code: '',
     subject: '',
     teacherId: '',
     roomId: 'P.101',
@@ -110,6 +109,8 @@ export default function AdminClassesPage() {
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [studentSearch, setStudentSearch] = useState('');
   const [modalLoading, setModalLoading] = useState(false);
+  const [sections, setSections] = useState<ClassSection[]>([]);
+  const [selectedSectionId, setSelectedSectionId] = useState('');
 
   // Sheet đổi giáo viên quản lý lớp
   const [changingTeacherClass, setChangingTeacherClass] = useState<ClassEntity | null>(null);
@@ -124,6 +125,21 @@ export default function AdminClassesPage() {
   // Sheet xác nhận xoá lớp
   const [classToDelete, setClassToDelete] = useState<ClassEntity | null>(null);
   const [isDeletingClass, setIsDeletingClass] = useState(false);
+
+  // Sheet sửa thông tin / thời gian lớp học
+  const [editingClass, setEditingClass] = useState<ClassEntity | null>(null);
+  const [savingClassEdit, setSavingClassEdit] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    subject: '',
+    teacherId: '',
+    roomId: '',
+    startTime: '',
+    endTime: '',
+    scheduleDays: [] as number[],
+    tuitionFee: 0,
+    meetingLink: '',
+  });
 
   const formatScheduleDays = (days?: number[]) => {
     if (!days || days.length === 0) return 'Chưa xếp thứ';
@@ -162,8 +178,8 @@ export default function AdminClassesPage() {
 
   const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newClassFormData.name || !newClassFormData.code || !newClassFormData.subject || !newClassFormData.teacherId) {
-      toast.error('Vui lòng điền đủ Tên lớp, Mã môn, Chuyên môn và Giảng viên');
+    if (!newClassFormData.name || !newClassFormData.subject || !newClassFormData.teacherId) {
+      toast.error('Vui lòng điền đủ Tên lớp, Chuyên môn và Giảng viên');
       return;
     }
 
@@ -180,7 +196,6 @@ export default function AdminClassesPage() {
         setShowAddClassModal(false);
         setNewClassFormData({
           name: '',
-          code: '',
           subject: '',
           teacherId: teachers[0]?.id || '',
           roomId: 'P.101',
@@ -268,10 +283,21 @@ export default function AdminClassesPage() {
     setStudentSearch('');
     try {
       const allRes = await fetch('/api/students?limit=400');
+      const secRes = await fetch('/api/classes/sections?classId=' + cls.id);
       const allData = await allRes.json();
+      const secData = await secRes.json();
       const studentsList: Student[] = allData.students || [];
+      const secList: ClassSection[] = secData.sections || [];
       setAllStudents(studentsList);
-      setEnrolledStudents(studentsList.filter((s) => (cls.studentIds || []).includes(s.id)));
+      setSections(secList);
+      const firstSec = secList[0] || null;
+      const selectedId = firstSec ? firstSec.id : '';
+      setSelectedSectionId(selectedId);
+      setEnrolledStudents(
+        firstSec
+          ? studentsList.filter((s) => (firstSec.studentIds || []).includes(s.id))
+          : studentsList.filter((s) => (cls.studentIds || []).includes(s.id))
+      );
     } catch (e: any) {
       toast.error(e?.message || 'Không thể tải danh sách học viên');
     } finally {
@@ -279,30 +305,45 @@ export default function AdminClassesPage() {
     }
   };
 
+  const handleSectionChange = (sectionId: string) => {
+    setSelectedSectionId(sectionId);
+    const sec = sections.find((x) => x.id === sectionId);
+    setEnrolledStudents(sec ? allStudents.filter((s) => (sec.studentIds || []).includes(s.id)) : []);
+  };
+
   const handleEnrollAction = async (studentId: string, action: 'ENROLL' | 'UNENROLL') => {
-    if (!selectedClass) return;
+    if (!selectedClass || !selectedSectionId) return;
     try {
       const res = await fetch('/api/classes/enroll', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           classId: selectedClass.id,
+          sectionId: selectedSectionId,
           studentId,
           action,
         }),
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success(data.message || (action === 'ENROLL' ? 'Đã thêm học viên vào lớp' : 'Đã xoá học viên khỏi lớp'));
-        let updatedIds = [...(selectedClass.studentIds || [])];
-        if (action === 'ENROLL') {
-          updatedIds.push(studentId);
-        } else {
-          updatedIds = updatedIds.filter((id) => id !== studentId);
-        }
-        const updatedCls = { ...selectedClass, studentIds: updatedIds };
+        toast.success(data.message || (action === 'ENROLL' ? 'Đã thêm học viên vào ca' : 'Đã xoá học viên khỏi ca'));
+        const updatedSections = sections.map((sec) => {
+          if (sec.id !== selectedSectionId) return sec;
+          let ids = [...(sec.studentIds || [])];
+          if (action === 'ENROLL') {
+            if (!ids.includes(studentId)) ids.push(studentId);
+          } else {
+            ids = ids.filter((id) => id !== studentId);
+          }
+          return { ...sec, studentIds: ids };
+        });
+        setSections(updatedSections);
+        const unionIds = new Set<string>();
+        updatedSections.forEach((sec) => (sec.studentIds || []).forEach((id) => unionIds.add(id)));
+        const updatedCls = { ...selectedClass, studentIds: Array.from(unionIds) };
         setSelectedClass(updatedCls);
-        setEnrolledStudents(allStudents.filter((s) => updatedIds.includes(s.id)));
+        const activeSec = updatedSections.find((sec) => sec.id === selectedSectionId);
+        setEnrolledStudents(allStudents.filter((s) => (activeSec?.studentIds || []).includes(s.id)));
         setClasses((prev) => prev.map((c) => (c.id === updatedCls.id ? updatedCls : c)));
       } else {
         toast.error(data.error || 'Thao tác thất bại');
@@ -372,6 +413,74 @@ export default function AdminClassesPage() {
     }
   };
 
+  const openClassEditModal = (cls: ClassEntity) => {
+    setEditingClass(cls);
+    setEditForm({
+      name: cls.name || '',
+      subject: cls.subject || '',
+      teacherId: cls.teacherId || '',
+      roomId: cls.roomId || '',
+      startTime: cls.startTime || '',
+      endTime: cls.endTime || '',
+      scheduleDays: cls.scheduleDays && cls.scheduleDays.length > 0 ? [...cls.scheduleDays] : [],
+      tuitionFee: cls.tuitionFee || 0,
+      meetingLink: cls.meetingLink || '',
+    });
+  };
+
+  const handleSaveClassEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingClass) return;
+    setSavingClassEdit(true);
+    try {
+      const res = await fetch('/api/classes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          classId: editingClass.id,
+          name: editForm.name,
+          subject: editForm.subject,
+          teacherId: editForm.teacherId,
+          roomId: editForm.roomId,
+          startTime: editForm.startTime,
+          endTime: editForm.endTime,
+          scheduleDays: editForm.scheduleDays,
+          tuitionFee: Number(editForm.tuitionFee) || 0,
+          meetingLink: editForm.meetingLink,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || 'Đã cập nhật thông tin lớp học');
+        setClasses((prev) =>
+          prev.map((c) =>
+            c.id === editingClass.id
+              ? {
+                  ...c,
+                  name: editForm.name,
+                  subject: editForm.subject,
+                  teacherId: editForm.teacherId,
+                  roomId: editForm.roomId,
+                  startTime: editForm.startTime,
+                  endTime: editForm.endTime,
+                  scheduleDays: editForm.scheduleDays,
+                  tuitionFee: Number(editForm.tuitionFee) || 0,
+                  meetingLink: editForm.meetingLink,
+                }
+              : c
+          )
+        );
+        setEditingClass(null);
+      } else {
+        toast.error(data.error || 'Cập nhật lớp học thất bại');
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Lỗi mạng');
+    } finally {
+      setSavingClassEdit(false);
+    }
+  };
+
   const teacherMap: Record<string, string> = {};
   teachers.forEach((t) => {
     teacherMap[t.id] = t.name;
@@ -384,7 +493,6 @@ export default function AdminClassesPage() {
   const filtered = classes.filter(
     (c) =>
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.teacherId.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (teacherMap[c.teacherId] && teacherMap[c.teacherId].toLowerCase().includes(searchTerm.toLowerCase())) ||
       c.roomId.toLowerCase().includes(searchTerm.toLowerCase())
@@ -400,7 +508,10 @@ export default function AdminClassesPage() {
   }, [currentPage, totalPages]);
 
   const availableToAdd = allStudents
-    .filter((s) => !(selectedClass?.studentIds || []).includes(s.id))
+    .filter((s) => {
+      const sec = sections.find((x) => x.id === selectedSectionId);
+      return !(sec?.studentIds || []).includes(s.id);
+    })
     .filter(
       (s) =>
         s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
@@ -600,7 +711,7 @@ export default function AdminClassesPage() {
                         <div className="space-y-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-field bg-muted text-foreground border border-line">
-                              {cls.code} • {cls.id}
+                              {cls.id}
                             </span>
                             {isRecurringClass && (
                               <Badge tone="info" className="text-[11px]">
@@ -763,6 +874,15 @@ export default function AdminClassesPage() {
                       >
                         Đổi GV
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        icon={<Settings2 size={13} />}
+                        onClick={() => openClassEditModal(cls)}
+                        title="Sửa thông tin / thời gian lớp học"
+                      >
+                        Sửa
+                      </Button>
                     </div>
                   </Card>
                 );
@@ -817,16 +937,6 @@ export default function AdminClassesPage() {
                   placeholder="Ví dụ: Vẽ hình họa & Tượng thạch cao"
                   value={newClassFormData.name}
                   onChange={(e) => setNewClassFormData({ ...newClassFormData, name: e.target.value })}
-                />
-              </Field>
-
-              <Field label="Mã lớp / Mã môn" required>
-                <Input
-                  required
-                  placeholder="VHH101, BCM201..."
-                  value={newClassFormData.code}
-                  onChange={(e) => setNewClassFormData({ ...newClassFormData, code: e.target.value })}
-                  className="font-mono uppercase"
                 />
               </Field>
             </div>
@@ -1186,7 +1296,7 @@ export default function AdminClassesPage() {
           title="Quản lý học viên"
           description={
             selectedClass
-              ? selectedClass.name + ' (' + selectedClass.code + ') • Sĩ số: ' + (selectedClass.studentIds || []).length
+              ? selectedClass.name + ' (' + selectedClass.id + ') • Sĩ số: ' + (selectedClass.studentIds || []).length
               : undefined
           }
           size="lg"
@@ -1199,6 +1309,35 @@ export default function AdminClassesPage() {
           }
         >
           <div className="space-y-5">
+            {/* Chọn ca học của lớp */}
+            {sections.length > 0 && (
+              <div className="space-y-1.5">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block">
+                  Ca học của lớp
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {sections.map((sec) => {
+                    const isActive = sec.id === selectedSectionId;
+                    return (
+                      <button
+                        type="button"
+                        key={sec.id}
+                        onClick={() => handleSectionChange(sec.id)}
+                        className={
+                          'h-9 px-3 rounded-pill text-[12px] font-semibold border transition cursor-pointer ' +
+                          (isActive
+                            ? 'bg-primary text-white border-primary shadow-primary'
+                            : 'bg-card text-muted-foreground border-line hover:text-foreground hover:bg-muted')
+                        }
+                      >
+                        {sec.name || sec.id} · {(sec.studentIds || []).length} HS
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Danh sách học viên đang học */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -1292,6 +1431,154 @@ export default function AdminClassesPage() {
               </div>
             </div>
           </div>
+        </Sheet>
+
+        {/* Sheet Sửa Thông Tin / Thời Gian Lớp Học */}
+        <Sheet
+          isOpen={!!editingClass}
+          onClose={() => setEditingClass(null)}
+          title="Sửa thông tin lớp học"
+          description={
+            editingClass
+              ? 'Lớp: ' + editingClass.name + ' (' + editingClass.id + ')'
+              : undefined
+          }
+          size="lg"
+          footer={
+            <div className="flex items-center justify-end gap-2 w-full">
+              <Button variant="secondary" onClick={() => setEditingClass(null)}>
+                Hủy
+              </Button>
+              <Button
+                variant="primary"
+                loading={savingClassEdit}
+                onClick={handleSaveClassEdit}
+              >
+                Lưu thay đổi
+              </Button>
+            </div>
+          }
+        >
+          <form onSubmit={handleSaveClassEdit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Tên lớp học" required>
+                <Input
+                  required
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                />
+              </Field>
+              <Field label="Bộ môn / Chuyên môn" required>
+                <Input
+                  required
+                  value={editForm.subject}
+                  onChange={(e) => setEditForm({ ...editForm, subject: e.target.value })}
+                />
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Giảng viên phụ trách" required>
+                <Select
+                  required
+                  value={editForm.teacherId}
+                  onChange={(e) => setEditForm({ ...editForm, teacherId: e.target.value })}
+                >
+                  {teachers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.id} - {t.name} ({t.specialty})
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Phòng học">
+                <Input
+                  value={editForm.roomId}
+                  onChange={(e) => setEditForm({ ...editForm, roomId: e.target.value })}
+                />
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Field label="Giờ bắt đầu" required>
+                <Input
+                  type="time"
+                  required
+                  value={editForm.startTime}
+                  onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })}
+                  className="font-mono font-bold"
+                />
+              </Field>
+              <Field label="Giờ kết thúc" required>
+                <Input
+                  type="time"
+                  required
+                  value={editForm.endTime}
+                  onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })}
+                  className="font-mono font-bold"
+                />
+              </Field>
+              <Field label="Học phí (VND)">
+                <Input
+                  type="number"
+                  value={editForm.tuitionFee}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, tuitionFee: Number(e.target.value) || 0 })
+                  }
+                  className="font-mono font-bold"
+                />
+              </Field>
+            </div>
+
+            <div className="space-y-1.5">
+              <span className="text-[12px] font-medium text-muted-foreground">Học vào các thứ</span>
+              <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                {WEEK_DAY_OPTIONS.map((day) => {
+                  const isSelected = editForm.scheduleDays.includes(day.value);
+                  return (
+                    <button
+                      type="button"
+                      key={day.value}
+                      onClick={() => {
+                        const selected = editForm.scheduleDays.includes(day.value);
+                        let updated = [...editForm.scheduleDays];
+                        if (selected) {
+                          if (updated.length <= 1) return;
+                          updated = updated.filter((d) => d !== day.value);
+                        } else {
+                          updated.push(day.value);
+                          updated.sort((a, b) => a - b);
+                        }
+                        setEditForm({ ...editForm, scheduleDays: updated });
+                      }}
+                      title={day.label}
+                      className={
+                        'h-11 rounded-field text-[13px] font-semibold border transition cursor-pointer ' +
+                        (isSelected
+                          ? 'bg-primary text-white border-primary shadow-primary'
+                          : 'bg-card text-muted-foreground border-line hover:text-foreground hover:bg-muted')
+                      }
+                    >
+                      {day.short}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <Field label="Liên kết phòng học trực tuyến (Discord / Meet)">
+              <Input
+                type="url"
+                value={editForm.meetingLink}
+                onChange={(e) => setEditForm({ ...editForm, meetingLink: e.target.value })}
+                className="font-mono"
+              />
+            </Field>
+
+            <p className="text-xs text-muted-foreground">
+              Hệ thống sẽ cập nhật thông tin lớp và đồng bộ khung giờ cho các ca học trong tương lai.
+            </p>
+          </form>
         </Sheet>
 
         {/* Sheet Lên Lịch Nhanh Cho Lớp */}

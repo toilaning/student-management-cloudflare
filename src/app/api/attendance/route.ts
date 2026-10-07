@@ -45,13 +45,22 @@ export async function GET(request: Request) {
 
   if (slotId) {
     records = await repo.getAttendanceBySlotId(slotId);
-    // Tự động hợp nhất danh sách học sinh của lớp vào sổ điểm danh nếu chưa có bản ghi
+    // Hợp danh sách học viên thuộc CA của buổi học vào sổ điểm danh nếu chưa có bản ghi.
     const slot = await repo.getScheduleSlotById(slotId);
     if (slot && slot.classId) {
-      const cls = await repo.getClassById(slot.classId);
-      if (cls && Array.isArray(cls.studentIds) && cls.studentIds.length > 0) {
+      // Ưu tiên danh sách của ca (class_sections); buổi cũ chưa gán ca thì lấy theo lớp.
+      let rosterIds: string[] = [];
+      if (slot.sectionId) {
+        const section = await repo.getSectionById(slot.sectionId);
+        rosterIds = section?.studentIds || [];
+      }
+      if (rosterIds.length === 0) {
+        const cls = await repo.getClassById(slot.classId);
+        rosterIds = cls?.studentIds || [];
+      }
+      if (Array.isArray(rosterIds) && rosterIds.length > 0) {
         const recordedIds = new Set(records.map(r => r.studentId));
-        for (const stId of cls.studentIds) {
+        for (const stId of rosterIds) {
           if (!recordedIds.has(stId)) {
             records.push({
               id: `ATT_ROSTER_${slotId}_${stId}`,
@@ -60,7 +69,7 @@ export async function GET(request: Request) {
               classId: slot.classId,
               date: slot.date,
               status: 'Chưa điểm danh' as any,
-              note: 'Học viên trong danh sách lớp',
+              note: 'Học viên trong ca học',
               method: 'MANUAL',
               updatedBy: 'SYSTEM',
               updatedAt: new Date().toISOString(),

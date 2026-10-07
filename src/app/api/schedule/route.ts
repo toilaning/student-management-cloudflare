@@ -11,7 +11,22 @@ export async function GET(request: Request) {
   const classId = searchParams.get('classId');
   const date = searchParams.get('date');
 
-  let slots = await repo.getAllScheduleSlots();
+  // Học sinh dùng đường lọc riêng (theo ca đã tham gia); người khác lấy toàn bộ rồi lọc.
+  let slots: Awaited<ReturnType<typeof repo.getScheduleSlotsByStudentId>> = [];
+  if (studentId) {
+    slots = await repo.getScheduleSlotsByStudentId(studentId);
+  } else {
+    slots = await repo.getAllScheduleSlots();
+  }
+  if (teacherId) {
+    slots = slots.filter(s => s.teacherId === teacherId);
+  }
+  if (classId) {
+    slots = slots.filter(s => s.classId === classId);
+  }
+  if (date) {
+    slots = slots.filter(s => s.date === date);
+  }
   // Enrich normalized schedule rows with class-owned subject and meeting link.
   const allClasses = await repo.getAllClasses();
   const classMap = new Map(allClasses.map(cls => [cls.id, cls]));
@@ -23,20 +38,6 @@ export async function GET(request: Request) {
       meetingLink: slot.meetingLink || cls?.meetingLink || '',
     };
   });
-  if (teacherId) {
-    slots = slots.filter(s => s.teacherId === teacherId);
-  }
-  if (classId) {
-    slots = slots.filter(s => s.classId === classId);
-  }
-  if (studentId) {
-    const studentClasses = await repo.getClassesByStudentId(studentId);
-    const classIds = new Set(studentClasses.map(c => c.id));
-    slots = slots.filter(s => classIds.has(s.classId));
-  }
-  if (date) {
-    slots = slots.filter(s => s.date === date);
-  }
 
   return NextResponse.json({ slots });
 }

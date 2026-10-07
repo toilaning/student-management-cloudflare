@@ -362,7 +362,7 @@ export default function StudentDashboardPage() {
                   icon={<Inbox size={18} />}
                   title="Đơn từ"
                   action={
-                    <Link href="/student/requests" className="text-[13px] font-semibold text-primary">
+                    <Link href="/student/schedule" className="text-[13px] font-semibold text-primary">
                       Gửi đơn
                     </Link>
                   }

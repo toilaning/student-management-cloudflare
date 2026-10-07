@@ -3,7 +3,7 @@ import { IRepository } from './IRepository';
 import { User } from '@/types/auth';
 import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
-import { Classroom, ClassEntity } from '@/types/classroom';
+import { Classroom, ClassEntity, ClassSection } from '@/types/classroom';
 import { ScheduleSlot, ClassRequest, TimeShift } from '@/types/schedule';
 import { AttendanceRecord } from '@/types/attendance';
 import { TuitionInvoice, PayrollRecord } from '@/types/finance';
@@ -177,7 +177,7 @@ function mapClassFromDb(row: any): ClassEntity {
 
   return {
     id: row.id,
-    code: row.code,
+    code: row.code || undefined,
     name: row.name,
     subject: row.subject,
     teacherId: row.teacher_id,
@@ -199,7 +199,7 @@ function mapClassFromDb(row: any): ClassEntity {
 function mapClassToDb(cls: ClassEntity): any {
   return {
     id: cls.id,
-    code: cls.code,
+    code: cls.code || null,
     name: cls.name,
     subject: cls.subject,
     teacher_id: cls.teacherId,
@@ -216,10 +216,49 @@ function mapClassToDb(cls: ClassEntity): any {
   };
 }
 
+function mapClassSectionFromDb(row: any): ClassSection {
+  const studentIds = Array.isArray(row.class_section_students)
+    ? row.class_section_students.map((css: any) => css.student_id)
+    : (row.studentIds || []);
+
+  return {
+    id: row.id,
+    classId: row.class_id,
+    name: row.name,
+    shiftId: row.shift_id ? Number(row.shift_id) : undefined,
+    startTime: row.start_time ? String(row.start_time).substring(0, 5) : undefined,
+    endTime: row.end_time ? String(row.end_time).substring(0, 5) : undefined,
+    scheduleDays: row.schedule_days || [],
+    teacherId: row.teacher_id || undefined,
+    roomId: row.room_id || undefined,
+    isActive: row.is_active !== undefined ? Boolean(row.is_active) : true,
+    studentIds,
+    createdAt: row.created_at || undefined,
+    updatedAt: row.updated_at || undefined,
+  };
+}
+
+function mapClassSectionToDb(section: ClassSection): any {
+  return {
+    id: section.id,
+    class_id: section.classId,
+    name: section.name,
+    shift_id: section.shiftId || null,
+    start_time: section.startTime || null,
+    end_time: section.endTime || null,
+    schedule_days: section.scheduleDays || [],
+    teacher_id: section.teacherId || null,
+    room_id: section.roomId || null,
+    is_active: section.isActive,
+    updated_at: new Date().toISOString(),
+  };
+}
+
 function mapScheduleSlotFromDb(row: any): ScheduleSlot {
   return {
     id: row.id,
     classId: row.class_id,
+    sectionId: row.section_id || undefined,
     teacherId: row.teacher_id,
     roomId: row.room_id,
     date: typeof row.date === 'string' ? row.date.split('T')[0] : row.date,
@@ -243,6 +282,7 @@ function mapScheduleSlotToDb(slot: ScheduleSlot): any {
   return {
     id: slot.id,
     class_id: slot.classId,
+    section_id: slot.sectionId || null,
     teacher_id: slot.teacherId,
     room_id: slot.roomId,
     date: slot.date,
@@ -336,6 +376,8 @@ function mapTuitionInvoiceFromDb(row: any): TuitionInvoice {
     studentId: row.student_id,
     classId: row.class_id,
     packageId: row.package_id || undefined,
+    packageName: row.package_name || undefined,
+    packagePrice: row.package_price !== undefined && row.package_price !== null ? Number(row.package_price) : undefined,
     sessionCount: row.session_count !== undefined && row.session_count !== null ? Number(row.session_count) : undefined,
     usedSessions: row.used_sessions !== undefined && row.used_sessions !== null ? Number(row.used_sessions) : undefined,
     title: row.title,
@@ -357,6 +399,8 @@ function mapTuitionInvoiceToDb(inv: TuitionInvoice): any {
     student_id: inv.studentId,
     class_id: inv.classId,
     package_id: inv.packageId || null,
+    package_name: inv.packageName || null,
+    package_price: inv.packagePrice ?? null,
     session_count: inv.sessionCount ?? 0,
     used_sessions: inv.usedSessions ?? 0,
     title: inv.title,
@@ -1138,6 +1182,132 @@ export class SupabaseRepository implements IRepository {
   }
 
   // --------------------------------------------------------------------------
+  // CLASS SECTIONS
+  // --------------------------------------------------------------------------
+
+  public async getClassSections(classId: string): Promise<ClassSection[]> {
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+
+    const { data, error } = await client
+      .from('class_sections')
+      .select('*, class_section_students(student_id)')
+      .eq('class_id', classId)
+      .order('created_at', { ascending: true });
+    if (error) throw new Error(error.message);
+    return (data || []).map(mapClassSectionFromDb);
+  }
+
+  public async getSectionById(id: string): Promise<ClassSection | null> {
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+
+    const { data, error } = await client
+      .from('class_sections')
+      .select('*, class_section_students(student_id)')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? mapClassSectionFromDb(data) : null;
+  }
+
+  public async getSectionsByStudentId(studentId: string): Promise<ClassSection[]> {
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+
+    const { data, error } = await client
+      .from('class_section_students')
+      .select('section_id')
+      .eq('student_id', studentId);
+    if (error) throw new Error(error.message);
+    const sectionIds = (data || []).map((r: any) => r.section_id);
+    if (sectionIds.length === 0) return [];
+
+    const { data: sections, error: secErr } = await client
+      .from('class_sections')
+      .select('*, class_section_students(student_id)')
+      .in('id', sectionIds);
+    if (secErr) throw new Error(secErr.message);
+    return (sections || []).map(mapClassSectionFromDb);
+  }
+
+  public async createClassSection(section: ClassSection): Promise<ClassSection> {
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+
+    await client.from('class_sections').insert(mapClassSectionToDb(section));
+    await this.replaceSectionStudents(section.id, section.studentIds || []);
+    return section;
+  }
+
+  public async updateClassSection(section: ClassSection): Promise<ClassSection> {
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+
+    const { error } = await client.from('class_sections').update(mapClassSectionToDb(section)).eq('id', section.id);
+    if (error) throw new Error(error.message);
+
+    if (section.studentIds !== undefined) {
+      await this.replaceSectionStudents(section.id, section.studentIds);
+    }
+    return section;
+  }
+
+  public async deleteClassSection(id: string): Promise<boolean> {
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+    const { error } = await client.from('class_sections').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+    return true;
+  }
+
+  public async addStudentToSection(sectionId: string, studentId: string): Promise<void> {
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+    const { error } = await client.from('class_section_students').upsert({ section_id: sectionId, student_id: studentId });
+    if (error) throw new Error(error.message);
+  }
+
+  public async removeStudentFromSection(sectionId: string, studentId: string): Promise<void> {
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+    const { error } = await client.from('class_section_students').delete().eq('section_id', sectionId).eq('student_id', studentId);
+    if (error) throw new Error(error.message);
+  }
+
+  private async replaceSectionStudents(sectionId: string, studentIds: string[]): Promise<void> {
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+    await client.from('class_section_students').delete().eq('section_id', sectionId);
+    if (studentIds.length > 0) {
+      const rows = studentIds.map(stId => ({ section_id: sectionId, student_id: stId }));
+      const { error } = await client.from('class_section_students').insert(rows);
+      if (error) throw new Error(error.message);
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // APP SETTINGS
+  // --------------------------------------------------------------------------
+
+  public async getAppSetting<T = any>(key: string): Promise<T | null> {
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+    const { data, error } = await client.from('app_settings').select('value').eq('key', key).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? (data.value as T) : null;
+  }
+
+  public async setAppSetting(key: string, value: any): Promise<void> {
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+    const { error } = await client
+      .from('app_settings')
+      .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    if (error) throw new Error(error.message);
+  }
+
+  // --------------------------------------------------------------------------
   // SCHEDULE
   // --------------------------------------------------------------------------
 
@@ -1290,9 +1460,11 @@ export class SupabaseRepository implements IRepository {
   }
 
   public async getScheduleSlotsByStudentId(studentId: string): Promise<ScheduleSlot[]> {
-    const studentClasses = await this.getClassesByStudentId(studentId);
-    if (!studentClasses || studentClasses.length === 0) return [];
-    const classIds = studentClasses.map(c => c.id);
+    // Học sinh chỉ thấy các buổi thuộc ca mà mình tham gia.
+    const studentSections = await this.getSectionsByStudentId(studentId);
+    const classIds = [...new Set(studentSections.map(s => s.classId))];
+    const sectionIds = [...new Set(studentSections.map(s => s.id))];
+    if (classIds.length === 0) return [];
 
     const client = this.getClient();
     if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local"); // getScheduleSlotsByStudentId(studentId);
@@ -1306,7 +1478,14 @@ export class SupabaseRepository implements IRepository {
       if (error) {
         throw new Error(error.message);
       }
-      return (data || []).map(mapScheduleSlotFromDb);
+      const sectionSet = new Set(sectionIds);
+      return (data || [])
+        .map(mapScheduleSlotFromDb)
+        .filter(s => {
+          // Nếu buổi đã gán ca, học sinh chỉ thấy ca mình tham gia; buổi cũ chưa gán ca vẫn thấy được.
+          if (s.sectionId) return sectionSet.has(s.sectionId);
+          return true;
+        });
     } catch (err) {
       throw err;
     }

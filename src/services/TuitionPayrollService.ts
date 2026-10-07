@@ -27,6 +27,8 @@ export class TuitionPayrollService {
     amount: number;
     dueDate: string;
     notes?: string;
+    packageName?: string;
+    packagePrice?: number;
   }): Promise<TuitionInvoice> {
     if (!data.studentId || !data.title || data.amount <= 0 || !data.dueDate) {
       throw new Error("Thiếu thông tin bắt buộc hoặc số tiền không hợp lệ");
@@ -54,6 +56,8 @@ export class TuitionPayrollService {
       studentId: data.studentId,
       classId: effectiveClassId,
       packageId: data.packageId,
+      packageName: data.packageName,
+      packagePrice: data.packagePrice,
       sessionCount: data.sessionCount,
       usedSessions: data.usedSessions || 0,
       title: data.title,

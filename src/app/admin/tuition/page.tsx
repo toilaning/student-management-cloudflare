@@ -128,18 +128,9 @@ export default function AdminTuitionPage() {
       const data = await res.json();
       if (data.success && data.bankConfig) {
         setBankConfig(data.bankConfig);
-        try {
-          localStorage.setItem('admin_bank_config', JSON.stringify(data.bankConfig));
-        } catch (e) {}
-      } else {
-        const local = localStorage.getItem('admin_bank_config');
-        if (local) setBankConfig(JSON.parse(local));
       }
     } catch (e) {
-      try {
-        const local = localStorage.getItem('admin_bank_config');
-        if (local) setBankConfig(JSON.parse(local));
-      } catch (err) {}
+      console.error('Error fetching bank config:', e);
     }
   };
 
@@ -476,7 +467,12 @@ export default function AdminTuitionPage() {
         <div className="max-w-[220px]">
           <p className="text-foreground font-medium truncate">{inv.title || 'Học phí'}</p>
           <div className="flex flex-wrap items-center gap-1.5 mt-1">
-            {inv.packageId && <Badge tone="primary">{inv.packageId}</Badge>}
+            {inv.packageName && (
+              <Badge tone="primary">
+                {inv.packageName}
+                {inv.packagePrice != null ? ' - ' + money(inv.packagePrice) : ''}
+              </Badge>
+            )}
             {inv.note && (
               <span className="text-[12px] text-muted-foreground truncate" title={inv.note}>
                 {inv.note}

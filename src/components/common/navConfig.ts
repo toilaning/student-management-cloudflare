@@ -95,11 +95,10 @@ export const NAV_GROUPS: Record<Role, NavGroup[]> = {
     },
     {
       title: 'Vận hành',
-      items: [
-        { label: 'Thời khoá biểu', href: '/student/schedule', icon: CalendarDays },
-        { label: 'Điểm danh', href: '/student/attendance', icon: UserCheck },
-        { label: 'Đơn từ', href: '/student/requests', icon: Inbox },
-      ],
+     items: [
+       { label: 'Thời khoá biểu', href: '/student/schedule', icon: CalendarDays },
+       { label: 'Điểm danh', href: '/student/attendance', icon: UserCheck },
+     ],
     },
     {
       title: 'Học tập',

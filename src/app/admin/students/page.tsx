@@ -6,6 +6,7 @@ import { RoleGuard } from '@/components/common/RoleGuard';
 import { Student } from '@/types/student';
 import { ClassEntity } from '@/types/classroom';
 import { formatClassTimeLabel } from '@/utils/schedule';
+import { QuickStudentModal } from '@/components/common/QuickStudentModal';
 import {
   Card,
   Button,
@@ -108,6 +109,7 @@ export default function AdminStudentsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [quickStudentId, setQuickStudentId] = useState<string | null>(null);
 
   // Modal / Sheet gán lớp cho học viên
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -473,7 +475,13 @@ Lưu ý: Vui lòng đăng nhập và đổi mật khẩu trong lần đầu sử
       header: 'Họ và tên',
       render: (st) => (
         <div>
-          <div className="font-semibold text-foreground">{st.name}</div>
+          <div
+            className="font-semibold text-foreground cursor-pointer hover:text-primary transition-colors"
+            onClick={() => setQuickStudentId(st.id)}
+            title="Xem thông tin học sinh"
+          >
+            {st.name}
+          </div>
           {st.gradeLevel && (
             <span className="text-[12px] text-muted-foreground">{st.gradeLevel}</span>
           )}
@@ -720,7 +728,13 @@ Lưu ý: Vui lòng đăng nhập và đổi mật khẩu trong lần đầu sử
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="font-semibold text-foreground text-[15px]">{st.name}</div>
+                      <div
+                        className="font-semibold text-foreground text-[15px] cursor-pointer hover:text-primary transition-colors"
+                        onClick={() => setQuickStudentId(st.id)}
+                        title="Xem thông tin học sinh"
+                      >
+                        {st.name}
+                      </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="font-mono text-[12px] font-bold text-muted-foreground">{st.id}</span>
                         {st.gradeLevel && (
@@ -1333,6 +1347,7 @@ Lưu ý: Vui lòng đăng nhập và đổi mật khẩu trong lần đầu sử
             </p>
           </div>
         </Sheet>
+      <QuickStudentModal studentId={quickStudentId} onClose={() => setQuickStudentId(null)} />
       </div>
     </RoleGuard>
   );

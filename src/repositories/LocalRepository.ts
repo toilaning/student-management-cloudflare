@@ -3,7 +3,7 @@ import { IRepository } from './IRepository';
 import { User } from '@/types/auth';
 import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
-import { Classroom, ClassEntity } from '@/types/classroom';
+import { Classroom, ClassEntity, ClassSection } from '@/types/classroom';
 import { TimeShift, TIME_SHIFTS } from '@/types/schedule';
 import { ScheduleSlot, ClassRequest } from '@/types/schedule';
 import { AttendanceRecord } from '@/types/attendance';
@@ -21,7 +21,10 @@ export class LocalRepository implements IRepository {
   private teachers: Map<string, Teacher> = new Map();
   private classrooms: Map<string, Classroom> = new Map();
   private classes: Map<string, ClassEntity> = new Map();
+  private classSections: Map<string, ClassSection> = new Map();
+  private classSectionStudents: Map<string, string[]> = new Map(); // sectionId -> studentIds
   private scheduleSlots: Map<string, ScheduleSlot> = new Map();
+  private appSettings: Map<string, any> = new Map();
   
   private timeShifts: Map<number, TimeShift> = new Map();
   private attendanceRecords: Map<string, AttendanceRecord> = new Map();
@@ -54,6 +57,12 @@ export class LocalRepository implements IRepository {
     seed.teachers.forEach(t => this.teachers.set(t.id, t));
     seed.classrooms.forEach(c => this.classrooms.set(c.id, c));
     seed.classes.forEach(cl => this.classes.set(cl.id, cl));
+    seed.sections.forEach(sec => this.classSections.set(sec.id, sec));
+    seed.sections.forEach(sec => {
+      const ids = sec.studentIds || [];
+      this.classSectionStudents.set(sec.id, [...ids]);
+      this.classSections.set(sec.id, { ...sec, studentIds: [...ids] });
+    });
     seed.scheduleSlots.forEach(ss => this.scheduleSlots.set(ss.id, ss));
     seed.attendanceRecords.forEach(ar => this.attendanceRecords.set(ar.id, ar));
     seed.classRequests.forEach(cr => this.classRequests.set(cr.id, cr));
@@ -70,7 +79,10 @@ export class LocalRepository implements IRepository {
     this.teachers.clear();
     this.classrooms.clear();
     this.classes.clear();
+    this.classSections.clear();
+    this.classSectionStudents.clear();
     this.scheduleSlots.clear();
+    this.appSettings.clear();
     this.attendanceRecords.clear();
     this.classRequests.clear();
     this.sessionPackages.clear();
@@ -216,6 +228,77 @@ export class LocalRepository implements IRepository {
     return classEntity;
   }
 
+  // Class Sections
+  public async getClassSections(classId: string): Promise<ClassSection[]> {
+    const list = Array.from(this.classSections.values()).filter(s => s.classId === classId);
+    const joined = list.map(s => ({
+      ...s,
+      studentIds: this.classSectionStudents.get(s.id) || s.studentIds || [],
+    }));
+    return joined.sort((a, b) => (a.shiftId || 0) - (b.shiftId || 0));
+  }
+
+  public async getSectionById(id: string): Promise<ClassSection | null> {
+    const sec = this.classSections.get(id) || null;
+    if (sec) {
+      return { ...sec, studentIds: this.classSectionStudents.get(id) || sec.studentIds || [] };
+    }
+    return null;
+  }
+
+  public async getSectionsByStudentId(studentId: string): Promise<ClassSection[]> {
+    const result: ClassSection[] = [];
+    for (const sec of this.classSections.values()) {
+      const ids = this.classSectionStudents.get(sec.id) || sec.studentIds || [];
+      if (ids.includes(studentId)) {
+        result.push({ ...sec, studentIds: ids });
+      }
+    }
+    return result;
+  }
+
+  public async createClassSection(section: ClassSection): Promise<ClassSection> {
+    this.classSections.set(section.id, { ...section });
+    this.classSectionStudents.set(section.id, [...(section.studentIds || [])]);
+    return section;
+  }
+
+  public async updateClassSection(section: ClassSection): Promise<ClassSection> {
+    this.classSections.set(section.id, { ...section });
+    if (section.studentIds !== undefined) {
+      this.classSectionStudents.set(section.id, [...section.studentIds]);
+    }
+    return section;
+  }
+
+  public async deleteClassSection(id: string): Promise<boolean> {
+    const existed = this.classSections.delete(id);
+    this.classSectionStudents.delete(id);
+    return existed;
+  }
+
+  public async addStudentToSection(sectionId: string, studentId: string): Promise<void> {
+    const ids = this.classSectionStudents.get(sectionId) || [];
+    if (!ids.includes(studentId)) {
+      ids.push(studentId);
+      this.classSectionStudents.set(sectionId, ids);
+    }
+  }
+
+  public async removeStudentFromSection(sectionId: string, studentId: string): Promise<void> {
+    const ids = (this.classSectionStudents.get(sectionId) || []).filter(id => id !== studentId);
+    this.classSectionStudents.set(sectionId, ids);
+  }
+
+  // App Settings
+  public async getAppSetting<T = any>(key: string): Promise<T | null> {
+    return this.appSettings.has(key) ? (this.appSettings.get(key) as T) : null;
+  }
+
+  public async setAppSetting(key: string, value: any): Promise<void> {
+    this.appSettings.set(key, value);
+  }
+
   // Schedule
   public async getAllScheduleSlots(): Promise<ScheduleSlot[]> {
     return Array.from(this.scheduleSlots.values());
@@ -265,9 +348,16 @@ export class LocalRepository implements IRepository {
   }
 
   public async getScheduleSlotsByStudentId(studentId: string): Promise<ScheduleSlot[]> {
-    const studentClasses = await this.getClassesByStudentId(studentId);
-    const classIds = new Set(studentClasses.map(c => c.id));
-    return Array.from(this.scheduleSlots.values()).filter(s => classIds.has(s.classId));
+    // Học sinh chỉ thấy các buổi thuộc ca mà mình tham gia.
+    const studentSections = await this.getSectionsByStudentId(studentId);
+    const classIds = new Set(studentSections.map(s => s.classId));
+    const sectionIds = new Set(studentSections.map(s => s.id));
+    return Array.from(this.scheduleSlots.values()).filter(s => {
+      if (s.sectionId && sectionIds.size > 0) {
+        return sectionIds.has(s.sectionId);
+      }
+      return classIds.has(s.classId);
+    });
   }
 
   public async createScheduleSlot(slot: ScheduleSlot): Promise<ScheduleSlot> {

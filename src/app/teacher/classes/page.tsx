@@ -8,6 +8,7 @@ import { RoleGuard } from '@/components/common/RoleGuard';
 import { ClassEntity } from '@/types/classroom';
 import { TimeShift, TIME_SHIFTS } from '@/types/schedule';
 import { formatClassTimeLabel } from '@/utils/schedule';
+import { QuickStudentModal } from '@/components/common/QuickStudentModal';
 import { Card, CardHeader, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -45,6 +46,7 @@ export default function TeacherClassesPage() {
   const [claimingClassId, setClaimingClassId] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<'ALL' | 'MINE' | 'AVAILABLE'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [quickStudentId, setQuickStudentId] = useState<string | null>(null);
 
   const loadData = async () => {
     if (!isReady || !currentUser?.id) return;
@@ -103,7 +105,7 @@ export default function TeacherClassesPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success(`Đã nhận ca dạy lớp ${cls.name} (${cls.code}) thành công.`);
+        toast.success(`Đã nhận ca dạy lớp ${cls.name} thành công.`);
         await loadData();
       } else {
         toast.error(data.error || 'Nhận ca dạy thất bại.');
@@ -142,10 +144,9 @@ export default function TeacherClassesPage() {
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
         const matchesName = c.name?.toLowerCase().includes(q);
-        const matchesCode = c.code?.toLowerCase().includes(q);
         const matchesSubj = c.subject?.toLowerCase().includes(q);
         const matchesRoom = c.roomId?.toLowerCase().includes(q);
-        return matchesName || matchesCode || matchesSubj || matchesRoom;
+        return matchesName || matchesSubj || matchesRoom;
       }
       return true;
     });
@@ -167,7 +168,13 @@ export default function TeacherClassesPage() {
         <div className="flex items-center gap-2.5">
           <Avatar name={st.name} size={32} />
           <div className="min-w-0">
-            <div className="font-bold text-foreground text-xs sm:text-sm truncate">{st.name}</div>
+            <div
+              className="font-bold text-foreground text-xs sm:text-sm truncate cursor-pointer hover:text-primary transition-colors"
+              onClick={() => setQuickStudentId(st.id)}
+              title="Xem thông tin học sinh"
+            >
+              {st.name}
+            </div>
             <div className="font-mono text-[11px] text-muted-foreground">{st.id}</div>
           </div>
         </div>
@@ -331,7 +338,7 @@ export default function TeacherClassesPage() {
                       {/* Tiêu đề thẻ & Huy hiệu trạng thái */}
                       <CardHeader
                         title={cls.name}
-                        subtitle={`${cls.code} • ${cls.subject}`}
+                        subtitle={cls.subject}
                         action={
                           isMine ? (
                             <Badge tone="success" dot>
@@ -437,7 +444,7 @@ export default function TeacherClassesPage() {
           title={selectedClassForView ? `Danh sách học viên: ${selectedClassForView.name}` : ''}
           description={
             selectedClassForView
-              ? `Mã lớp: ${selectedClassForView.code} • Môn: ${selectedClassForView.subject} • Phòng: ${selectedClassForView.roomId} • Thứ ${selectedClassForView.scheduleDays?.join(', ')}`
+              ? `Môn: ${selectedClassForView.subject} • Phòng: ${selectedClassForView.roomId} • Thứ ${selectedClassForView.scheduleDays?.join(', ')}`
               : ''
           }
           size="lg"
@@ -485,7 +492,11 @@ export default function TeacherClassesPage() {
                     <div className="flex items-start gap-2.5 min-w-0">
                       <Avatar name={st.name} size={32} />
                       <div className="min-w-0 space-y-1">
-                        <div className="font-bold text-foreground text-sm leading-tight truncate">
+                        <div
+                          className="font-bold text-foreground text-sm leading-tight truncate cursor-pointer hover:text-primary transition-colors"
+                          onClick={() => setQuickStudentId(st.id)}
+                          title="Xem thông tin học sinh"
+                        >
                           {st.name}
                         </div>
                         <div className="font-mono text-[11px] text-muted-foreground">{st.id}</div>
@@ -513,6 +524,7 @@ export default function TeacherClassesPage() {
             </div>
           )}
         </Sheet>
+      <QuickStudentModal studentId={quickStudentId} onClose={() => setQuickStudentId(null)} />
       </div>
     </RoleGuard>
   );

@@ -132,8 +132,10 @@ export async function POST(request: Request) {
       const newInvoice = await financeService.createInvoice({
         studentId,
         classId: 'CHUNG',
-        packageId: pkg.id,
-        sessionCount: pkg.sessionCount,
+       packageId: pkg.id,
+        packageName: pkg.name,
+        packagePrice: pkg.price,
+       sessionCount: pkg.sessionCount,
         usedSessions: 0,
         title: `Đăng ký ${pkg.name} (${pkg.sessionCount} buổi)`,
         amount: pkg.price,
@@ -169,9 +171,11 @@ export async function POST(request: Request) {
         originalAmount,
         finalAmount,
         amount,
-        dueDate,
-        notes,
-      } = body;
+       dueDate,
+       notes,
+        packageName,
+        packagePrice,
+     } = body;
 
       const calcAmount = finalAmount !== undefined 
         ? Number(finalAmount) 
@@ -188,10 +192,12 @@ export async function POST(request: Request) {
         sessionCount: sessionCount ? Number(sessionCount) : undefined,
         usedSessions: 0,
         title: title || `Học phí khóa học - ${defaultMonth}`,
-        amount: calcAmount,
-        dueDate,
-        notes,
-      });
+       amount: calcAmount,
+       dueDate,
+       notes,
+        packageName: packageName || undefined,
+        packagePrice: packagePrice !== undefined ? Number(packagePrice) : undefined,
+     });
 
       return NextResponse.json({ 
         success: true, 

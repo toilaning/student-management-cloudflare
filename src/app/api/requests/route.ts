@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       const updated = await repo.updateRequest(existing);
 
       // Duyệt đơn xin nghỉ: tự động ghi 'Vắng có phép' vào sổ điểm danh của ca tương ứng.
-      if (body.status === 'ĐÃ_DUYỆT' && existing.scheduleSlotId) {
+      if (body.status === 'ĐÃ_DUYỆT' && existing.scheduleSlotId && existing.type !== 'DOI_CA') {
         try {
           const slot = await repo.getScheduleSlotById(existing.scheduleSlotId);
           if (slot) {
@@ -61,21 +61,54 @@ export async function POST(request: Request) {
               updatedBy: body.reviewerId || reviewerRole,
               updatedAt: new Date().toISOString(),
             });
-          }
-        } catch (attErr) {
-          console.warn('[REQUEST-DECIDE] Không ghi được điểm danh vắng có phép:', attErr);
-        }
+         }
+      } catch (attErr) {
+        console.warn('[REQUEST-DECIDE] Không ghi được điểm danh vắng có phép:', attErr);
       }
+    }
 
-      await repo.addAuditLog({
-        userId: body.reviewerId || reviewerRole,
-        userName: reviewerName,
-        userRole: reviewerRole,
-        action: 'REQUEST_DECIDE',
-        targetResource: 'REQUEST',
-        targetId: existing.id,
-        details: `${body.status === 'ĐÃ_DUYỆT' ? 'Duyệt' : 'Từ chối'} đơn xin nghỉ của học viên ${existing.studentId}`,
-      });
+    // Duyệt đơn đổi ca (DOI_CA): chuyển học viên từ ca hiện tại sang ca đích trong cùng lớp,
+    // rồi đồng bộ lại danh sách học viên của lớp (hợp học viên của mọi ca).
+    if (body.status === 'ĐÃ_DUYỆT' && existing.type === 'DOI_CA') {
+      try {
+        const fromSlot = existing.scheduleSlotId
+          ? await repo.getScheduleSlotById(existing.scheduleSlotId)
+          : null;
+        const toSlot = existing.targetScheduleSlotId
+          ? await repo.getScheduleSlotById(existing.targetScheduleSlotId)
+          : null;
+        if (fromSlot && toSlot && toSlot.id !== fromSlot.id) {
+          if (fromSlot.sectionId) {
+            await repo.removeStudentFromSection(fromSlot.sectionId, existing.studentId);
+          }
+          if (toSlot.sectionId) {
+            await repo.addStudentToSection(toSlot.sectionId, existing.studentId);
+          }
+          const sections = await repo.getClassSections(existing.classId);
+          const unionIds = new Set<string>();
+          for (const sec of sections) {
+            for (const sid of sec.studentIds || []) unionIds.add(sid);
+          }
+          const cls = await repo.getClassById(existing.classId);
+          if (cls) {
+            cls.studentIds = Array.from(unionIds);
+            await repo.updateClass(cls);
+          }
+        }
+      } catch (shiftErr) {
+        console.warn('[REQUEST-DECIDE] Không đổi ca được:', shiftErr);
+      }
+    }
+
+    await repo.addAuditLog({
+      userId: body.reviewerId || reviewerRole,
+      userName: reviewerName,
+      userRole: reviewerRole,
+      action: 'REQUEST_DECIDE',
+      targetResource: 'REQUEST',
+      targetId: existing.id,
+      details: `${body.status === 'ĐÃ_DUYỆT' ? 'Duyệt' : 'Từ chối'} đơn ${existing.type === 'DOI_CA' ? 'đổi ca' : 'xin nghỉ'} của học viên ${existing.studentId}`,
+    });
 
       return NextResponse.json({ success: true, request: updated });
     }

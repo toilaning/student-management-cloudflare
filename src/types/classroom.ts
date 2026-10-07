@@ -8,7 +8,7 @@ export interface Classroom {
 
 export interface ClassEntity {
   id: string; // CLS01..CLS30
-  code: string; // MATH101, ENG201, etc.
+  code?: string; // Deprecated: mã lớp đã bị loại bỏ, giữ nullable để tương thích dữ liệu cũ
   name: string;
   subject: string;
   teacherId: string; // GV001..
@@ -22,4 +22,21 @@ export interface ClassEntity {
   isRecurring?: boolean; // Mặc định true: Lớp chạy xuyên suốt liên tục
   meetingLink?: string; // Link phòng học online (Google Meet, Zoom...)
   status: 'Đang mở' | 'Sắp khai giảng' | 'Đã kết thúc';
+}
+
+/** Một ca học riêng trong một lớp (lớp có thể có nhiều ca). */
+export interface ClassSection {
+  id: string;            // SEC_...
+  classId: string;       // Lớp chứa ca này
+  name: string;          // Tên ca, VD "Ca 1 (08:00 - 10:00)"
+  shiftId?: number;      // Liên kết time_shifts
+  startTime?: string;    // HH:mm
+  endTime?: string;      // HH:mm
+  scheduleDays: number[]; // Các thứ học
+  teacherId?: string;
+  roomId?: string;
+  isActive: boolean;
+  studentIds?: string[];  // Danh sách học sinh thuộc ca (nạp khi cần)
+  createdAt?: string;
+  updatedAt?: string;
 }

@@ -814,7 +814,7 @@ export default function TeacherSchedulePage() {
                       <div className="space-y-3">
                         <CardHeader
                           title={cls.name}
-                          subtitle={`${cls.code} • ${cls.subject}`}
+                          subtitle={cls.subject}
                           action={
                             <Badge tone="primary" dot>
                               Ca mở

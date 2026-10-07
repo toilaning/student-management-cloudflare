@@ -1,7 +1,7 @@
 import { User } from '@/types/auth';
 import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
-import { Classroom, ClassEntity } from '@/types/classroom';
+import { Classroom, ClassEntity, ClassSection } from '@/types/classroom';
 import { ScheduleSlot, ClassRequest, TIME_SHIFTS } from '@/types/schedule';
 import { AttendanceRecord } from '@/types/attendance';
 import { TuitionInvoice, PayrollRecord } from '@/types/finance';
@@ -157,6 +157,9 @@ export function generateSeedData() {
   // 3 lớp trong cùng ca sử dụng 3 phòng khác nhau và 3 giáo viên khác nhau!
   const classes: ClassEntity[] = [];
 
+  // Sinh ca học cho từng lớp (mỗi lớp có 1 ca mặc định trong seed, thừa kế thông tin lớp).
+  const sections: ClassSection[] = [];
+
   for (let idx = 0; idx < 30; idx++) {
     const classId = `CLS${(idx + 1).toString().padStart(2, '0')}`;
     const isGroupA = idx < 15;
@@ -201,6 +204,21 @@ export function generateSeedData() {
       shiftId,
       status: 'Đang mở',
     });
+
+    const shift = TIME_SHIFTS.find(s => s.id === shiftId) || TIME_SHIFTS[0];
+    sections.push({
+      id: 'SEC_' + classId,
+      classId,
+      name: shift.name,
+      shiftId,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+      scheduleDays: [...days],
+      teacherId: teacher.id,
+      roomId: room.id,
+      isActive: true,
+      studentIds: [...classStudentIds],
+    });
   }
 
   // Đảm bảo mọi học viên đều có ít nhất 1 lớp
@@ -244,6 +262,7 @@ export function generateSeedData() {
         scheduleSlots.push({
           id: slotId,
           classId: cls.id,
+          sectionId: 'SEC_' + cls.id,
           teacherId: cls.teacherId,
           roomId: cls.roomId,
           date: dateStr,
@@ -447,6 +466,7 @@ export function generateSeedData() {
     classrooms,
     students,
     classes,
+    sections,
     scheduleSlots,
     attendanceRecords,
     classRequests,

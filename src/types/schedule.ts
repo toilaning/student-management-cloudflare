@@ -18,6 +18,7 @@ export const TIME_SHIFTS: TimeShift[] = [
 export interface ScheduleSlot {
   id: string; // SCH001...
   classId: string;
+  sectionId?: string; // Ca học (class_sections) mà buổi này thuộc về; nullable với dữ liệu cũ
   teacherId: string;
   roomId: string;
   date: string; // YYYY-MM-DD (e.g. "2026-09-01")
@@ -49,7 +50,7 @@ export interface ScheduleConflict {
   conflictingSlot: ScheduleSlot;
 }
 
-export type RequestType = 'XIN_NGHI';
+export type RequestType = 'XIN_NGHI' | 'DOI_CA';
 export type RequestStatus = 'CHỜ_DUYỆT' | 'ĐÃ_DUYỆT' | 'TỪ_CHỐI';
 
 export interface ClassRequest {
