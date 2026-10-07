@@ -56,6 +56,25 @@ const WEEK_DAY_OPTIONS: { value: number; label: string; short: string }[] = [
   { value: 8, label: 'Chủ nhật', short: 'CN' },
 ];
 
+/** Một ca học bổ sung khi khởi tạo lớp mới (lớp có thể gồm nhiều ca). */
+type DraftSection = {
+  shiftId: number;
+  startTime: string;
+  endTime: string;
+  scheduleDays: number[];
+  teacherId: string;
+  roomId: string;
+};
+
+const createEmptySection = (teacherId: string, roomId: string): DraftSection => ({
+  shiftId: 1,
+  startTime: '18:30',
+  endTime: '20:30',
+  scheduleDays: [2, 4, 6],
+  teacherId: teacherId || '',
+  roomId: roomId || 'P.101',
+});
+
 export default function AdminClassesPage() {
   const toast = useToast();
 
@@ -76,6 +95,8 @@ export default function AdminClassesPage() {
     autoGenerateSchedule: true,
     generateMonths: 3,
   });
+  // Các ca học bổ sung khi khởi tạo lớp (luôn giữ ít nhất một hàng).
+  const [draftSections, setDraftSections] = useState<DraftSection[]>([]);
 
   // Sheet Lên lịch nhanh cho riêng 1 lớp
   const [quickScheduleClass, setQuickScheduleClass] = useState<ClassEntity | null>(null);
@@ -111,6 +132,19 @@ export default function AdminClassesPage() {
   const [modalLoading, setModalLoading] = useState(false);
   const [sections, setSections] = useState<ClassSection[]>([]);
   const [selectedSectionId, setSelectedSectionId] = useState('');
+  // Popup thêm/sửa một ca trong lớp đã có
+  const [editingSection, setEditingSection] = useState<ClassSection | null>(null);
+  const [sectionFormOpen, setSectionFormOpen] = useState(false);
+  const [sectionFormLoading, setSectionFormLoading] = useState(false);
+  const [sectionForm, setSectionForm] = useState({
+    name: '',
+    shiftId: 1,
+    startTime: '18:30',
+    endTime: '20:30',
+    scheduleDays: [] as number[],
+    teacherId: '',
+    roomId: '',
+  });
 
   // Sheet đổi giáo viên quản lý lớp
   const [changingTeacherClass, setChangingTeacherClass] = useState<ClassEntity | null>(null);
@@ -185,10 +219,25 @@ export default function AdminClassesPage() {
 
     setAddClassLoading(true);
     try {
+      // Ca gốc lấy từ form; các ca bổ sung lấy từ draftSections (đã bỏ ca trống).
+      const baseSection = {
+        shiftId: newClassFormData.shiftId,
+        startTime: newClassFormData.startTime,
+        endTime: newClassFormData.endTime,
+        scheduleDays: newClassFormData.scheduleDays,
+        teacherId: newClassFormData.teacherId,
+        roomId: newClassFormData.roomId,
+      };
+      const extraSections = draftSections.filter(
+        (s) => s.startTime && s.endTime && s.teacherId
+      );
       const res = await fetch('/api/classes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newClassFormData),
+        body: JSON.stringify({
+          ...newClassFormData,
+          sections: [baseSection, ...extraSections],
+        }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -209,6 +258,7 @@ export default function AdminClassesPage() {
           autoGenerateSchedule: true,
           generateMonths: 3,
         });
+        setDraftSections([]);
         await loadData();
       } else {
         toast.error(data.error || 'Tạo lớp học thất bại');
@@ -350,6 +400,174 @@ export default function AdminClassesPage() {
       }
     } catch (e: any) {
       toast.error(e?.message || 'Lỗi mạng');
+    }
+  };
+
+  /** Mở popup thêm/sửa một ca trong lớp đã chọn. */
+  const openSectionForm = (sec: ClassSection | null) => {
+    setEditingSection(sec);
+    setSectionFormOpen(true);
+    if (sec) {
+      setSectionForm({
+        name: sec.name || '',
+        shiftId: sec.shiftId || 1,
+        startTime: sec.startTime || '18:30',
+        endTime: sec.endTime || '20:30',
+        scheduleDays: sec.scheduleDays && sec.scheduleDays.length > 0 ? [...sec.scheduleDays] : [],
+        teacherId: sec.teacherId || '',
+        roomId: sec.roomId || '',
+      });
+    } else {
+      setSectionForm({
+        name: '',
+        shiftId: newClassFormData.shiftId,
+        startTime: newClassFormData.startTime,
+        endTime: newClassFormData.endTime,
+        scheduleDays: newClassFormData.scheduleDays.length > 0
+          ? [...newClassFormData.scheduleDays]
+          : (selectedClass?.scheduleDays || []).length > 0
+            ? [...(selectedClass?.scheduleDays || [])]
+            : [],
+        teacherId: selectedClass?.teacherId || teachers[0]?.id || '',
+        roomId: selectedClass?.roomId || 'P.101',
+      });
+    }
+  };
+
+  const applySectionShiftPreset = (shift: TimeShift) => {
+    setSectionForm((prev) => ({
+      ...prev,
+      shiftId: shift.id,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+    }));
+  };
+
+  const toggleSectionDay = (day: number) => {
+    const selected = sectionForm.scheduleDays.includes(day);
+    let updated = [...sectionForm.scheduleDays];
+    if (selected) {
+      if (updated.length <= 1) return;
+      updated = updated.filter((d) => d !== day);
+    } else {
+      updated.push(day);
+      updated.sort((a, b) => a - b);
+    }
+    setSectionForm((prev) => ({ ...prev, scheduleDays: updated }));
+  };
+
+  const saveSectionForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedClass) return;
+    const endMin = timeToMinutes(sectionForm.endTime);
+    const startMin = timeToMinutes(sectionForm.startTime);
+    if (endMin <= startMin) {
+      toast.error('Giờ kết thúc phải sau giờ bắt đầu.');
+      return;
+    }
+    setSectionFormLoading(true);
+    try {
+      if (editingSection) {
+        const res = await fetch('/api/classes/sections', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sectionId: editingSection.id,
+            name: sectionForm.name,
+            shiftId: sectionForm.shiftId,
+            startTime: sectionForm.startTime,
+            endTime: sectionForm.endTime,
+            scheduleDays: sectionForm.scheduleDays,
+            teacherId: sectionForm.teacherId,
+            roomId: sectionForm.roomId,
+            syncFutureSlots: true,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(data.error || 'Cập nhật ca học thất bại');
+          return;
+        }
+        toast.success(data.syncedSlotsCount > 0
+          ? `Đã cập nhật ca và đồng bộ ${data.syncedSlotsCount} buổi tương lai`
+          : 'Đã cập nhật ca học');
+        setSections((prev) =>
+          prev.map((sec) =>
+            sec.id === editingSection.id
+              ? {
+                  ...sec,
+                  name: data.section.name || sec.name,
+                  shiftId: data.section.shiftId,
+                  startTime: data.section.startTime,
+                  endTime: data.section.endTime,
+                  scheduleDays: data.section.scheduleDays,
+                  teacherId: data.section.teacherId,
+                  roomId: data.section.roomId,
+                }
+              : sec
+          )
+        );
+      } else {
+        const res = await fetch('/api/classes/sections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            classId: selectedClass.id,
+            name: sectionForm.name || undefined,
+            shiftId: sectionForm.shiftId,
+            startTime: sectionForm.startTime,
+            endTime: sectionForm.endTime,
+            scheduleDays: sectionForm.scheduleDays,
+            teacherId: sectionForm.teacherId,
+            roomId: sectionForm.roomId,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(data.error || 'Thêm ca học thất bại');
+          return;
+        }
+        toast.success('Đã thêm ca học mới');
+        setSections((prev) => [...prev, { ...data.section, studentIds: [] }]);
+        setSelectedSectionId(data.section.id);
+        setEnrolledStudents([]);
+      }
+      setEditingSection(null);
+      setSectionFormOpen(false);
+    } catch (err: any) {
+      toast.error(err?.message || 'Lỗi mạng');
+    } finally {
+      setSectionFormLoading(false);
+    }
+  };
+
+  const deleteSection = async (sec: ClassSection) => {
+    if (!selectedClass) return;
+    if (!window.confirm(`Xóa ca "${sec.name || sec.id}"? Các buổi học tương lai của ca sẽ bị hủy.`)) return;
+    try {
+      const res = await fetch('/api/classes/sections?id=' + encodeURIComponent(sec.id), {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Xóa ca học thất bại');
+        return;
+      }
+      toast.success(data.message || 'Đã xóa ca học và hủy các buổi tương lai');
+      const remaining = sections.filter((s) => s.id !== sec.id);
+      setSections(remaining);
+      if (selectedSectionId === sec.id) {
+        const first = remaining[0] || null;
+        setSelectedSectionId(first ? first.id : '');
+        setEnrolledStudents(first ? allStudents.filter((s) => (first.studentIds || []).includes(s.id)) : []);
+      }
+      const unionIds = new Set<string>();
+      remaining.forEach((s) => (s.studentIds || []).forEach((id) => unionIds.add(id)));
+      const updatedCls = { ...selectedClass, studentIds: Array.from(unionIds) };
+      setSelectedClass(updatedCls);
+      setClasses((prev) => prev.map((c) => (c.id === updatedCls.id ? updatedCls : c)));
+    } catch (err: any) {
+      toast.error(err?.message || 'Lỗi mạng');
     }
   };
 
@@ -574,6 +792,41 @@ export default function AdminClassesPage() {
       endTime,
       shiftId: matched ? matched.id : newClassFormData.shiftId,
     });
+  };
+
+  /** Thêm một hàng ca học bổ sung trong form khởi tạo lớp. */
+  const addDraftSection = () => {
+    setDraftSections((prev) => [
+      ...prev,
+      createEmptySection(newClassFormData.teacherId || teachers[0]?.id || '', newClassFormData.roomId),
+    ]);
+  };
+
+  const removeDraftSection = (index: number) => {
+    setDraftSections((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateDraftSection = (index: number, patch: Partial<DraftSection>) => {
+    setDraftSections((prev) => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)));
+  };
+
+  const applyDraftShiftPreset = (index: number, shift: TimeShift) => {
+    updateDraftSection(index, { shiftId: shift.id, startTime: shift.startTime, endTime: shift.endTime });
+  };
+
+  const toggleDraftDay = (index: number, day: number) => {
+    const sec = draftSections[index];
+    if (!sec) return;
+    const selected = sec.scheduleDays.includes(day);
+    let updated = [...sec.scheduleDays];
+    if (selected) {
+      if (updated.length <= 1) return;
+      updated = updated.filter((d) => d !== day);
+    } else {
+      updated.push(day);
+      updated.sort((a, b) => a - b);
+    }
+    updateDraftSection(index, { scheduleDays: updated });
   };
 
   /** Mở bảng chỉnh danh sách ca học của trung tâm. */
@@ -1133,6 +1386,149 @@ export default function AdminClassesPage() {
               </div>
             </div>
 
+            {/* Nhiều ca học trong cùng một lớp */}
+            <div className="rounded-card border border-line bg-muted/30 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <span className="font-semibold text-foreground text-[13px] flex items-center gap-1.5">
+                    <Users size={15} className="text-primary" /> Các ca học của lớp ({draftSections.length + 1} ca)
+                  </span>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Mỗi ca có thể có giờ, thứ và giáo viên riêng. Học viên chỉ tham gia ca đã chọn.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<Plus size={13} />}
+                  onClick={addDraftSection}
+                >
+                  Thêm ca
+                </Button>
+              </div>
+
+              {/* Ca gốc (từ khung giờ chính phía trên) */}
+              <div className="rounded-field bg-card border border-line p-3 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-bold text-foreground">Ca 1 (khung giờ chính)</span>
+                  <span className="text-[11px] font-mono text-muted-foreground">
+                    {newClassFormData.startTime} – {newClassFormData.endTime} ·{' '}
+                    {formatScheduleDays(newClassFormData.scheduleDays)}
+                  </span>
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  Giảng viên: {teacherMap[newClassFormData.teacherId] || newClassFormData.teacherId || '—'}
+                </div>
+              </div>
+
+              {draftSections.map((sec, index) => (
+                <div
+                  key={index}
+                  className="rounded-field bg-card border border-line p-3 space-y-2.5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[12px] font-bold text-foreground">Ca {index + 2}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeDraftSection(index)}
+                      className="text-subtle-foreground hover:text-danger cursor-pointer p-0.5"
+                      title="Bỏ ca này"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {shifts.map((shift) => {
+                      const isActive =
+                        Number(sec.shiftId) === shift.id ||
+                        (sec.startTime === shift.startTime && sec.endTime === shift.endTime);
+                      return (
+                        <button
+                          type="button"
+                          key={shift.id}
+                          onClick={() => applyDraftShiftPreset(index, shift)}
+                          className={
+                            'h-8 px-3 rounded-pill text-[11px] font-semibold border transition cursor-pointer tabular ' +
+                            (isActive
+                              ? 'bg-primary text-white border-primary shadow-primary'
+                              : 'bg-card text-muted-foreground border-line hover:text-foreground hover:bg-muted')
+                          }
+                        >
+                          {shift.startTime} – {shift.endTime}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <Field label="Giờ bắt đầu">
+                      <Input
+                        type="time"
+                        value={sec.startTime}
+                        onChange={(e) => updateDraftSection(index, { startTime: e.target.value })}
+                        className="font-mono font-bold"
+                      />
+                    </Field>
+                    <Field label="Giờ kết thúc">
+                      <Input
+                        type="time"
+                        value={sec.endTime}
+                        onChange={(e) => updateDraftSection(index, { endTime: e.target.value })}
+                        className="font-mono font-bold"
+                      />
+                    </Field>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-medium text-muted-foreground">Học vào các thứ</span>
+                    <div className="grid grid-cols-7 gap-1.5">
+                      {WEEK_DAY_OPTIONS.map((day) => {
+                        const isSelected = sec.scheduleDays.includes(day.value);
+                        return (
+                          <button
+                            type="button"
+                            key={day.value}
+                            onClick={() => toggleDraftDay(index, day.value)}
+                            title={day.label}
+                            className={
+                              'h-9 rounded-field text-[12px] font-semibold border transition cursor-pointer ' +
+                              (isSelected
+                                ? 'bg-primary text-white border-primary shadow-primary'
+                                : 'bg-card text-muted-foreground border-line hover:text-foreground hover:bg-muted')
+                            }
+                          >
+                            {day.short}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <Field label="Giảng viên">
+                      <Select
+                        value={sec.teacherId}
+                        onChange={(e) => updateDraftSection(index, { teacherId: e.target.value })}
+                      >
+                        {teachers.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.id} - {t.name}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <Field label="Phòng học">
+                      <Input
+                        value={sec.roomId}
+                        onChange={(e) => updateDraftSection(index, { roomId: e.target.value })}
+                      />
+                    </Field>
+                  </div>
+                </div>
+              ))}
+            </div>
+
             <Field label="Liên kết phòng học trực tuyến (Discord / Meet)">
               <Input
                 type="url"
@@ -1311,34 +1707,78 @@ export default function AdminClassesPage() {
           }
         >
           <div className="space-y-5">
-            {/* Chọn ca học của lớp */}
-            {sections.length > 0 && (
-              <div className="space-y-1.5">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block">
+            {/* Chọn ca học của lớp + quản lý ca (thêm/sửa/xoá, đổi GV từng ca) */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   Ca học của lớp
                 </span>
-                <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<Plus size={13} />}
+                  onClick={() => openSectionForm(null)}
+                >
+                  Thêm ca
+                </Button>
+              </div>
+
+              {sections.length === 0 ? (
+                <div className="p-4 text-center text-xs text-muted-foreground border border-dashed border-line rounded-card">
+                  Lớp chưa có ca học nào. Bấm "Thêm ca" để tạo ca đầu tiên.
+                </div>
+              ) : (
+                <div className="space-y-2">
                   {sections.map((sec) => {
                     const isActive = sec.id === selectedSectionId;
                     return (
-                      <button
-                        type="button"
+                      <div
                         key={sec.id}
-                        onClick={() => handleSectionChange(sec.id)}
                         className={
-                          'h-9 px-3 rounded-pill text-[12px] font-semibold border transition cursor-pointer ' +
-                          (isActive
-                            ? 'bg-primary text-white border-primary shadow-primary'
-                            : 'bg-card text-muted-foreground border-line hover:text-foreground hover:bg-muted')
+                          'rounded-field border border-line p-2.5 flex items-center justify-between gap-2 transition ' +
+                          (isActive ? 'bg-primary-soft border-primary/40' : 'bg-card hover:bg-muted/40')
                         }
                       >
-                        {sec.name || sec.id} · {(sec.studentIds || []).length} HS
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSectionChange(sec.id)}
+                          className="flex-1 min-w-0 text-left cursor-pointer"
+                        >
+                          <div className="text-[12px] font-bold text-foreground truncate">
+                            {sec.name || sec.id}
+                            <span className="ml-1.5 text-[11px] font-semibold text-muted-foreground">
+                              · {(sec.studentIds || []).length} HS
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-muted-foreground mt-0.5">
+                            {sec.startTime} – {sec.endTime} · {formatScheduleDays(sec.scheduleDays)} ·{' '}
+                            GV: {teacherMap[sec.teacherId || ''] || sec.teacherId || '—'}
+                          </div>
+                        </button>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => openSectionForm(sec)}
+                            className="text-subtle-foreground hover:text-foreground cursor-pointer p-1"
+                            title="Sửa ca / đổi giáo viên"
+                          >
+                            <Edit3 size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteSection(sec)}
+                            className="text-subtle-foreground hover:text-danger cursor-pointer p-1"
+                            title="Xóa ca"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Danh sách học viên đang học */}
             <div className="space-y-2">
@@ -1433,6 +1873,137 @@ export default function AdminClassesPage() {
               </div>
             </div>
           </div>
+        </Sheet>
+
+        {/* Sheet Thêm / Sửa Ca Học Của Lớp */}
+        <Sheet
+          isOpen={sectionFormOpen}
+          onClose={() => setSectionFormOpen(false)}
+          title={editingSection ? 'Sửa ca học' : 'Thêm ca học cho lớp'}
+          description={selectedClass ? selectedClass.name + ' (' + selectedClass.id + ')' : undefined}
+          size="md"
+          footer={
+            <div className="flex items-center justify-end gap-2 w-full">
+              <Button variant="secondary" onClick={() => setSectionFormOpen(false)}>
+                Hủy
+              </Button>
+              <Button
+                variant="primary"
+                loading={sectionFormLoading}
+                onClick={saveSectionForm}
+              >
+                {editingSection ? 'Lưu ca học' : 'Thêm ca học'}
+              </Button>
+            </div>
+          }
+        >
+          <form onSubmit={saveSectionForm} className="space-y-4">
+            <Field label="Tên ca (tùy chọn)">
+              <Input
+                placeholder="Ví dụ: Ca sáng, Ca tối..."
+                value={sectionForm.name}
+                onChange={(e) => setSectionForm((prev) => ({ ...prev, name: e.target.value }))}
+              />
+            </Field>
+
+            <div className="space-y-1.5">
+              <span className="text-[12px] font-medium text-muted-foreground">Chọn ca mẫu</span>
+              <div className="flex flex-wrap gap-2">
+                {shifts.map((shift) => {
+                  const isActive =
+                    Number(sectionForm.shiftId) === shift.id ||
+                    (sectionForm.startTime === shift.startTime && sectionForm.endTime === shift.endTime);
+                  return (
+                    <button
+                      type="button"
+                      key={shift.id}
+                      onClick={() => applySectionShiftPreset(shift)}
+                      className={
+                        'h-10 px-3.5 rounded-pill text-[12px] font-semibold border transition cursor-pointer tabular ' +
+                        (isActive
+                          ? 'bg-primary text-white border-primary shadow-primary'
+                          : 'bg-card text-muted-foreground border-line hover:text-foreground hover:bg-muted')
+                      }
+                    >
+                      {shift.startTime} – {shift.endTime}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Giờ bắt đầu" required>
+                <Input
+                  type="time"
+                  required
+                  value={sectionForm.startTime}
+                  onChange={(e) => setSectionForm((prev) => ({ ...prev, startTime: e.target.value }))}
+                  className="font-mono font-bold"
+                />
+              </Field>
+              <Field label="Giờ kết thúc" required>
+                <Input
+                  type="time"
+                  required
+                  value={sectionForm.endTime}
+                  onChange={(e) => setSectionForm((prev) => ({ ...prev, endTime: e.target.value }))}
+                  className="font-mono font-bold"
+                />
+              </Field>
+            </div>
+
+            <div className="space-y-1.5">
+              <span className="text-[12px] font-medium text-muted-foreground">Học vào các thứ</span>
+              <div className="grid grid-cols-7 gap-1.5">
+                {WEEK_DAY_OPTIONS.map((day) => {
+                  const isSelected = sectionForm.scheduleDays.includes(day.value);
+                  return (
+                    <button
+                      type="button"
+                      key={day.value}
+                      onClick={() => toggleSectionDay(day.value)}
+                      title={day.label}
+                      className={
+                        'h-9 rounded-field text-[12px] font-semibold border transition cursor-pointer ' +
+                        (isSelected
+                          ? 'bg-primary text-white border-primary shadow-primary'
+                          : 'bg-card text-muted-foreground border-line hover:text-foreground hover:bg-muted')
+                      }
+                    >
+                      {day.short}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Giảng viên (theo ca)" required>
+                <Select
+                  required
+                  value={sectionForm.teacherId}
+                  onChange={(e) => setSectionForm((prev) => ({ ...prev, teacherId: e.target.value }))}
+                >
+                  {teachers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.id} - {t.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Phòng học">
+                <Input
+                  value={sectionForm.roomId}
+                  onChange={(e) => setSectionForm((prev) => ({ ...prev, roomId: e.target.value }))}
+                />
+              </Field>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Đổi giáo viên hoặc thời gian của ca sẽ tự đồng bộ cho các buổi học tương lai thuộc ca này.
+            </p>
+          </form>
         </Sheet>
 
         {/* Sheet Sửa Thông Tin / Thời Gian Lớp Học */}

@@ -3,7 +3,7 @@ import { repo as defaultRepo } from '@/repositories';
 import { ShiftService } from './ShiftService';
 import { ConflictEngine } from './ConflictEngine';
 import { ScheduleSlot, ScheduleConflict } from '@/types/schedule';
-import { ClassEntity } from '@/types/classroom';
+import { ClassEntity, ClassSection } from '@/types/classroom';
 
 export interface BulkGenerateParams {
   classIds: string[]; // ['CLS01', ...] hoặc ['all']
@@ -84,11 +84,31 @@ export class BulkScheduleService {
     const conflictEngine = new ConflictEngine(this.repo);
     const shifts = await ShiftService.getAllShifts();
 
-    // Mỗi lớp sẽ tạo buổi gắn vào ca học mặc định (ca đầu tiên) của lớp đó.
-    const classSectionMap = new Map<string, string>();
+    // Mỗi lớp có thể có nhiều ca học: đọc toàn bộ ca của từng lớp và sinh lịch cho từng ca.
+    // Lớp cũ chưa có ca (dữ liệu legacy) thì tự suy một "ca ảo" từ thông tin lớp.
+    const sectionsByClass = new Map<string, ClassSection[]>();
     for (const cls of targetClasses) {
       const sections = await this.repo.getClassSections(cls.id);
-      if (sections.length > 0) classSectionMap.set(cls.id, sections[0].id);
+      const activeSections = sections.filter((s) => s.isActive !== false);
+      if (activeSections.length > 0) {
+        sectionsByClass.set(cls.id, activeSections);
+      } else {
+        sectionsByClass.set(cls.id, [
+          {
+            id: '',
+            classId: cls.id,
+            name: cls.name || 'Ca học',
+            shiftId: cls.shiftId,
+            startTime: cls.startTime,
+            endTime: cls.endTime,
+            scheduleDays: [...(cls.scheduleDays || [])],
+            teacherId: cls.teacherId,
+            roomId: cls.roomId,
+            isActive: true,
+            studentIds: [],
+          },
+        ]);
+      }
     }
     const shiftMap = new Map<number, (typeof shifts)[0]>();
     shifts.forEach(s => shiftMap.set(s.id, s));
@@ -130,7 +150,7 @@ export class BulkScheduleService {
     const slotsToCreate: ScheduleSlot[] = [];
     const slotsToUpdate: ScheduleSlot[] = [];
 
-    // Duyệt qua từng ngày
+    // Duyệt qua từng ngày, mỗi ca học (section) của lớp sinh slot riêng.
     for (const dateStr of dateList) {
       const [y, m, d] = dateStr.split('-').map(Number);
       const dateObj = new Date(Date.UTC(y, m - 1, d));
@@ -138,110 +158,121 @@ export class BulkScheduleService {
       const dayOfWeek = jsDay === 0 ? 8 : jsDay + 1; // 2..7 cho T2..T7, 8 cho CN
 
       for (const cls of targetClasses) {
-        const classDays = overrideScheduleDays && overrideScheduleDays.length > 0
-          ? overrideScheduleDays
-          : cls.scheduleDays || [];
+        const sections = sectionsByClass.get(cls.id) || [];
 
-        // Kiểm tra xem thứ của ngày hiện tại có nằm trong lịch học của lớp không (2..8)
-        if (!classDays.includes(dayOfWeek)) {
-          continue;
-        }
+        for (const section of sections) {
+          // Override lịch (quick schedule) áp cho mọi ca; ngược lại ưu tiên thứ của ca, fallback về lớp.
+          const sectionDays = overrideScheduleDays && overrideScheduleDays.length > 0
+            ? overrideScheduleDays
+            : (section.scheduleDays && section.scheduleDays.length > 0
+                ? section.scheduleDays
+                : cls.scheduleDays || []);
 
-        totalAttempted++;
-
-        const currentShiftId = overrideShiftId !== undefined && overrideShiftId !== null
-          ? Number(overrideShiftId)
-          : cls.shiftId || 1;
-
-        const defaultShift = shiftMap.get(currentShiftId) || shifts[0] || {
-          id: currentShiftId,
-          startTime: '18:30',
-          endTime: '20:30',
-        };
-
-        const slotStartTime = overrideStartTime || cls.startTime || defaultShift.startTime || '18:30';
-        const slotEndTime = overrideEndTime || cls.endTime || defaultShift.endTime || '20:30';
-
-        const existingSlot = workingSlots.find(
-          s => s.classId === cls.id && s.date === dateStr && s.status !== 'Đã hủy'
-        );
-
-        if (existingSlot) {
-          if (overwriteExisting) {
-            // Cập nhật slot hiện có
-            const updatedSlot: ScheduleSlot = {
-              ...existingSlot,
-              teacherId: cls.teacherId,
-              roomId: cls.roomId,
-              shiftId: currentShiftId,
-              startTime: slotStartTime,
-              endTime: slotEndTime,
-              subject: cls.subject || existingSlot.subject,
-              meetingLink: cls.meetingLink || existingSlot.meetingLink,
-              status: 'Đã lên lịch',
-            };
-
-            // Kiểm tra xung đột trước khi update (ngoại trừ chính existingSlot.id)
-            const check = await conflictEngine.checkScheduleConflict(updatedSlot, existingSlot.id, workingSlots);
-            if (check.hasConflict) {
-              conflictCount++;
-              conflicts.push({
-                classId: cls.id,
-                date: dateStr,
-                shiftId: currentShiftId,
-                conflicts: check.conflicts,
-              });
-            } else {
-              slotsToUpdate.push(updatedSlot);
-              const idx = workingSlots.findIndex(s => s.id === existingSlot.id);
-              if (idx >= 0) workingSlots[idx] = updatedSlot;
-              updatedCount++;
-              createdSlots.push(updatedSlot);
-            }
-          } else {
-            // Bỏ qua nếu đã có và không cho phép ghi đè
-            skippedCount++;
+          if (!sectionDays.includes(dayOfWeek)) {
+            continue;
           }
-          continue;
-        }
 
-        // Trường hợp chưa có slot: Kiểm tra xung đột
-        const candidateSlot: Omit<ScheduleSlot, 'id'> = {
-          classId: cls.id,
-          sectionId: classSectionMap.get(cls.id),
-          teacherId: cls.teacherId,
-          roomId: cls.roomId,
-          date: dateStr,
-          shiftId: currentShiftId,
-          startTime: slotStartTime,
-          endTime: slotEndTime,
-          subject: cls.subject || cls.name,
-          topic: `Buổi học định kỳ - ${cls.name}`,
-          meetingLink: cls.meetingLink || '',
-          status: 'Đã lên lịch',
-        };
+          totalAttempted++;
 
-        const conflictResult = await conflictEngine.checkScheduleConflict(candidateSlot, undefined, workingSlots);
+          const rawShiftId = overrideShiftId !== undefined && overrideShiftId !== null
+            ? Number(overrideShiftId)
+            : (section.shiftId ?? cls.shiftId ?? 1);
+          const currentShiftId = Number(rawShiftId) || 1;
 
-        if (conflictResult.hasConflict) {
-          conflictCount++;
-          conflicts.push({
+          const defaultShift = shiftMap.get(currentShiftId) || shifts[0] || {
+            id: currentShiftId,
+            startTime: '18:30',
+            endTime: '20:30',
+          };
+
+          const slotStartTime = overrideStartTime || section.startTime || cls.startTime || defaultShift.startTime || '18:30';
+          const slotEndTime = overrideEndTime || section.endTime || cls.endTime || defaultShift.endTime || '20:30';
+          const slotTeacherId = section.teacherId || cls.teacherId;
+          const slotRoomId = section.roomId || cls.roomId;
+
+          // Ưu tiên khớp theo sectionId; dữ liệu cũ chưa có sectionId thì khớp theo lớp + ngày.
+          const existingSlot = workingSlots.find((s) => {
+            if (section.id) {
+              return s.sectionId === section.id && s.date === dateStr && s.status !== 'Đã hủy';
+            }
+            return s.classId === cls.id && s.date === dateStr && !s.sectionId && s.status !== 'Đã hủy';
+          });
+
+          if (existingSlot) {
+            if (overwriteExisting) {
+              const updatedSlot: ScheduleSlot = {
+                ...existingSlot,
+                sectionId: section.id || existingSlot.sectionId,
+                teacherId: slotTeacherId,
+                roomId: slotRoomId,
+                shiftId: currentShiftId,
+                startTime: slotStartTime,
+                endTime: slotEndTime,
+                subject: cls.subject || existingSlot.subject,
+                meetingLink: cls.meetingLink || existingSlot.meetingLink,
+                status: 'Đã lên lịch',
+              };
+
+              const check = await conflictEngine.checkScheduleConflict(updatedSlot, existingSlot.id, workingSlots);
+              if (check.hasConflict) {
+                conflictCount++;
+                conflicts.push({
+                  classId: cls.id,
+                  date: dateStr,
+                  shiftId: currentShiftId,
+                  conflicts: check.conflicts,
+                });
+              } else {
+                slotsToUpdate.push(updatedSlot);
+                const idx = workingSlots.findIndex((s) => s.id === existingSlot.id);
+                if (idx >= 0) workingSlots[idx] = updatedSlot;
+                updatedCount++;
+                createdSlots.push(updatedSlot);
+              }
+            } else {
+              skippedCount++;
+            }
+            continue;
+          }
+
+          // Trường hợp chưa có slot: Kiểm tra xung đột
+          const candidateSlot: Omit<ScheduleSlot, 'id'> = {
             classId: cls.id,
+            sectionId: section.id || undefined,
+            teacherId: slotTeacherId,
+            roomId: slotRoomId,
             date: dateStr,
             shiftId: currentShiftId,
-            conflicts: conflictResult.conflicts,
-          });
-        } else {
-          maxNum++;
-          const newSlotId = `SCH${maxNum.toString().padStart(4, '0')}`;
-          const newSlot: ScheduleSlot = {
-            id: newSlotId,
-            ...candidateSlot,
+            startTime: slotStartTime,
+            endTime: slotEndTime,
+            subject: cls.subject || cls.name,
+            topic: `Buổi học định kỳ - ${cls.name}`,
+            meetingLink: cls.meetingLink || '',
+            status: 'Đã lên lịch',
           };
-          slotsToCreate.push(newSlot);
-          workingSlots.push(newSlot);
-          createdCount++;
-          createdSlots.push(newSlot);
+
+          const conflictResult = await conflictEngine.checkScheduleConflict(candidateSlot, undefined, workingSlots);
+
+          if (conflictResult.hasConflict) {
+            conflictCount++;
+            conflicts.push({
+              classId: cls.id,
+              date: dateStr,
+              shiftId: currentShiftId,
+              conflicts: conflictResult.conflicts,
+            });
+          } else {
+            maxNum++;
+            const newSlotId = `SCH${maxNum.toString().padStart(4, '0')}`;
+            const newSlot: ScheduleSlot = {
+              id: newSlotId,
+              ...candidateSlot,
+            };
+            slotsToCreate.push(newSlot);
+            workingSlots.push(newSlot);
+            createdCount++;
+            createdSlots.push(newSlot);
+          }
         }
       }
     }

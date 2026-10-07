@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { repo } from '@/repositories';
 import { BulkScheduleService } from '@/services/BulkScheduleService';
 import { ShiftService } from '@/services/ShiftService';
+import { ClassSection } from '@/types/classroom';
 
 export const dynamic = 'force-dynamic';
 
@@ -226,6 +227,7 @@ export async function POST(request: Request) {
       autoGenerateSchedule = true,
       generateMonths = 3,
       actorId = 'ADMIN001',
+      sections = [],
     } = body;
 
     if (!name || !subject || !teacherId) {
@@ -272,31 +274,71 @@ export async function POST(request: Request) {
 
     await repo.createClass(newClass);
 
-    // Tạo ca học mặc định kế thừa lịch của lớp (lớp mới luôn có ít nhất 1 ca).
-    const defaultSection = {
-      id: 'SEC_' + newId,
-      classId: newId,
-      name: (matchedShift?.name || 'Ca ' + resolvedShiftId) + ' (' + parsedStartTime + ' - ' + parsedEndTime + ')',
-      shiftId: resolvedShiftId,
-      startTime: parsedStartTime,
-      endTime: parsedEndTime,
-      scheduleDays: newClass.scheduleDays,
-      teacherId: teacherId,
-      roomId: roomId,
-      isActive: true,
-      studentIds: [] as string[],
-    };
-    await repo.createClassSection(defaultSection);
+    // Danh sách ca học cần tạo. Ưu tiên ca admin khai báo tường minh (nhiều ca);
+    // nếu không có thì tạo 1 ca mặc định kế thừa lịch của lớp.
+    const sectionInputs: Array<{
+      name?: string;
+      shiftId?: number;
+      startTime?: string;
+      endTime?: string;
+      scheduleDays?: number[];
+      teacherId?: string;
+      roomId?: string;
+    }> = Array.isArray(sections) && sections.length > 0
+      ? sections
+      : [
+          {
+            name:
+              (matchedShift?.name || 'Ca ' + resolvedShiftId) +
+              ' (' + parsedStartTime + ' - ' + parsedEndTime + ')',
+            shiftId: resolvedShiftId,
+            startTime: parsedStartTime,
+            endTime: parsedEndTime,
+            scheduleDays: newClass.scheduleDays,
+            teacherId,
+            roomId,
+          },
+        ];
 
-    // Cập nhật assignedClassIds của giảng viên
-    const teacher = await repo.getTeacherById(teacherId);
-    if (teacher) {
-      if (!teacher.assignedClassIds) teacher.assignedClassIds = [];
-      if (!teacher.assignedClassIds.includes(newId)) {
-        teacher.assignedClassIds.push(newId);
-        await repo.updateTeacher(teacher);
+    const createdSections: ClassSection[] = [];
+    for (let i = 0; i < sectionInputs.length; i++) {
+      const input = sectionInputs[i];
+      const secStart = (input.startTime || parsedStartTime).trim();
+      const secEnd = (input.endTime || parsedEndTime).trim();
+      const secShiftId = input.shiftId !== undefined ? Number(input.shiftId) : resolvedShiftId;
+      const secId = 'SEC_' + newId + '_' + Date.now().toString().slice(-5) + '_' + i;
+      const section: ClassSection = {
+        id: secId,
+        classId: newId,
+        name: input.name || 'Ca ' + (i + 1) + ' (' + secStart + ' - ' + secEnd + ')',
+        shiftId: secShiftId,
+        startTime: secStart,
+        endTime: secEnd,
+        scheduleDays: Array.isArray(input.scheduleDays) && input.scheduleDays.length > 0
+          ? input.scheduleDays.map(Number)
+          : newClass.scheduleDays,
+        teacherId: input.teacherId || teacherId,
+        roomId: input.roomId || roomId,
+        isActive: true,
+        studentIds: [],
+      };
+      await repo.createClassSection(section);
+      createdSections.push(section);
+    }
+
+    // Cập nhật assignedClassIds cho mọi giảng viên phụ trách các ca của lớp.
+    const sectionTeacherIds = [...new Set(createdSections.map((s) => s.teacherId).filter(Boolean))] as string[];
+    for (const tid of sectionTeacherIds) {
+      const teacher = await repo.getTeacherById(tid);
+      if (teacher) {
+        if (!teacher.assignedClassIds) teacher.assignedClassIds = [];
+        if (!teacher.assignedClassIds.includes(newId)) {
+          teacher.assignedClassIds.push(newId);
+          await repo.updateTeacher(teacher);
+        }
       }
     }
+    const teacher = await repo.getTeacherById(teacherId);
 
     await repo.addAuditLog({
       action: 'CREATE',
@@ -320,14 +362,16 @@ export async function POST(request: Request) {
       endDateObj.setMonth(endDateObj.getMonth() + monthsToAdd);
       const endDate = endDateObj.toISOString().split('T')[0];
 
+      // Khi lớp có nhiều ca, không gửi override ở mức lớp để ca nào giữ lịch riêng của ca đó.
+      const hasMultipleSections = createdSections.length > 1;
       bulkScheduleResult = await bulkService.generateRecurringSlots({
         classIds: [newId],
         startDate,
         endDate,
-        shiftId: newClass.shiftId,
-        startTime: newClass.startTime,
-        endTime: newClass.endTime,
-        scheduleDays: newClass.scheduleDays,
+        shiftId: hasMultipleSections ? undefined : newClass.shiftId,
+        startTime: hasMultipleSections ? undefined : newClass.startTime,
+        endTime: hasMultipleSections ? undefined : newClass.endTime,
+        scheduleDays: hasMultipleSections ? undefined : newClass.scheduleDays,
         overwriteExisting: false,
         actorId,
       });
@@ -337,8 +381,9 @@ export async function POST(request: Request) {
       success: true,
       class: newClass,
       bulkScheduleResult,
-      message: `Tạo lớp ${newClass.name} (${newId}) thành công!${
-        bulkScheduleResult ? ` Đã tự động sinh ${bulkScheduleResult.summary.createdCount} ca học (${newClass.startTime} - ${newClass.endTime}) cho các ngày tới.` : ''
+      sectionCount: createdSections.length,
+      message: `Tạo lớp ${newClass.name} (${newId}) với ${createdSections.length} ca học thành công!${
+        bulkScheduleResult ? ` Đã tự động sinh ${bulkScheduleResult.summary.createdCount} buổi học cho các ngày tới.` : ''
       }`,
     });
   } catch (error: any) {
