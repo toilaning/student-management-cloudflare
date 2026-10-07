@@ -51,7 +51,13 @@ WITH ranked AS (
         ROW_NUMBER() OVER (
             PARTITION BY ss.id
             ORDER BY
-                CASE WHEN (sec.start_time = ss.start_time AND sec.end_time = ss.end_time) THEN 0 ELSE 1 END,
+                CASE WHEN (
+                    sec.start_time IS NOT NULL
+                    AND NULLIF(sec.start_time, '') IS NOT NULL
+                    AND ss.start_time IS NOT NULL
+                    AND NULLIF(sec.start_time, '')::time = ss.start_time
+                    AND NULLIF(sec.end_time, '')::time = ss.end_time
+                ) THEN 0 ELSE 1 END,
                 CASE WHEN sec.shift_id = ss.shift_id THEN 0 ELSE 1 END,
                 CASE WHEN sec.teacher_id = ss.teacher_id THEN 0 ELSE 1 END,
                 sec.created_at,
