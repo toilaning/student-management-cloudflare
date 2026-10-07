@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { POST as createClassRoute } from '../src/app/api/classes/route';
-import { PUT as putSectionRoute, DELETE as deleteSectionRoute } from '../src/app/api/classes/sections/route';
+import { GET as getSectionsRoute, PUT as putSectionRoute, DELETE as deleteSectionRoute } from '../src/app/api/classes/sections/route';
 import { POST as generateRoute } from '../src/app/api/schedule/bulk-generate/route';
 import { repo } from '../src/repositories';
 
@@ -246,5 +246,55 @@ describe('Multi-Section Class: nhiều ca, đổi giáo viên theo từng ca', (
 
     const after = await repo.getSectionById(sec.id);
     assert.equal(after, null, 'Ca phải bị xóa');
+  });
+
+  it('6. GET /api/classes/sections?classIds=... trả ca theo nhiều lớp trong 1 request', async () => {
+    const req = new Request('http://localhost/api/classes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Lớp Batch A',
+        subject: 'Lý',
+        teacherId: 'GV001',
+        roomId: 'P.101',
+        scheduleDays: [2, 4],
+        isRecurring: false,
+        autoGenerateSchedule: false,
+        sections: [
+          { shiftId: 1, startTime: '08:00', endTime: '10:00', scheduleDays: [2, 4], teacherId: 'GV001', roomId: 'P.101' },
+          { shiftId: 2, startTime: '10:15', endTime: '12:15', scheduleDays: [2, 4], teacherId: 'GV002', roomId: 'P.102' },
+        ],
+      }),
+    });
+    const resA = await createClassRoute(req);
+    const clsA = (await resA.json()).class;
+
+    const reqB = new Request('http://localhost/api/classes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Lớp Batch B',
+        subject: 'Hóa',
+        teacherId: 'GV001',
+        roomId: 'P.103',
+        scheduleDays: [2, 4],
+        isRecurring: false,
+        autoGenerateSchedule: false,
+        sections: [
+          { shiftId: 1, startTime: '08:00', endTime: '10:00', scheduleDays: [2, 4], teacherId: 'GV001', roomId: 'P.103' },
+        ],
+      }),
+    });
+    const resB = await createClassRoute(reqB);
+    const bBody = await resB.json();
+    const clsB = bBody.class;
+    assert.ok(clsB, 'Lớp B phải được tạo: ' + JSON.stringify(bBody));
+
+    const gres = await getSectionsRoute(new Request(
+      'http://localhost/api/classes/sections?classIds=' + clsA.id + ',' + clsB.id
+    ));
+    const gdata = await gres.json();
+    assert.equal(gdata.sectionsByClass[clsA.id].length, 2, 'Lớp A có 2 ca');
+    assert.equal(gdata.sectionsByClass[clsB.id].length, 1, 'Lớp B có 1 ca');
   });
 });

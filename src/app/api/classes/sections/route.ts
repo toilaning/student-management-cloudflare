@@ -9,10 +9,19 @@ export async function GET(request: Request) {
   const classId = searchParams.get('classId');
   const studentId = searchParams.get('studentId');
   const id = searchParams.get('id');
+  const classIdsParam = searchParams.get('classIds');
 
   if (id) {
     const sec = await repo.getSectionById(id);
     return NextResponse.json({ section: sec });
+  }
+  if (classIdsParam) {
+    const ids = classIdsParam.split(',').map((s) => s.trim()).filter(Boolean);
+    const sectionsByClass: Record<string, ClassSection[]> = {};
+    for (const cid of ids) {
+      sectionsByClass[cid] = await repo.getClassSections(cid);
+    }
+    return NextResponse.json({ sectionsByClass });
   }
   if (classId) {
     const sections = await repo.getClassSections(classId);

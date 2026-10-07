@@ -81,6 +81,8 @@ export default function StudentClassesPage() {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [sectionsMap, setSectionsMap] = useState<Record<string, ClassSection[]>>({});
   const [currentSectionByClass, setCurrentSectionByClass] = useState<Record<string, string>>({});
+  // Ca học sinh chọn khi đăng ký từng lớp mới.
+  const [enrollSectionByClass, setEnrollSectionByClass] = useState<Record<string, string>>({});
   // Ca mới học sinh muốn chuyển sang, tính theo từng lớp đang học.
   const [targetSectionByClass, setTargetSectionByClass] = useState<Record<string, string>>({});
   const [pendingChange, setPendingChange] = useState<{
@@ -104,27 +106,35 @@ export default function StudentClassesPage() {
       const stData = await stRes.json();
       const shiftData = await shiftRes.json();
 
-      setClasses(clsData.classes || []);
+      const classList = (clsData.classes || []) as ClassEntity[];
+      setClasses(classList);
       setStudent(stData.student || null);
       if (shiftData.shifts) setShifts(shiftData.shifts);
 
-      const enrolledIds = (stData.student?.enrolledClassIds || []) as string[];
-      const secResults = await Promise.all(
-        enrolledIds.map(async (id) => {
-          const res = await fetch('/api/classes/sections?classId=' + id);
-          const data = await res.json();
-          return { id, sections: (data.sections || []) as ClassSection[] };
-        })
-      );
       const nextMap: Record<string, ClassSection[]> = {};
       const nextCurrent: Record<string, string> = {};
-      for (const item of secResults) {
-        nextMap[item.id] = item.sections;
-        const mine = item.sections.find((sec) => (sec.studentIds || []).includes(currentUser.id));
-        if (mine) nextCurrent[item.id] = mine.id;
+      const nextEnroll: Record<string, string> = {};
+      const enrolledIds = new Set((stData.student?.enrolledClassIds || []) as string[]);
+      // Lấy toàn bộ ca của mọi lớp (cả đang học lẫn đang mở) trong 1 request.
+      const allIds = classList.map((c) => c.id);
+      if (allIds.length > 0) {
+        const secRes = await fetch('/api/classes/sections?classIds=' + allIds.join(','));
+        const secData = await secRes.json();
+        const secByClass = (secData.sectionsByClass || {}) as Record<string, ClassSection[]>;
+        for (const cid of allIds) {
+          const secs = secByClass[cid] || [];
+          nextMap[cid] = secs;
+          const mine = secs.find((sec) => (sec.studentIds || []).includes(currentUser.id));
+          if (mine) nextCurrent[cid] = mine.id;
+          // Lớp đang mở chỉ có 1 ca thì chọn sẵn để đăng ký nhanh.
+          if (!enrolledIds.has(cid) && secs.length === 1) {
+            nextEnroll[cid] = secs[0].id;
+          }
+        }
       }
       setSectionsMap(nextMap);
       setCurrentSectionByClass(nextCurrent);
+      setEnrollSectionByClass(nextEnroll);
     } catch (e) {
       console.error(e);
       toast.error('Không tải được dữ liệu lớp học.');
@@ -181,7 +191,7 @@ export default function StudentClassesPage() {
     return null;
   };
 
-  const handleEnroll = async (classId: string, className: string) => {
+  const handleEnroll = async (classId: string, className: string, sectionId?: string) => {
     if (!student || !currentUser?.id) return;
     setActionLoadingId(classId);
     try {
@@ -190,6 +200,7 @@ export default function StudentClassesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           classId,
+          sectionId,
           studentId: currentUser.id,
           action: 'ENROLL',
           actorId: currentUser.id,
@@ -375,6 +386,68 @@ export default function StudentClassesPage() {
     );
   };
 
+  /** Bộ chọn ca khi đăng ký lớp mới: liệt kê toàn bộ ca học của lớp. */
+  const renderEnrollSectionPicker = (cls: ClassEntity) => {
+    const sections = sectionsMap[cls.id] || [];
+    const selected = enrollSectionByClass[cls.id];
+
+    if (sections.length === 0) {
+      // Lớp cũ chưa khai báo ca: đăng ký vào ca mặc định của lớp.
+      return (
+        <p className="text-[12px] text-muted-foreground flex items-center gap-1.5">
+          <Clock size={13} className="text-primary" />
+          {cls.startTime || '—'} – {cls.endTime || '—'} · {formatDays(cls.scheduleDays)}
+        </p>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        <span className="text-[12px] font-semibold text-muted-foreground flex items-center gap-1">
+          <Clock size={13} className="text-primary" /> Chọn ca học
+        </span>
+        <div className="grid grid-cols-1 gap-2">
+          {sections.map((sec) => {
+            const isSelected = selected === sec.id;
+            return (
+              <button
+                key={sec.id}
+                type="button"
+                disabled={actionLoadingId === cls.id}
+                onClick={() => {
+                  setEnrollSectionByClass((prev) => {
+                    const next = { ...prev };
+                    if (next[cls.id] === sec.id) delete next[cls.id];
+                    else next[cls.id] = sec.id;
+                    return next;
+                  });
+                }}
+                className={cn(
+                  'relative px-3 py-2.5 rounded-field text-[12px] border transition text-left leading-tight cursor-pointer',
+                  'disabled:opacity-45 disabled:cursor-not-allowed',
+                  isSelected
+                    ? 'border-primary bg-primary-soft ring-2 ring-primary/25'
+                    : 'border-line bg-card hover:bg-muted'
+                )}
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className="font-bold text-foreground">
+                    {sec.startTime || '—'} – {sec.endTime || '—'}
+                  </span>
+                  {isSelected && <Check size={14} className="text-primary shrink-0" />}
+                </span>
+                <span className="block text-[11px] text-muted-foreground mt-0.5">
+                  {formatDays(sec.scheduleDays?.length ? sec.scheduleDays : cls.scheduleDays)}
+                  {sec.teacherId ? ' · ' + sec.teacherId : ''}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <RoleGuard allowedRoles={['STUDENT', 'ADMIN']}>
       <div className="flex-1 flex flex-col min-h-screen">
@@ -544,6 +617,9 @@ export default function StudentClassesPage() {
                             </div>
                           </div>
                           {renderClassInfo(cls)}
+                          <div className="pt-3 border-t border-line">
+                            {renderEnrollSectionPicker(cls)}
+                          </div>
                         </div>
                         <div className="pt-4 border-t border-line mt-4">
                           <Button
@@ -551,10 +627,15 @@ export default function StudentClassesPage() {
                             size="md"
                             fullWidth
                             loading={actionLoadingId === cls.id}
-                            onClick={() => handleEnroll(cls.id, cls.name)}
+                            disabled={
+                              (sectionsMap[cls.id] || []).length > 0 && !enrollSectionByClass[cls.id]
+                            }
+                            onClick={() => handleEnroll(cls.id, cls.name, enrollSectionByClass[cls.id])}
                             icon={<Plus size={16} />}
                           >
-                            Đăng ký lớp này
+                            {(sectionsMap[cls.id] || []).length > 0 && !enrollSectionByClass[cls.id]
+                              ? 'Chọn ca để đăng ký'
+                              : 'Đăng ký lớp này'}
                           </Button>
                         </div>
                       </Card>
