@@ -709,11 +709,16 @@ export default function AdminClassesPage() {
   }, [searchTerm]);
 
   const filtered = classes.filter(
-    (c) =>
-      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.teacherId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (teacherMap[c.teacherId] && teacherMap[c.teacherId].toLowerCase().includes(searchTerm.toLowerCase())) ||
-      c.roomId.toLowerCase().includes(searchTerm.toLowerCase())
+    (c) => {
+      const q = searchTerm.toLowerCase();
+      return (
+        (c.name || '').toLowerCase().includes(q) ||
+        (c.subject || '').toLowerCase().includes(q) ||
+        (c.teacherId || '').toLowerCase().includes(q) ||
+        (teacherMap[c.teacherId] || '').toLowerCase().includes(q) ||
+        (c.roomId || '').toLowerCase().includes(q)
+      );
+    }
   );
 
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
@@ -899,7 +904,7 @@ export default function AdminClassesPage() {
           {/* Thanh tìm kiếm và nút khởi tạo */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             <SearchInput
-              placeholder="Tìm theo mã lớp, môn học, giảng viên..."
+              placeholder="Tìm theo tên lớp, môn học, giảng viên, phòng..."
               value={searchTerm}
               onChange={setSearchTerm}
               className="w-full sm:w-96"
