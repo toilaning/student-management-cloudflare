@@ -55,6 +55,8 @@ export interface IRepository {
   getClassSections(classId: string): Promise<ClassSection[]>;
   getSectionById(id: string): Promise<ClassSection | null>;
   getSectionsByStudentId(studentId: string): Promise<ClassSection[]>;
+  getSectionsByTeacherId(teacherId: string): Promise<ClassSection[]>;
+  getAllClassSections(): Promise<ClassSection[]>;
   createClassSection(section: ClassSection): Promise<ClassSection>;
   updateClassSection(section: ClassSection): Promise<ClassSection>;
   deleteClassSection(id: string): Promise<boolean>;

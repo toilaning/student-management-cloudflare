@@ -114,7 +114,7 @@ export default function AdminClassesPage() {
 
   const [classes, setClasses] = useState<ClassEntity[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
-  // Danh sách ca học lấy từ hệ thống; nếu chưa tải được thì dùng bộ ca mẫu mặc định.
+  // Danh sách khung giờ gợi ý lấy từ hệ thống; nếu chưa tải được thì dùng bộ mặc định.
   const [shifts, setShifts] = useState<TimeShift[]>(TIME_SHIFTS);
   const [showShiftManager, setShowShiftManager] = useState(false);
   const [shiftDraft, setShiftDraft] = useState<TimeShift[]>([]);
@@ -197,7 +197,7 @@ export default function AdminClassesPage() {
         const loadedShifts: TimeShift[] = shiftData.shifts || [];
         if (loadedShifts.length > 0) setShifts(loadedShifts);
       } catch {
-        // Giữ bộ ca mẫu mặc định nếu máy chủ chưa trả về danh sách ca.
+        // Giữ bộ khung giờ gợi ý mặc định nếu máy chủ chưa trả về danh sách.
       }
     } catch (e: any) {
       toast.error(e?.message || 'Không thể tải danh sách lớp học');
@@ -770,7 +770,7 @@ export default function AdminClassesPage() {
   };
 
   /**
-   * Áp một ca mẫu vào lớp: ghi cả khung giờ lẫn shiftId, để lớp luôn nhất quán
+   * Áp một khung giờ gợi ý vào lớp: ghi cả khung giờ lẫn shiftId, để lớp luôn nhất quán
    * (trước đây chỉ ghi giờ, khiến lớp mang ca mặc định lệch hẳn với giờ đang dạy).
    */
   const applyShiftPreset = (shift: TimeShift) => {
@@ -783,7 +783,7 @@ export default function AdminClassesPage() {
   };
 
   /**
-   * Đổi khung giờ thủ công. Nếu khung giờ trùng một ca mẫu thì cập nhật luôn
+   * Đổi khung giờ thủ công. Nếu khung giờ trùng một khung giờ gợi ý thì cập nhật luôn
    * shiftId để lớp không còn mang ca lệch với giờ đang dạy; giờ lẻ thì giữ
    * nguyên ca hiện tại và chỉ dùng khung giờ làm nguồn chính khi hiển thị.
    */
@@ -953,7 +953,7 @@ export default function AdminClassesPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {paginatedClasses.map((cls) => {
-                // Giờ riêng của lớp là nguồn chính; ca mẫu chỉ dùng khi lớp chưa đặt giờ.
+                // Giờ riêng của lớp là nguồn chính; khung giờ gợi ý chỉ dùng khi lớp chưa đặt giờ.
                 const { startTime: classStartTime, endTime: classEndTime } = getClassTimeRange(cls, shifts);
                 const isRecurringClass = cls.isRecurring !== false;
 
@@ -1226,7 +1226,7 @@ export default function AdminClassesPage() {
               </Field>
             </div>
 
-            {/* Lịch học: chọn ca mẫu, khung giờ, thứ trong tuần và xem trước */}
+            {/* Lịch học: chọn khung giờ gợi ý, giờ, thứ trong tuần và xem trước */}
             <div className="rounded-card border border-line bg-muted/50 p-4 space-y-4">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <span className="font-semibold text-foreground text-[13px] flex items-center gap-1.5">
@@ -1237,16 +1237,16 @@ export default function AdminClassesPage() {
                 </Badge>
               </div>
 
-              {/* Ca mẫu */}
+              {/* Khung giờ gợi ý */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[12px] font-medium text-muted-foreground">Chọn ca mẫu</span>
+                  <span className="text-[12px] font-medium text-muted-foreground">Chọn khung giờ gợi ý</span>
                   <button
                     type="button"
                     onClick={openShiftManager}
                     className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary hover:text-primary-hover cursor-pointer"
                   >
-                    <Settings2 size={13} /> Sửa ca học
+                    <Settings2 size={13} /> Sửa khung giờ
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1912,7 +1912,7 @@ export default function AdminClassesPage() {
             </Field>
 
             <div className="space-y-1.5">
-              <span className="text-[12px] font-medium text-muted-foreground">Chọn ca mẫu</span>
+              <span className="text-[12px] font-medium text-muted-foreground">Chọn khung giờ gợi ý</span>
               <div className="flex flex-wrap gap-2">
                 {shifts.map((shift) => {
                   const isActive =
@@ -2344,20 +2344,20 @@ export default function AdminClassesPage() {
         <Sheet
           isOpen={showShiftManager}
           onClose={() => setShowShiftManager(false)}
-          title="Danh sách ca học của trung tâm"
-          description="Thêm, sửa hoặc bớt ca. Khung giờ mới sẽ tự cập nhật cho các ca học sắp tới."
+          title="Danh sách khung giờ gợi ý của trung tâm"
+          description="Thêm, sửa hoặc bớt khung giờ. Giờ mới sẽ tự cập nhật cho các ca học sắp tới."
           size="md"
           footer={
             <div className="flex items-center justify-between gap-2 w-full">
               <Button variant="secondary" icon={<Plus size={14} />} onClick={addShiftDraft}>
-                Thêm ca
+                Thêm khung giờ
               </Button>
               <div className="flex items-center gap-2">
                 <Button variant="secondary" onClick={() => setShowShiftManager(false)}>
                   Hủy
                 </Button>
                 <Button variant="primary" loading={savingShifts} icon={<Check size={15} />} onClick={saveShifts}>
-                  Lưu ca học
+                  Lưu khung giờ
                 </Button>
               </div>
             </div>
@@ -2367,23 +2367,23 @@ export default function AdminClassesPage() {
             {shiftDraft.map((shift, index) => (
               <div key={shift.id} className="rounded-card border border-line bg-muted/50 p-3 space-y-2.5">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[12px] font-mono font-bold text-muted-foreground">Ca {shift.id}</span>
+                  <span className="text-[12px] font-mono font-bold text-muted-foreground">Khung giờ {index + 1}</span>
                   <button
                     type="button"
                     onClick={() => removeShiftDraft(index)}
                     disabled={shiftDraft.length <= 1}
                     className="text-subtle-foreground hover:text-danger cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                    title="Bỏ ca này"
+                    title="Bỏ khung giờ này"
                   >
                     <Trash2 size={14} />
                   </button>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  <Field label="Tên ca">
+                  <Field label="Tên khung giờ">
                     <Input
                       value={shift.name}
                       onChange={(e) => updateShiftDraft(index, { name: e.target.value })}
-                      placeholder={'Ca ' + shift.id}
+                      placeholder={'Khung giờ ' + (index + 1)}
                     />
                   </Field>
                   <Field label="Bắt đầu">

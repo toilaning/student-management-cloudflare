@@ -257,6 +257,24 @@ export class LocalRepository implements IRepository {
     return result;
   }
 
+  public async getSectionsByTeacherId(teacherId: string): Promise<ClassSection[]> {
+    const result: ClassSection[] = [];
+    for (const sec of this.classSections.values()) {
+      if (sec.teacherId === teacherId && sec.isActive !== false) {
+        result.push({ ...sec, studentIds: this.classSectionStudents.get(sec.id) || sec.studentIds || [] });
+      }
+    }
+    return result.sort((a, b) => (a.shiftId || 0) - (b.shiftId || 0));
+  }
+
+  public async getAllClassSections(): Promise<ClassSection[]> {
+    const result: ClassSection[] = [];
+    for (const sec of this.classSections.values()) {
+      result.push({ ...sec, studentIds: this.classSectionStudents.get(sec.id) || sec.studentIds || [] });
+    }
+    return result.sort((a, b) => (a.shiftId || 0) - (b.shiftId || 0));
+  }
+
   public async createClassSection(section: ClassSection): Promise<ClassSection> {
     this.classSections.set(section.id, { ...section });
     this.classSectionStudents.set(section.id, [...(section.studentIds || [])]);

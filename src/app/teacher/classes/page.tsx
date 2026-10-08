@@ -4,9 +4,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Header } from '@/components/common/Header';
 import { useApp } from '@/context/AppContext';
 import { RoleGuard } from '@/components/common/RoleGuard';
-import { ClassEntity } from '@/types/classroom';
+import { ClassEntity, ClassSection } from '@/types/classroom';
 import { TimeShift, TIME_SHIFTS } from '@/types/schedule';
-import { formatClassTimeLabel } from '@/utils/schedule';
 import { QuickStudentModal } from '@/components/common/QuickStudentModal';
 import { Card, CardHeader, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -34,16 +33,22 @@ import {
   Phone,
 } from 'lucide-react';
 
+interface SectionItem {
+  section: ClassSection;
+  cls: ClassEntity;
+}
+
 export default function TeacherClassesPage() {
   const { currentUser, isReady } = useApp();
   const toast = useToast();
   const [allClasses, setAllClasses] = useState<ClassEntity[]>([]);
+  const [sections, setSections] = useState<ClassSection[]>([]);
   const [selectedClassForView, setSelectedClassForView] = useState<ClassEntity | null>(null);
   const [classStudents, setClassStudents] = useState<any[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [shifts, setShifts] = useState<TimeShift[]>(TIME_SHIFTS);
   const [loading, setLoading] = useState(true);
-  const [claimingClassId, setClaimingClassId] = useState<string | null>(null);
+  const [claimingSectionId, setClaimingSectionId] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<'ALL' | 'MINE' | 'AVAILABLE'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [quickStudentId, setQuickStudentId] = useState<string | null>(null);
@@ -52,15 +57,18 @@ export default function TeacherClassesPage() {
     if (!isReady || !currentUser?.id) return;
     setLoading(true);
     try {
-      const [clsRes, shiftRes] = await Promise.all([
+      const [clsRes, shiftRes, secRes] = await Promise.all([
         fetch('/api/classes'),
         fetch('/api/shifts'),
+        fetch('/api/classes/sections?teacherId=' + currentUser.id),
       ]);
       const clsData = await clsRes.json();
       const shiftData = await shiftRes.json();
+      const secData = await secRes.json();
 
       setAllClasses(clsData.classes || []);
       if (shiftData.shifts) setShifts(shiftData.shifts);
+      setSections((secData.sections || []) as ClassSection[]);
     } catch (e) {
       console.error(e);
       toast.error('Không thể tải dữ liệu lớp học.');
@@ -90,22 +98,23 @@ export default function TeacherClassesPage() {
     }
   };
 
-  const handleClaimShift = async (cls: ClassEntity) => {
+  const handleClaimSection = async (item: SectionItem) => {
     if (!currentUser?.id) return;
-    setClaimingClassId(cls.id);
+    setClaimingSectionId(item.section.id);
     try {
-      const res = await fetch('/api/classes', {
+      const res = await fetch('/api/classes/sections', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          classId: cls.id,
+          sectionId: item.section.id,
           teacherId: currentUser.id,
+          syncFutureSlots: true,
           actorId: currentUser.id,
         }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success(`Đã nhận ca dạy lớp ${cls.name} thành công.`);
+        toast.success('Đã nhận ca dạy lớp ' + item.cls.name + ' thành công.');
         await loadData();
       } else {
         toast.error(data.error || 'Nhận ca dạy thất bại.');
@@ -113,46 +122,55 @@ export default function TeacherClassesPage() {
     } catch (e: any) {
       toast.error(e.message || 'Lỗi kết nối khi nhận ca dạy.');
     } finally {
-      setClaimingClassId(null);
+      setClaimingSectionId(null);
     }
   };
 
-  const myClasses = useMemo(
-    () => allClasses.filter((c) => c.teacherId === currentUser?.id),
-    [allClasses, currentUser?.id]
+  const allItems: SectionItem[] = useMemo(() => {
+    const list: SectionItem[] = [];
+    const map = new Map(allClasses.map((c) => [c.id, c]));
+    for (const s of sections) {
+      const cls = map.get(s.classId);
+      if (cls) list.push({ section: s, cls });
+    }
+    return list;
+  }, [allClasses, sections]);
+
+  const myItems = useMemo(
+    () => allItems.filter((i) => i.section.teacherId === currentUser?.id),
+    [allItems, currentUser?.id]
   );
 
-  const availableClasses = useMemo(
+  const availableItems = useMemo(
     () =>
-      allClasses.filter(
-        (c) => !c.teacherId || c.teacherId === 'CHUA_PHAN_CONG' || c.teacherId === ''
+      allItems.filter(
+        (i) => !i.section.teacherId || i.section.teacherId === 'CHUA_PHAN_CONG' || i.section.teacherId === ''
       ),
-    [allClasses]
+    [allItems]
   );
 
-  const displayedClasses = useMemo(() => {
-    return allClasses.filter((c) => {
-      if (filterMode === 'MINE' && c.teacherId !== currentUser?.id) return false;
+  const displayedItems = useMemo(() => {
+    return allItems.filter((i) => {
+      if (filterMode === 'MINE' && i.section.teacherId !== currentUser?.id) return false;
       if (
         filterMode === 'AVAILABLE' &&
-        c.teacherId &&
-        c.teacherId !== 'CHUA_PHAN_CONG' &&
-        c.teacherId !== ''
+        i.section.teacherId &&
+        i.section.teacherId !== 'CHUA_PHAN_CONG' &&
+        i.section.teacherId !== ''
       ) {
         return false;
       }
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
-        const matchesName = c.name?.toLowerCase().includes(q);
-        const matchesSubj = c.subject?.toLowerCase().includes(q);
-        const matchesRoom = c.roomId?.toLowerCase().includes(q);
+        const matchesName = i.cls.name?.toLowerCase().includes(q);
+        const matchesSubj = i.cls.subject?.toLowerCase().includes(q);
+        const matchesRoom = i.section.roomId?.toLowerCase().includes(q);
         return matchesName || matchesSubj || matchesRoom;
       }
       return true;
     });
-  }, [allClasses, filterMode, currentUser?.id, searchTerm]);
+  }, [allItems, filterMode, currentUser?.id, searchTerm]);
 
-  // Columns cho DataTable danh sách học sinh trong Sheet
   const studentColumns: Column<any>[] = [
     {
       key: 'stt',
@@ -240,44 +258,42 @@ export default function TeacherClassesPage() {
       <div className="flex-1 flex flex-col min-h-screen">
         <Header
           title="Lớp học & ca dạy"
-          subtitle={`Giảng viên ${currentUser?.name || ''} (${currentUser?.id || ''}) • Quản lý các lớp phụ trách`}
+          subtitle={'Giảng viên ' + (currentUser?.name || '') + ' (' + (currentUser?.id || '') + ') • Quản lý các ca phụ trách'}
         />
 
         <main className="p-4 sm:p-6 max-w-content mx-auto w-full space-y-5">
-          {/* Hàng KPI thống kê */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <StatCard
               label="Ca bạn đang dạy"
-              value={myClasses.length}
-              hint="Lớp phụ trách trực tiếp"
+              value={myItems.length}
+              hint="Ca học phụ trách trực tiếp"
               icon={<UserCheck size={18} />}
               tone="primary"
             />
             <StatCard
               label="Ca mở chờ nhận"
-              value={availableClasses.length}
+              value={availableItems.length}
               hint="Có thể nhận dạy thêm"
               icon={<Sparkles size={18} />}
               tone="success"
             />
             <StatCard
-              label="Tổng số lớp mở"
-              value={allClasses.length}
-              hint="Toàn bộ lớp trung tâm"
+              label="Tổng số ca học"
+              value={allItems.length}
+              hint="Toàn bộ ca của trung tâm"
               icon={<BookOpen size={18} />}
               tone="info"
             />
           </div>
 
-          {/* Thanh lọc & tìm kiếm */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <SegmentedControl
               value={filterMode}
               onChange={setFilterMode}
               items={[
-                { value: 'ALL', label: 'Tất cả ca học', count: allClasses.length },
-                { value: 'MINE', label: 'Ca bạn đang dạy', count: myClasses.length },
-                { value: 'AVAILABLE', label: 'Ca mở / Trống', count: availableClasses.length },
+                { value: 'ALL', label: 'Tất cả ca học', count: allItems.length },
+                { value: 'MINE', label: 'Ca bạn đang dạy', count: myItems.length },
+                { value: 'AVAILABLE', label: 'Ca mở / Trống', count: availableItems.length },
               ]}
             />
 
@@ -285,27 +301,26 @@ export default function TeacherClassesPage() {
               <SearchInput
                 value={searchTerm}
                 onChange={setSearchTerm}
-                placeholder="Tìm tên lớp, mã, môn học..."
+                placeholder="Tìm tên lớp, môn học, phòng..."
               />
             </div>
           </div>
 
-          {/* Danh sách thẻ lớp học */}
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="h-64 rounded-card bg-muted animate-pulse border border-line" />
               ))}
             </div>
-          ) : displayedClasses.length === 0 ? (
+          ) : displayedItems.length === 0 ? (
             <Card>
               <EmptyState
                 icon={<BookOpen size={28} />}
-                title="Không tìm thấy lớp học nào"
+                title="Không tìm thấy ca học nào"
                 description={
                   searchTerm
-                    ? 'Không có lớp học nào khớp với từ khóa tìm kiếm.'
-                    : 'Không có lớp học nào trong danh mục này.'
+                    ? 'Không có ca học nào khớp với từ khóa tìm kiếm.'
+                    : 'Không có ca học nào trong danh mục này.'
                 }
                 action={
                   searchTerm ? (
@@ -318,27 +333,39 @@ export default function TeacherClassesPage() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {displayedClasses.map((cls) => {
-                const isMine = cls.teacherId === currentUser?.id;
+              {displayedItems.map(({ section, cls }) => {
+                const isMine = section.teacherId === currentUser?.id;
                 const isOpen =
-                  !cls.teacherId ||
-                  cls.teacherId === 'CHUA_PHAN_CONG' ||
-                  cls.teacherId === '';
-                // Khung giờ thật của lớp được ưu tiên; ca mẫu chỉ là phương án dự phòng.
-                const shiftTimeLabel = formatClassTimeLabel(cls, shifts);
+                  !section.teacherId ||
+                  section.teacherId === 'CHUA_PHAN_CONG' ||
+                  section.teacherId === '';
+                const timeLabel =
+                  section.startTime && section.endTime
+                    ? section.startTime + ' – ' + section.endTime
+                    : cls.startTime && cls.endTime
+                    ? cls.startTime + ' – ' + cls.endTime
+                    : 'Chưa đặt giờ';
+                const days = section.scheduleDays && section.scheduleDays.length > 0
+                  ? section.scheduleDays
+                  : cls.scheduleDays;
 
                 return (
                   <Card
-                    key={cls.id}
-                    className={`flex flex-col justify-between transition-all ${
-                      isMine ? 'border-primary/40 ring-1 ring-primary/20' : ''
-                    }`}
+                    key={section.id}
+                    className={
+                      'flex flex-col justify-between transition-all ' +
+                      (isMine ? 'border-primary/40 ring-1 ring-primary/20' : '')
+                    }
                   >
                     <div className="space-y-3.5">
-                      {/* Tiêu đề thẻ & Huy hiệu trạng thái */}
                       <CardHeader
                         title={cls.name}
-                        subtitle={cls.subject}
+                        subtitle={
+                          <>
+                            {cls.subject}
+                            {section.name ? <span className="opacity-70"> • {section.name}</span> : null}
+                          </>
+                        }
                         action={
                           isMine ? (
                             <Badge tone="success" dot>
@@ -349,29 +376,24 @@ export default function TeacherClassesPage() {
                               Ca mở
                             </Badge>
                           ) : (
-                            <Badge tone="neutral">
-                              GV: {cls.teacherId}
-                            </Badge>
+                            <Badge tone="neutral">GV: {section.teacherId}</Badge>
                           )
                         }
                       />
 
-                      {/* Chi tiết ca học */}
                       <div className="bg-muted rounded-field p-3.5 border border-line space-y-2 text-xs">
                         <div className="flex items-center justify-between">
                           <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
                             <Clock size={13} className="text-primary" /> Ca & khung giờ:
                           </span>
-                          <span className="font-semibold text-foreground tabular">
-                            {shiftTimeLabel}
-                          </span>
+                          <span className="font-semibold text-foreground tabular">{timeLabel}</span>
                         </div>
 
                         <div className="flex items-center justify-between">
                           <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
                             <MapPin size={13} className="text-primary" /> Phòng học:
                           </span>
-                          <span className="font-semibold text-foreground">{cls.roomId}</span>
+                          <span className="font-semibold text-foreground">{section.roomId || cls.roomId}</span>
                         </div>
 
                         <div className="flex items-center justify-between">
@@ -379,11 +401,10 @@ export default function TeacherClassesPage() {
                             <Calendar size={13} className="text-primary" /> Lịch trong tuần:
                           </span>
                           <span className="font-semibold text-foreground">
-                            Thứ {cls.scheduleDays.join(', ')}
+                            {days && days.length > 0 ? 'Thứ ' + days.join(', ') : 'Chưa xếp thứ'}
                           </span>
                         </div>
 
-                        {/* Bấm xem sĩ số / danh sách học sinh */}
                         <button
                           type="button"
                           onClick={() => handleOpenClassStudents(cls)}
@@ -400,11 +421,10 @@ export default function TeacherClassesPage() {
                       </div>
                     </div>
 
-                    {/* Nút thao tác dưới thẻ */}
                     <div className="pt-4 border-t border-line mt-4">
                       {isMine ? (
                         <LinkButton
-                          href={`/teacher/attendance?classId=${cls.id}`}
+                          href={'/teacher/attendance?classId=' + cls.id}
                           variant="primary"
                           size="md"
                           fullWidth
@@ -418,15 +438,15 @@ export default function TeacherClassesPage() {
                           variant="primary"
                           size="md"
                           fullWidth
-                          loading={claimingClassId === cls.id}
-                          onClick={() => handleClaimShift(cls)}
+                          loading={claimingSectionId === section.id}
+                          onClick={() => handleClaimSection({ section, cls })}
                           icon={<Plus size={16} />}
                         >
                           Nhận ca dạy này
                         </Button>
                       ) : (
                         <div className="w-full py-2.5 bg-muted text-muted-foreground rounded-pill text-xs font-semibold text-center border border-line">
-                          Đã phân công: <strong className="text-foreground">{cls.teacherId}</strong>
+                          Đã phân công: <strong className="text-foreground">{section.teacherId}</strong>
                         </div>
                       )}
                     </div>
@@ -437,14 +457,13 @@ export default function TeacherClassesPage() {
           )}
         </main>
 
-        {/* Sheet xem danh sách học sinh của lớp */}
         <Sheet
           isOpen={!!selectedClassForView}
           onClose={() => setSelectedClassForView(null)}
-          title={selectedClassForView ? `Danh sách học viên: ${selectedClassForView.name}` : ''}
+          title={selectedClassForView ? 'Danh sách học viên: ' + selectedClassForView.name : ''}
           description={
             selectedClassForView
-              ? `Môn: ${selectedClassForView.subject} • Phòng: ${selectedClassForView.roomId} • Thứ ${selectedClassForView.scheduleDays?.join(', ')}`
+              ? 'Môn: ' + selectedClassForView.subject + ' • Phòng: ' + selectedClassForView.roomId + ' • Thứ ' + (selectedClassForView.scheduleDays?.join(', ') || '')
               : ''
           }
           size="lg"
@@ -453,11 +472,7 @@ export default function TeacherClassesPage() {
               <span className="text-xs text-muted-foreground">
                 Xem chi tiết từng buổi và điểm danh tại mục <strong>Sổ điểm danh</strong>.
               </span>
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={() => setSelectedClassForView(null)}
-              >
+              <Button variant="secondary" size="md" onClick={() => setSelectedClassForView(null)}>
                 Đóng
               </Button>
             </div>
@@ -524,7 +539,7 @@ export default function TeacherClassesPage() {
             </div>
           )}
         </Sheet>
-      <QuickStudentModal studentId={quickStudentId} onClose={() => setQuickStudentId(null)} />
+        <QuickStudentModal studentId={quickStudentId} onClose={() => setQuickStudentId(null)} />
       </div>
     </RoleGuard>
   );

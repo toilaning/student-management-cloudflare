@@ -6,7 +6,7 @@ import { Header } from '@/components/common/Header';
 import { useApp } from '@/context/AppContext';
 import { RoleGuard } from '@/components/common/RoleGuard';
 import { ScheduleSlot, TimeShift, TIME_SHIFTS } from '@/types/schedule';
-import { ClassEntity } from '@/types/classroom';
+import { ClassEntity, ClassSection } from '@/types/classroom';
 import { Card, CardHeader, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { LinkButton } from '@/components/ui/LinkButton';
@@ -100,14 +100,31 @@ function formatWeekRange(weekDates: string[]): string {
   return `${fdd}/${fm} – ${ldd}/${lm}`;
 }
 
+/** Ca giả cho lớp cũ chưa có ca học (class_sections): nhận lớp theo cơ chế cũ. */
+function legacySectionFromClass(cls: ClassEntity): ClassSection {
+  return {
+    id: 'LEGACY_' + cls.id,
+    classId: cls.id,
+    name: '',
+    shiftId: cls.shiftId,
+    startTime: cls.startTime,
+    endTime: cls.endTime,
+    scheduleDays: cls.scheduleDays || [],
+    teacherId: cls.teacherId,
+    roomId: cls.roomId,
+    isActive: true,
+  };
+}
+
 export default function TeacherSchedulePage() {
   const { currentUser, isReady } = useApp();
   const toast = useToast();
   const [slots, setSlots] = useState<ScheduleSlot[]>([]);
   const [allClasses, setAllClasses] = useState<ClassEntity[]>([]);
+  const [allSections, setAllSections] = useState<ClassSection[]>([]);
   const [shifts, setShifts] = useState<TimeShift[]>(TIME_SHIFTS);
   const [loading, setLoading] = useState(true);
-  const [claimingClassId, setClaimingClassId] = useState<string | null>(null);
+  const [claimingSectionId, setClaimingSectionId] = useState<string | null>(null);
 
   // Điều hướng tuần & ngày được chọn
   const [weekRefDate, setWeekRefDate] = useState(getTodayDateStr());
@@ -117,17 +134,20 @@ export default function TeacherSchedulePage() {
     if (!isReady || !currentUser?.id) return;
     setLoading(true);
     try {
-      const [slotRes, clsRes, shiftRes] = await Promise.all([
+      const [slotRes, clsRes, shiftRes, secRes] = await Promise.all([
         fetch(`/api/schedule?teacherId=${currentUser?.id || ''}`),
         fetch('/api/classes'),
         fetch('/api/shifts'),
+        fetch('/api/classes/sections?all=true'),
       ]);
       const slotData = await slotRes.json();
       const clsData = await clsRes.json();
       const shiftData = await shiftRes.json();
+      const secData = await secRes.json();
 
       setSlots(slotData.slots || []);
       setAllClasses(clsData.classes || []);
+      setAllSections((secData.sections || []) as ClassSection[]);
       if (shiftData.shifts) setShifts(shiftData.shifts);
     } catch (e) {
       console.error(e);
@@ -141,22 +161,34 @@ export default function TeacherSchedulePage() {
     loadData();
   }, [currentUser, isReady]);
 
-  const handleClaimClass = async (cls: ClassEntity) => {
+  const handleClaimSection = async (section: ClassSection, cls: ClassEntity) => {
     if (!currentUser?.id) return;
-    setClaimingClassId(cls.id);
+    setClaimingSectionId(section.id);
     try {
-      const res = await fetch('/api/classes', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          classId: cls.id,
-          teacherId: currentUser.id,
-          actorId: currentUser.id,
-        }),
-      });
+      const isLegacy = section.id.startsWith('LEGACY_');
+      const res = isLegacy
+        ? await fetch('/api/classes', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              classId: cls.id,
+              teacherId: currentUser.id,
+              actorId: currentUser.id,
+            }),
+          })
+        : await fetch('/api/classes/sections', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sectionId: section.id,
+              teacherId: currentUser.id,
+              syncFutureSlots: true,
+              actorId: currentUser.id,
+            }),
+          });
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success(`Đã nhận ca dạy thành công cho lớp ${cls.name}.`);
+        toast.success('Đã nhận ca dạy thành công cho ' + cls.name + '.');
         await loadData();
       } else {
         toast.error(data.error || 'Nhận ca dạy thất bại.');
@@ -164,7 +196,7 @@ export default function TeacherSchedulePage() {
     } catch (e: any) {
       toast.error(e.message || 'Lỗi kết nối khi nhận ca dạy.');
     } finally {
-      setClaimingClassId(null);
+      setClaimingSectionId(null);
     }
   };
 
@@ -186,14 +218,28 @@ export default function TeacherSchedulePage() {
     [slots, weekDateSet]
   );
 
-  // Ca mở chưa có GV phân công
-  const openClasses = useMemo(
-    () =>
-      allClasses.filter(
-        (c) => !c.teacherId || c.teacherId === 'CHUA_PHAN_CONG' || c.teacherId === ''
-      ),
-    [allClasses]
-  );
+  // Ca mở chưa có GV phân công: dựa theo ca học (section) của lớp.
+  const openSections = useMemo(() => {
+    const map = new Map(allClasses.map((c) => [c.id, c]));
+    const list: { section: ClassSection; cls: ClassEntity }[] = [];
+    const sectionClassIds = new Set(allSections.map((s) => s.classId));
+    for (const sec of allSections) {
+      if (sec.isActive === false) continue;
+      const cls = map.get(sec.classId);
+      if (!cls) continue;
+      if (!sec.teacherId || sec.teacherId === 'CHUA_PHAN_CONG' || sec.teacherId === '') {
+        list.push({ section: sec, cls });
+      }
+    }
+    // Lớp cũ chưa có ca (class_sections) nào: vẫn giữ cơ chế nhận lớp theo lớp.
+    for (const cls of allClasses) {
+      if (sectionClassIds.has(cls.id)) continue;
+      if (!cls.teacherId || cls.teacherId === 'CHUA_PHAN_CONG' || cls.teacherId === '') {
+        list.push({ section: legacySectionFromClass(cls), cls });
+      }
+    }
+    return list;
+  }, [allSections, allClasses]);
 
   const goPrevWeek = () => {
     const d = toSaigonDate(weekRefDate);
@@ -290,8 +336,8 @@ export default function TeacherSchedulePage() {
             />
             <StatCard
               label="Ca mở cần giảng viên"
-              value={openClasses.length}
-              hint="Lớp trống có thể nhận dạy"
+              value={openSections.length}
+              hint="Ca trống có thể nhận dạy"
               icon={<Sparkles size={18} />}
               tone="warning"
             />
@@ -790,13 +836,13 @@ export default function TeacherSchedulePage() {
           </section>
 
           {/* Section: Ca mở chưa có GV phân công */}
-          {openClasses.length > 0 && (
+          {openSections.length > 0 && (
             <section className="space-y-3 pt-3">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-[15px] font-bold text-foreground flex items-center gap-2">
                     <Sparkles size={16} className="text-warning" />
-                    Ca mở cần giảng viên phụ trách ({openClasses.length})
+                    Ca mở cần giảng viên phụ trách ({openSections.length})
                   </h2>
                   <p className="text-[13px] text-muted-foreground mt-0.5">
                     Thầy/Cô có thể nhận ca trực tiếp để phân công vào lịch dạy cá nhân
@@ -805,15 +851,27 @@ export default function TeacherSchedulePage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {openClasses.map((cls) => {
-                  const classTimeLabel = formatClassTimeLabel(cls, shifts);
+                {openSections.map(({ section: sec, cls }) => {
+                  const classTimeLabel =
+                    sec.startTime && sec.endTime
+                      ? sec.startTime + ' – ' + sec.endTime
+                      : formatClassTimeLabel(cls, shifts);
+                  const days =
+                    sec.scheduleDays && sec.scheduleDays.length > 0
+                      ? sec.scheduleDays
+                      : cls.scheduleDays;
 
                   return (
-                    <Card key={cls.id} className="flex flex-col justify-between">
+                    <Card key={sec.id} className="flex flex-col justify-between">
                       <div className="space-y-3">
                         <CardHeader
                           title={cls.name}
-                          subtitle={cls.subject}
+                          subtitle={
+                            <>
+                              {cls.subject}
+                              {sec.name ? <span className="opacity-70"> • {sec.name}</span> : null}
+                            </>
+                          }
                           action={
                             <Badge tone="primary" dot>
                               Ca mở
@@ -834,13 +892,13 @@ export default function TeacherSchedulePage() {
                             <span className="text-muted-foreground flex items-center gap-1.5">
                               <Calendar size={13} className="text-primary" /> Ngày học:
                             </span>
-                            <span className="font-semibold">Thứ {cls.scheduleDays.join(', ')}</span>
+                            <span className="font-semibold">Thứ {days.join(', ')}</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-muted-foreground flex items-center gap-1.5">
                               <MapPin size={13} className="text-primary" /> Phòng học:
                             </span>
-                            <span className="font-semibold">{cls.roomId}</span>
+                            <span className="font-semibold">{sec.roomId || cls.roomId}</span>
                           </div>
                           <div className="flex items-center justify-between pt-1 border-t border-line">
                             <span className="text-muted-foreground flex items-center gap-1.5">
@@ -858,8 +916,8 @@ export default function TeacherSchedulePage() {
                           variant="primary"
                           size="md"
                           fullWidth
-                          loading={claimingClassId === cls.id}
-                          onClick={() => handleClaimClass(cls)}
+                          loading={claimingSectionId === sec.id}
+                          onClick={() => handleClaimSection(sec, cls)}
                           icon={<Plus size={16} />}
                         >
                           Nhận ca dạy này

@@ -1231,6 +1231,32 @@ export class SupabaseRepository implements IRepository {
     return (sections || []).map(mapClassSectionFromDb);
   }
 
+  public async getSectionsByTeacherId(teacherId: string): Promise<ClassSection[]> {
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+
+    const { data, error } = await client
+      .from('class_sections')
+      .select('*, class_section_students(student_id)')
+      .eq('teacher_id', teacherId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true });
+    if (error) throw new Error(error.message);
+    return (data || []).map(mapClassSectionFromDb);
+  }
+
+  public async getAllClassSections(): Promise<ClassSection[]> {
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+
+    const { data, error } = await client
+      .from('class_sections')
+      .select('*, class_section_students(student_id)')
+      .order('created_at', { ascending: true });
+    if (error) throw new Error(error.message);
+    return (data || []).map(mapClassSectionFromDb);
+  }
+
   public async createClassSection(section: ClassSection): Promise<ClassSection> {
     const client = this.getClient();
     if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");

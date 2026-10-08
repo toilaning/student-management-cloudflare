@@ -91,8 +91,8 @@ Bảng dưới là nguồn sự thật cho phạm vi tính năng. Khi thêm tín
 |---|-----------|--------------|------------|-----------|
 | 1 | Tài khoản & phân quyền | admin, teacher, student, parent | profiles, roles | TODO |
 | 2 | Hồ sơ học sinh | admin, teacher | students, guardians | TODO |
-| 3 | Lớp học & niên khóa | admin | classes, enrollments | TODO |
-| 4 | Giáo viên & phân công | admin | teachers, assignments | TODO |
+| 3 | Lớp học & ca học (class_sections) | admin, teacher, student | classes, class_sections, class_section_students | in-progress |
+| 4 | Giáo viên & phân công theo ca | admin, teacher | teachers, assignments, class_sections.teacher_id | in-progress |
 | 5 | Môn học & thời khóa biểu | admin, teacher | subjects, timetable | TODO |
 | 6 | Điểm số & học bạ | teacher, student, parent | grades, terms | TODO |
 | 7 | Điểm danh học sinh | admin, teacher | attendance, schedule_slots | done |

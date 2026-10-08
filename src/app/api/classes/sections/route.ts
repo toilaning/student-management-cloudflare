@@ -8,12 +8,18 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const classId = searchParams.get('classId');
   const studentId = searchParams.get('studentId');
+  const teacherId = searchParams.get('teacherId');
   const id = searchParams.get('id');
   const classIdsParam = searchParams.get('classIds');
+  const all = searchParams.get('all');
 
   if (id) {
     const sec = await repo.getSectionById(id);
     return NextResponse.json({ section: sec });
+  }
+  if (all === 'true') {
+    const sections = await repo.getAllClassSections();
+    return NextResponse.json({ sections });
   }
   if (classIdsParam) {
     const ids = classIdsParam.split(',').map((s) => s.trim()).filter(Boolean);
@@ -31,7 +37,11 @@ export async function GET(request: Request) {
     const sections = await repo.getSectionsByStudentId(studentId);
     return NextResponse.json({ sections });
   }
-  return NextResponse.json({ error: 'Thiếu classId hoặc studentId' }, { status: 400 });
+  if (teacherId) {
+    const sections = await repo.getSectionsByTeacherId(teacherId);
+    return NextResponse.json({ sections });
+  }
+  return NextResponse.json({ error: 'Thiếu classId, studentId hoặc teacherId' }, { status: 400 });
 }
 
 export async function POST(request: Request) {
