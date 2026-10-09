@@ -182,16 +182,17 @@ async function resolveSection(classId: string, sectionId?: string | null) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const {
-      classId,
-      sectionId,
-      studentId,
-      action,
-      actorId = 'ADMIN001',
-      actorRole,
-      targetSectionId,
-      targetShiftId,
-    } = body;
+   const {
+     classId,
+     sectionId,
+     studentId,
+     action,
+     actorId = 'ADMIN001',
+     actorRole,
+     targetSectionId,
+     targetShiftId,
+      scheduleDays,
+   } = body;
 
     if (!classId || !studentId || !action) {
       return NextResponse.json({ error: 'Thiếu thông tin classId, studentId hoặc action' }, { status: 400 });
@@ -212,9 +213,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Không tìm thấy ca học của lớp' }, { status: 404 });
     }
 
-    const shifts = await ShiftService.getAllShifts();
+   const shifts = await ShiftService.getAllShifts();
 
-    // Học sinh tự đăng ký/đổi ca thì không bị chặn vì trùng giờ; chỉ quản trị viên mới bị chặn
+    // Chuẩn hoá thứ riêng của học sinh (2..7, 8 = Chủ Nhật). Rỗng/bỏ trống = theo đúng lịch ca.
+    const normalizedDays = Array.isArray(scheduleDays)
+      ? scheduleDays.map(Number).filter(d => Number.isInteger(d) && d >= 2 && d <= 8)
+      : [];
+
+   // Học sinh tự đăng ký/đổi ca thì không bị chặn vì trùng giờ; chỉ quản trị viên mới bị chặn
     // để tránh xếp lớp chồng lấn ngoài ý muốn.
     let actorRoleResolved = typeof actorRole === 'string' ? actorRole : '';
     const actorUser = actorId ? await repo.getUserById(String(actorId)) : null;
@@ -231,7 +237,7 @@ export async function POST(request: Request) {
         }
       }
 
-      await repo.addStudentToSection(section.id, studentId);
+      await repo.addStudentToSection(section.id, studentId, normalizedDays);
       await syncClassFromSections(classId);
 
       if (!student.enrolledClassIds.includes(classId)) {
@@ -312,9 +318,9 @@ export async function POST(request: Request) {
       }
 
       // Chuyển học viên giữa 2 ca của cùng lớp.
-      await repo.removeStudentFromSection(section.id, studentId);
-      await repo.addStudentToSection(targetSection.id, studentId);
-      await syncClassFromSections(classId);
+     await repo.removeStudentFromSection(section.id, studentId);
+      await repo.addStudentToSection(targetSection.id, studentId, normalizedDays);
+     await syncClassFromSections(classId);
 
       // Lớp giữ nguyên nên enrolledClassIds không đổi; đảm bảo vẫn tồn tại.
       if (!student.enrolledClassIds.includes(classId)) {

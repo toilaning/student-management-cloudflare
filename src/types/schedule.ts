@@ -53,6 +53,17 @@ export interface ScheduleConflict {
 export type RequestType = 'XIN_NGHI' | 'DOI_CA';
 export type RequestStatus = 'CHỜ_DUYỆT' | 'ĐÃ_DUYỆT' | 'TỪ_CHỐI';
 
+/** Đổi ca nhanh trong ngày: học sinh tạm chuyển sang một buổi khác cùng lớp cùng ngày. */
+export interface StudentSlotSwap {
+  id: string;
+  studentId: string;
+  fromSlotId: string;
+  toSlotId: string;
+  date: string; // YYYY-MM-DD
+  status: 'ACTIVE' | 'CANCELLED';
+  createdAt: string;
+}
+
 export interface ClassRequest {
   id: string; // REQ001..
   studentId: string;

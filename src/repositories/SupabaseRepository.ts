@@ -4,13 +4,14 @@ import { User } from '@/types/auth';
 import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
 import { Classroom, ClassEntity, ClassSection } from '@/types/classroom';
-import { ScheduleSlot, ClassRequest, TimeShift } from '@/types/schedule';
+import { ScheduleSlot, ClassRequest, TimeShift, StudentSlotSwap } from '@/types/schedule';
 import { AttendanceRecord } from '@/types/attendance';
 import { TuitionInvoice, PayrollRecord } from '@/types/finance';
 import { SessionPackage } from '@/types/package';
 import { AuditLog } from '@/types/audit';
 import { AppNotification } from '@/types/notification';
 import { getSupabaseAdminClient } from '@/lib/supabase';
+import { dateToDayOfWeek } from '@/utils/date';
 
 // ============================================================================
 // DATA MAPPERS (Database snake_case <-> Application camelCase)
@@ -1287,10 +1288,13 @@ export class SupabaseRepository implements IRepository {
     return true;
   }
 
-  public async addStudentToSection(sectionId: string, studentId: string): Promise<void> {
+  public async addStudentToSection(sectionId: string, studentId: string, scheduleDays?: number[]): Promise<void> {
     const client = this.getClient();
     if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
-    const { error } = await client.from('class_section_students').upsert({ section_id: sectionId, student_id: studentId });
+    // Upsert giu nguyen schedule_days cu neu khong truyen tham so moi.
+    const payload: any = { section_id: sectionId, student_id: studentId };
+    if (scheduleDays !== undefined) payload.schedule_days = scheduleDays;
+    const { error } = await client.from('class_section_students').upsert(payload, { onConflict: 'section_id,student_id' });
     if (error) throw new Error(error.message);
   }
 
@@ -1299,6 +1303,65 @@ export class SupabaseRepository implements IRepository {
     if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
     const { error } = await client.from('class_section_students').delete().eq('section_id', sectionId).eq('student_id', studentId);
     if (error) throw new Error(error.message);
+  }
+
+  public async getSectionStudentScheduleDays(sectionId: string): Promise<Record<string, number[]>> {
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+    const { data, error } = await client
+      .from('class_section_students')
+      .select('student_id, schedule_days')
+      .eq('section_id', sectionId);
+    if (error) throw new Error(error.message);
+    const result: Record<string, number[]> = {};
+    for (const row of data || []) {
+      result[row.student_id] = Array.isArray(row.schedule_days) ? row.schedule_days : [];
+    }
+    return result;
+  }
+
+  public async getSlotSwaps(filter: { studentId?: string; toSlotId?: string; fromSlotId?: string; date?: string; status?: 'ACTIVE' | 'CANCELLED' }): Promise<StudentSlotSwap[]> {
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+    let query = client.from('student_slot_swaps').select('*');
+    if (filter.studentId) query = query.eq('student_id', filter.studentId);
+    if (filter.toSlotId) query = query.eq('to_slot_id', filter.toSlotId);
+    if (filter.fromSlotId) query = query.eq('from_slot_id', filter.fromSlotId);
+    if (filter.date) query = query.eq('swap_date', filter.date);
+    if (filter.status) query = query.eq('status', filter.status);
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      studentId: row.student_id,
+      fromSlotId: row.from_slot_id,
+      toSlotId: row.to_slot_id,
+      date: row.swap_date,
+      status: row.status,
+      createdAt: row.created_at,
+    }));
+  }
+
+  public async createSlotSwap(swap: StudentSlotSwap): Promise<StudentSlotSwap> {
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+    const { data, error } = await client.from('student_slot_swaps').insert({
+      student_id: swap.studentId,
+      from_slot_id: swap.fromSlotId,
+      to_slot_id: swap.toSlotId,
+      swap_date: swap.date,
+      status: swap.status || 'ACTIVE',
+    }).select().single();
+    if (error) throw new Error(error.message);
+    return {
+      id: data.id,
+      studentId: data.student_id,
+      fromSlotId: data.from_slot_id,
+      toSlotId: data.to_slot_id,
+      date: data.swap_date,
+      status: data.status,
+      createdAt: data.created_at,
+    };
   }
 
   private async replaceSectionStudents(sectionId: string, studentIds: string[]): Promise<void> {
@@ -1485,37 +1548,51 @@ export class SupabaseRepository implements IRepository {
     }
   }
 
-  public async getScheduleSlotsByStudentId(studentId: string): Promise<ScheduleSlot[]> {
-    // Học sinh chỉ thấy các buổi thuộc ca mà mình tham gia.
-    const studentSections = await this.getSectionsByStudentId(studentId);
-    const classIds = [...new Set(studentSections.map(s => s.classId))];
-    const sectionIds = [...new Set(studentSections.map(s => s.id))];
-    if (classIds.length === 0) return [];
+ public async getScheduleSlotsByStudentId(studentId: string): Promise<ScheduleSlot[]> {
+   // Học sinh chỉ thấy các buổi thuộc ca mà mình tham gia.
+   const studentSections = await this.getSectionsByStudentId(studentId);
+   const classIds = [...new Set(studentSections.map(s => s.classId))];
+   const sectionIds = [...new Set(studentSections.map(s => s.id))];
+   if (classIds.length === 0) return [];
 
-    const client = this.getClient();
-    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local"); // getScheduleSlotsByStudentId(studentId);
+   const client = this.getClient();
+   if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local"); // getScheduleSlotsByStudentId(studentId);
 
-    try {
-      const { data, error } = await client
-        .from('schedule_slots')
-        .select('*')
-        .in('class_id', classIds);
+   try {
+     const { data, error } = await client
+       .from('schedule_slots')
+       .select('*')
+       .in('class_id', classIds);
 
-      if (error) {
-        throw new Error(error.message);
-      }
-      const sectionSet = new Set(sectionIds);
-      return (data || [])
-        .map(mapScheduleSlotFromDb)
-        .filter(s => {
-          // Nếu buổi đã gán ca, học sinh chỉ thấy ca mình tham gia; buổi cũ chưa gán ca vẫn thấy được.
-          if (s.sectionId) return sectionSet.has(s.sectionId);
-          return true;
-        });
-    } catch (err) {
-      throw err;
+     if (error) {
+       throw new Error(error.message);
+     }
+    const sectionSet = new Set(sectionIds);
+    // Thứ riêng của từng học sinh trong từng ca: chỉ thấy buổi thuộc thứ mình đã chọn.
+    const studentDaysBySection = new Map<string, number[]>();
+    for (const sec of studentSections) {
+      const daysMap = await this.getSectionStudentScheduleDays(sec.id);
+      studentDaysBySection.set(sec.id, daysMap[studentId] || []);
     }
-  }
+    return (data || [])
+      .map(mapScheduleSlotFromDb)
+      .filter(s => {
+        // Nếu buổi đã gán ca, học sinh chỉ thấy ca mình tham gia; buổi cũ chưa gán ca vẫn thấy được.
+        if (s.sectionId) return sectionSet.has(s.sectionId);
+        return true;
+      })
+      .filter(s => {
+        if (!s.sectionId) return true;
+        const days = studentDaysBySection.get(s.sectionId) || [];
+        // Mảng rỗng = theo đúng lịch ca (không lọc thêm).
+        if (days.length === 0) return true;
+        const dow = dateToDayOfWeek(s.date);
+        return dow !== null && days.includes(dow);
+      });
+  } catch (err) {
+     throw err;
+   }
+ }
 
   public async createScheduleSlot(slot: ScheduleSlot): Promise<ScheduleSlot> {
     const client = this.getClient();

@@ -3,7 +3,7 @@ import { User } from '@/types/auth';
 import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
 import { Classroom, ClassEntity, ClassSection } from '@/types/classroom';
-import { ScheduleSlot, ClassRequest, TimeShift } from '@/types/schedule';
+import { ScheduleSlot, ClassRequest, TimeShift, StudentSlotSwap } from '@/types/schedule';
 import { AttendanceRecord } from '@/types/attendance';
 import { TuitionInvoice, PayrollRecord } from '@/types/finance';
 import { SessionPackage } from '@/types/package';
@@ -60,8 +60,14 @@ export interface IRepository {
   createClassSection(section: ClassSection): Promise<ClassSection>;
   updateClassSection(section: ClassSection): Promise<ClassSection>;
   deleteClassSection(id: string): Promise<boolean>;
-  addStudentToSection(sectionId: string, studentId: string): Promise<void>;
+  addStudentToSection(sectionId: string, studentId: string, scheduleDays?: number[]): Promise<void>;
   removeStudentFromSection(sectionId: string, studentId: string): Promise<void>;
+  /** Thứ riêng học sinh đã chọn trong từng ca: sectionId -> scheduleDays (rỗng = theo ca). */
+  getSectionStudentScheduleDays(sectionId: string): Promise<Record<string, number[]>>;
+
+  // Đổi ca nhanh trong ngày (student_slot_swaps)
+  getSlotSwaps(filter: { studentId?: string; toSlotId?: string; fromSlotId?: string; date?: string; status?: 'ACTIVE' | 'CANCELLED' }): Promise<StudentSlotSwap[]>;
+  createSlotSwap(swap: StudentSlotSwap): Promise<StudentSlotSwap>;
 
   // Schedule
   getAllScheduleSlots(): Promise<ScheduleSlot[]>;

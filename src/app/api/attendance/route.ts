@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { repo } from '@/repositories';
 import { AttendanceRecord, AttendanceStatus } from '@/types/attendance';
-import { getTodayDateStr, getNowTimeStr, timeToMinutes } from '@/utils/date';
+import { getTodayDateStr, getNowTimeStr, timeToMinutes, dateToDayOfWeek } from '@/utils/date';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,16 +48,38 @@ export async function GET(request: Request) {
     // Hợp danh sách học viên thuộc CA của buổi học vào sổ điểm danh nếu chưa có bản ghi.
     const slot = await repo.getScheduleSlotById(slotId);
     if (slot && slot.classId) {
-      // Ưu tiên danh sách của ca (class_sections); buổi cũ chưa gán ca thì lấy theo lớp.
-      let rosterIds: string[] = [];
-      if (slot.sectionId) {
-        const section = await repo.getSectionById(slot.sectionId);
-        rosterIds = section?.studentIds || [];
-      }
-      if (rosterIds.length === 0) {
-        const cls = await repo.getClassById(slot.classId);
-        rosterIds = cls?.studentIds || [];
-      }
+       // Ưu tiên danh sách của ca (class_sections); buổi cũ chưa gán ca thì lấy theo lớp.
+       let rosterIds: string[] = [];
+       let legacyClassFallback = false;
+       if (slot.sectionId) {
+         const section = await repo.getSectionById(slot.sectionId);
+         rosterIds = section?.studentIds || [];
+          legacyClassFallback = rosterIds.length === 0;
+         // Học sinh có chọn "thứ riêng" thì chỉ vào sổ ở đúng thứ đã chọn.
+         const daysMap = await repo.getSectionStudentScheduleDays(slot.sectionId);
+         const slotDow = dateToDayOfWeek(slot.date);
+         rosterIds = rosterIds.filter((stId) => {
+           const days = daysMap[stId] || [];
+           if (days.length === 0) return true;
+           return slotDow !== null && days.includes(slotDow);
+         });
+         // Đổi ca nhanh trong ngày: học sinh đổi SANG ca này thì thêm vào sổ.
+         const swapsIn = await repo.getSlotSwaps({ toSlotId: slotId, status: 'ACTIVE' });
+         for (const sw of swapsIn) {
+           if (!rosterIds.includes(sw.studentId)) rosterIds.push(sw.studentId);
+         }
+         // Đổi ca nhanh trong ngày: học sinh đổi ĐI ca này thì bỏ khỏi sổ.
+         const swapsOut = await repo.getSlotSwaps({ fromSlotId: slotId, status: 'ACTIVE' });
+         const outSet = new Set(swapsOut.map((sw) => sw.studentId));
+         rosterIds = rosterIds.filter((stId) => !outSet.has(stId));
+       }
+       if (rosterIds.length === 0 && !slot.sectionId) {
+         legacyClassFallback = true;
+       }
+       if (rosterIds.length === 0 && legacyClassFallback) {
+         const cls = await repo.getClassById(slot.classId);
+         rosterIds = cls?.studentIds || [];
+       }
       if (Array.isArray(rosterIds) && rosterIds.length > 0) {
         const recordedIds = new Set(records.map(r => r.studentId));
         for (const stId of rosterIds) {

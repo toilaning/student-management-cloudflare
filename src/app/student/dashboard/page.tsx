@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/Button';
 import { LinkButton } from '@/components/ui/LinkButton';
 import { Badge, AttendanceBadge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Sheet } from '@/components/ui/Sheet';
+import { Field, Textarea } from '@/components/ui/Field';
 import { useToast } from '@/components/ui/Toast';
 import { getTodayDateStr } from '@/utils/date';
 import { formatSlotShortLabel } from '@/utils/schedule';
@@ -25,6 +27,8 @@ import {
   Inbox,
   MapPin,
   UserCheck,
+  CalendarX2,
+  ArrowRightLeft,
 } from 'lucide-react';
 
 const WEEKDAY_LABELS = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
@@ -52,6 +56,12 @@ export default function StudentDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState<string | null>(null);
   const [badges, setBadges] = useState<Record<string, { status: string; time: string }>>({});
+  const [absenceSlot, setAbsenceSlot] = useState<any | null>(null);
+  const [absenceReason, setAbsenceReason] = useState('');
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [swapSlot, setSwapSlot] = useState<any | null>(null);
+  const [swapTargets, setSwapTargets] = useState<any[]>([]);
+  const [swapLoading, setSwapLoading] = useState(false);
 
   const todayStr = getTodayDateStr();
 
@@ -163,6 +173,89 @@ export default function StudentDashboardPage() {
     }
   };
 
+  const openAbsence = (slot: any) => {
+    setAbsenceSlot(slot);
+    setAbsenceReason('');
+  };
+
+  const submitAbsence = async () => {
+    if (!absenceSlot || !currentUser?.id) return;
+    if (!absenceReason.trim()) {
+      toast.error('Vui lòng nhập lý do xin vắng mặt.');
+      return;
+    }
+    setRequestSubmitting(true);
+    try {
+      const res = await fetch('/api/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: currentUser.id,
+          classId: absenceSlot.classId,
+          scheduleSlotId: absenceSlot.id,
+          type: 'XIN_NGHI',
+          reason: absenceReason.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Đã gửi đơn xin vắng mặt.');
+        setAbsenceSlot(null);
+        setAbsenceReason('');
+      } else {
+        toast.error(data.error || 'Gửi đơn thất bại.');
+      }
+    } catch {
+      toast.error('Không kết nối được, bạn thử lại nhé.');
+    } finally {
+      setRequestSubmitting(false);
+    }
+  };
+
+  const openSwap = async (slot: any) => {
+    if (!currentUser?.id) return;
+    setSwapSlot(slot);
+    setSwapTargets([]);
+    try {
+      const res = await fetch('/api/schedule?classId=' + slot.classId + '&date=' + slot.date);
+      const data = await res.json();
+      const all = (data.slots || []).filter(
+        (s: any) => s.id !== slot.id && s.status !== 'Đã hủy'
+      );
+      setSwapTargets(all.sort((a: any, b: any) => (a.startTime || '').localeCompare(b.startTime || '')));
+    } catch {
+      toast.error('Không tải được các ca khác.');
+    }
+  };
+
+  const confirmSwap = async (toSlotId: string) => {
+    if (!swapSlot || !currentUser?.id) return;
+    setSwapLoading(true);
+    try {
+      const res = await fetch('/api/student/swap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: currentUser.id,
+          fromSlotId: swapSlot.id,
+          toSlotId,
+          date: swapSlot.date,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Đã đổi ca trong ngày. Sổ điểm danh sẽ cập nhật theo ca mới.');
+        setSwapSlot(null);
+      } else {
+        toast.error(data.error || 'Đổi ca thất bại.');
+      }
+    } catch {
+      toast.error('Không kết nối được, bạn thử lại nhé.');
+    } finally {
+      setSwapLoading(false);
+    }
+  };
+
   const present = attendance.filter((a) => a.status === 'Có mặt').length;
   const late = attendance.filter((a) => a.status === 'Đi muộn').length;
   const absent = attendance.filter((a) => a.status.includes('Vắng')).length;
@@ -224,7 +317,26 @@ export default function StudentDashboardPage() {
                       </div>
                     </div>
 
-                    <div className="shrink-0">
+                    <div className="shrink-0 flex flex-col items-end gap-2">
+                      <div className="flex items-center gap-2 flex-wrap justify-end">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon={<CalendarX2 size={14} />}
+                          onClick={() => openAbsence(slot)}
+                        >
+                          Xin vắng
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon={<ArrowRightLeft size={14} />}
+                          disabled={state.type === 'closed' && state.reason === 'Ca đã kết thúc'}
+                          onClick={() => openSwap(slot)}
+                        >
+                          Đổi ca
+                        </Button>
+                      </div>
                       {state.type === 'done' ? (
                         <AttendanceBadge status={state.status as any} />
                       ) : state.type === 'open' ? (
@@ -385,6 +497,109 @@ export default function StudentDashboardPage() {
               </Card>
             </div>
           </div>
+
+          {/* Sheet xin vắng mặt */}
+          <Sheet
+            isOpen={!!absenceSlot}
+            onClose={() => {
+              if (!requestSubmitting) setAbsenceSlot(null);
+            }}
+            title="Xin vắng mặt"
+            description={
+              absenceSlot
+                ? absenceSlot.subject + ' • ' + absenceSlot.date + ' (' + absenceSlot.startTime + ' – ' + absenceSlot.endTime + ')'
+                : undefined
+            }
+            size="sm"
+            footer={
+              <Button variant="primary" fullWidth loading={requestSubmitting} onClick={submitAbsence}>
+                Gửi đơn xin phép
+              </Button>
+            }
+          >
+            {absenceSlot && (
+              <div className="space-y-4">
+                <div className="rounded-field bg-muted border border-line p-3 text-[13px] space-y-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Lớp</span>
+                    <span className="font-semibold">{absenceSlot.classId}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Buổi học</span>
+                    <span className="font-semibold tabular">{absenceSlot.date}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Khung giờ</span>
+                    <span className="font-semibold tabular">
+                      {absenceSlot.startTime} – {absenceSlot.endTime}
+                    </span>
+                  </div>
+                </div>
+                <Field label="Lý do xin vắng" required>
+                  <Textarea
+                    value={absenceReason}
+                    onChange={(e) => setAbsenceReason(e.target.value)}
+                    placeholder="VD: Bận việc gia đình, ốm đau..."
+                  />
+                </Field>
+              </div>
+            )}
+          </Sheet>
+
+          {/* Sheet đổi ca trong ngày */}
+          <Sheet
+            isOpen={!!swapSlot}
+            onClose={() => {
+              if (!swapLoading) setSwapSlot(null);
+            }}
+            title="Đổi ca trong ngày"
+            description={
+              swapSlot
+                ? 'Chọn một ca khác cùng lớp trong ngày ' + swapSlot.date + ' để chuyển tạm thời.'
+                : undefined
+            }
+            size="sm"
+          >
+            {swapSlot && (
+              <div className="space-y-3">
+                <div className="rounded-field bg-muted border border-line p-3 text-[13px] flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Ca hiện tại</span>
+                  <span className="font-semibold tabular">
+                    {swapSlot.startTime} – {swapSlot.endTime}
+                  </span>
+                </div>
+                {swapTargets.length === 0 ? (
+                  <p className="text-[13px] text-muted-foreground">
+                    Không có ca nào khác cùng lớp vào ngày này để đổi.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {swapTargets.map((t) => (
+                      <div
+                        key={t.id}
+                        className="flex items-center justify-between gap-3 p-3 rounded-field border border-line"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-bold text-foreground tabular">
+                            {t.startTime} – {t.endTime}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground truncate">{t.subject}</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          loading={swapLoading}
+                          onClick={() => confirmSwap(t.id)}
+                          icon={<ArrowRightLeft size={14} />}
+                        >
+                          Chọn
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </Sheet>
         </main>
       </div>
     </RoleGuard>

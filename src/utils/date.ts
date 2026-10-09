@@ -56,3 +56,14 @@ export function getTodayDateStrByDate(d: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Saigon' }).format(d);
 }
 
+/**
+ * Thứ trong tuần theo quy ước dự án: 2 = Thứ 2 ... 7 = Thứ 7, 8 = Chủ Nhật.
+ * Nhận chuỗi ngày YYYY-MM-DD, tính theo giờ Việt Nam để không bị lệch ngày khi chạy UTC.
+ */
+export function dateToDayOfWeek(dateStr: string): number | null {
+  if (!dateStr) return null;
+  const d = new Date(dateStr + 'T00:00:00+07:00');
+  if (isNaN(d.getTime())) return null;
+  const jsDay = d.getDay(); // 0: CN, 1: T2 ... 6: T7
+  return jsDay === 0 ? 8 : jsDay + 1;
+}

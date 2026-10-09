@@ -85,6 +85,10 @@ export default function StudentClassesPage() {
   const [enrollSectionByClass, setEnrollSectionByClass] = useState<Record<string, string>>({});
   // Ca mới học sinh muốn chuyển sang, tính theo từng lớp đang học.
   const [targetSectionByClass, setTargetSectionByClass] = useState<Record<string, string>>({});
+  // Thứ học sinh chọn khi đăng ký từng lớp mới (classId -> danh sách thứ 2..8).
+  const [enrollDaysByClass, setEnrollDaysByClass] = useState<Record<string, number[]>>({});
+  // Thứ học sinh chọn khi đổi sang ca mới (classId -> danh sách thứ 2..8).
+  const [targetDaysByClass, setTargetDaysByClass] = useState<Record<string, number[]>>({});
   const [pendingChange, setPendingChange] = useState<{
     classId: string;
     className: string;
@@ -205,6 +209,7 @@ export default function StudentClassesPage() {
           action: 'ENROLL',
           actorId: currentUser.id,
           actorRole: 'STUDENT',
+          scheduleDays: enrollDaysByClass[classId] || null,
         }),
       });
       const data = await res.json();
@@ -237,6 +242,7 @@ export default function StudentClassesPage() {
           action: 'CHANGE_SHIFT',
           actorId: currentUser?.id || '',
           actorRole: 'STUDENT',
+          scheduleDays: targetDaysByClass[classId] || null,
         }),
       });
       const data = await res.json();
@@ -270,8 +276,12 @@ export default function StudentClassesPage() {
   const visibleOpenClasses = openClasses.filter(matchesKeyword);
   const visibleEnrolledClasses = enrolledClasses.filter(matchesKeyword);
 
-  const renderClassInfo = (cls: ClassEntity) => {
-    const { startTime, endTime } = getClassTimeRange(cls, shifts);
+  const renderClassInfo = (cls: ClassEntity, section?: ClassSection) => {
+    // Lớp đang học: ưu tiên hiển thị giờ/thứ theo ca học sinh đã chọn; legacy fallback theo lớp.
+    const startTime = section?.startTime || getClassTimeRange(cls, shifts).startTime;
+    const endTime = section?.endTime || getClassTimeRange(cls, shifts).endTime;
+    const displayDays = section ? (section.scheduleDays?.length ? section.scheduleDays : cls.scheduleDays) : cls.scheduleDays;
+    const displayTeacher = section?.teacherId || cls.teacherId;
     return (
       <div className="bg-muted rounded-field p-3.5 border border-line space-y-2 text-[13px]">
         <div className="flex items-center justify-between gap-3">
@@ -286,13 +296,13 @@ export default function StudentClassesPage() {
           <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
             <Calendar size={14} className="text-primary shrink-0" /> Ngày học
           </span>
-          <span className="font-semibold text-foreground text-right">{formatDays(cls.scheduleDays)}</span>
+          <span className="font-semibold text-foreground text-right">{formatDays(displayDays)}</span>
         </div>
         <div className="flex items-center justify-between gap-3">
           <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
             <UserCheck size={14} className="text-primary shrink-0" /> Giảng viên
           </span>
-          <span className="font-semibold text-foreground">{cls.teacherId}</span>
+          <span className="font-semibold text-foreground">{displayTeacher}</span>
         </div>
         <div className="flex items-center justify-between gap-3 pt-1 border-t border-line">
           <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
@@ -321,6 +331,56 @@ export default function StudentClassesPage() {
     );
   };
 
+  /** Thứ thực tế của một ca: ưu tiên lịch ca, fallback lịch lớp. */
+  const daysForSection = (cls: ClassEntity, sec: ClassSection): number[] =>
+    sec.scheduleDays?.length ? sec.scheduleDays : cls.scheduleDays || [];
+
+  const toggleDay = (
+    setter: React.Dispatch<React.SetStateAction<Record<string, number[]>>>,
+    classId: string,
+    base: number[],
+    day: number
+  ) => {
+    setter((prev) => {
+      const cur = (prev[classId] ?? base).map(Number);
+      const next = cur.includes(day)
+        ? cur.filter((d) => d !== day)
+        : [...cur, day].sort((a, b) => a - b);
+      return { ...prev, [classId]: next };
+    });
+  };
+
+  /** Trình chọn thứ học (tick/bỏ tick). selected rỗng nghĩa là theo đủ lịch ca. */
+  const renderDayTicker = (
+    baseDays: number[],
+    selected: number[],
+    onToggle: (day: number) => void
+  ) => {
+    const days = baseDays.length ? baseDays : [2, 3, 4, 5, 6, 7, 8];
+    return (
+      <div className="flex flex-wrap gap-1.5">
+        {days.map((d) => {
+          const on = selected.includes(d);
+          return (
+            <button
+              key={d}
+              type="button"
+              onClick={() => onToggle(d)}
+              className={cn(
+                'px-2.5 py-1 rounded-pill text-[11px] font-semibold border transition',
+                on
+                  ? 'bg-primary text-white border-primary'
+                  : 'bg-card text-muted-foreground border-line hover:bg-muted'
+              )}
+            >
+              {DAY_LABELS[d] || ('Thứ ' + d)}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
   const renderSectionPicker = (cls: ClassEntity) => {
     const sections = sectionsMap[cls.id] || [];
     const currentSectionId = currentSectionByClass[cls.id];
@@ -334,6 +394,10 @@ export default function StudentClassesPage() {
         </p>
       );
     }
+
+    const selectedSection = sections.find((sec) => sec.id === selected);
+    const selectedBaseDays = selectedSection ? daysForSection(cls, selectedSection) : [];
+    const selectedDays = targetDaysByClass[cls.id] ?? selectedBaseDays;
 
     return (
       <div className="space-y-2">
@@ -355,6 +419,11 @@ export default function StudentClassesPage() {
                     const next = { ...prev };
                     if (next[cls.id] === sec.id) delete next[cls.id];
                     else next[cls.id] = sec.id;
+                    return next;
+                  });
+                  setTargetDaysByClass((prev) => {
+                    const next = { ...prev };
+                    delete next[cls.id];
                     return next;
                   });
                 }}
@@ -382,6 +451,16 @@ export default function StudentClassesPage() {
             );
           })}
         </div>
+        {selectedSection && (
+          <div className="space-y-1.5">
+            <span className="text-[12px] font-semibold text-muted-foreground flex items-center gap-1">
+              <Calendar size={13} className="text-primary" /> Chọn thứ học (bỏ tick = không học hôm đó)
+            </span>
+            {renderDayTicker(selectedBaseDays, selectedDays, (day) =>
+              toggleDay(setTargetDaysByClass, cls.id, selectedBaseDays, day)
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -400,6 +479,10 @@ export default function StudentClassesPage() {
         </p>
       );
     }
+
+    const selectedSection = sections.find((sec) => sec.id === selected);
+    const selectedBaseDays = selectedSection ? daysForSection(cls, selectedSection) : [];
+    const selectedDays = enrollDaysByClass[cls.id] ?? selectedBaseDays;
 
     return (
       <div className="space-y-2">
@@ -421,6 +504,11 @@ export default function StudentClassesPage() {
                     else next[cls.id] = sec.id;
                     return next;
                   });
+                  setEnrollDaysByClass((prev) => {
+                    const next = { ...prev };
+                    delete next[cls.id];
+                    return next;
+                  });
                 }}
                 className={cn(
                   'relative px-3 py-2.5 rounded-field text-[12px] border transition text-left leading-tight cursor-pointer',
@@ -437,13 +525,23 @@ export default function StudentClassesPage() {
                   {isSelected && <Check size={14} className="text-primary shrink-0" />}
                 </span>
                 <span className="block text-[11px] text-muted-foreground mt-0.5">
-                  {formatDays(sec.scheduleDays?.length ? sec.scheduleDays : cls.scheduleDays)}
+                  {formatDays(daysForSection(cls, sec))}
                   {sec.teacherId ? ' · ' + sec.teacherId : ''}
                 </span>
               </button>
             );
           })}
         </div>
+        {selectedSection && (
+          <div className="space-y-1.5">
+            <span className="text-[12px] font-semibold text-muted-foreground flex items-center gap-1">
+              <Calendar size={13} className="text-primary" /> Chọn thứ học (bỏ tick = không học hôm đó)
+            </span>
+            {renderDayTicker(selectedBaseDays, selectedDays, (day) =>
+              toggleDay(setEnrollDaysByClass, cls.id, selectedBaseDays, day)
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -523,7 +621,7 @@ export default function StudentClassesPage() {
                               </Badge>
                             </div>
 
-                            {renderClassInfo(cls)}
+                            {renderClassInfo(cls, currentSection)}
 
                             <div className="pt-3 border-t border-line space-y-3">
                               {renderSectionPicker(cls)}

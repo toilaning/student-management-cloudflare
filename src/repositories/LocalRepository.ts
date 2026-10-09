@@ -5,13 +5,14 @@ import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
 import { Classroom, ClassEntity, ClassSection } from '@/types/classroom';
 import { TimeShift, TIME_SHIFTS } from '@/types/schedule';
-import { ScheduleSlot, ClassRequest } from '@/types/schedule';
+import { ScheduleSlot, ClassRequest, StudentSlotSwap } from '@/types/schedule';
 import { AttendanceRecord } from '@/types/attendance';
 import { TuitionInvoice, PayrollRecord } from '@/types/finance';
 import { SessionPackage } from '@/types/package';
 import { DEFAULT_PACKAGES } from './seeds/seedPackages';
 import { AuditLog } from '@/types/audit';
 import { generateSeedData } from './seeds/seedData';
+import { dateToDayOfWeek } from '@/utils/date';
 
 export class LocalRepository implements IRepository {
   private static instance: LocalRepository;
@@ -21,12 +22,14 @@ export class LocalRepository implements IRepository {
   private teachers: Map<string, Teacher> = new Map();
   private classrooms: Map<string, Classroom> = new Map();
   private classes: Map<string, ClassEntity> = new Map();
-  private classSections: Map<string, ClassSection> = new Map();
-  private classSectionStudents: Map<string, string[]> = new Map(); // sectionId -> studentIds
-  private scheduleSlots: Map<string, ScheduleSlot> = new Map();
-  private appSettings: Map<string, any> = new Map();
-  
-  private timeShifts: Map<number, TimeShift> = new Map();
+ private classSections: Map<string, ClassSection> = new Map();
+ private classSectionStudents: Map<string, string[]> = new Map(); // sectionId -> studentIds
+  private classSectionStudentDays: Map<string, Record<string, number[]>> = new Map(); // sectionId -> {studentId: scheduleDays}
+ private scheduleSlots: Map<string, ScheduleSlot> = new Map();
+ private appSettings: Map<string, any> = new Map();
+  private slotSwaps: Map<string, StudentSlotSwap> = new Map();
+ 
+ private timeShifts: Map<number, TimeShift> = new Map();
   private attendanceRecords: Map<string, AttendanceRecord> = new Map();
   private classRequests: Map<string, ClassRequest> = new Map();
   private sessionPackages: Map<string, SessionPackage> = new Map();
@@ -79,11 +82,13 @@ export class LocalRepository implements IRepository {
     this.teachers.clear();
     this.classrooms.clear();
     this.classes.clear();
-    this.classSections.clear();
-    this.classSectionStudents.clear();
-    this.scheduleSlots.clear();
-    this.appSettings.clear();
-    this.attendanceRecords.clear();
+   this.classSections.clear();
+   this.classSectionStudents.clear();
+    this.classSectionStudentDays.clear();
+   this.scheduleSlots.clear();
+   this.appSettings.clear();
+    this.slotSwaps.clear();
+   this.attendanceRecords.clear();
     this.classRequests.clear();
     this.sessionPackages.clear();
     this.tuitionInvoices.clear();
@@ -295,17 +300,47 @@ export class LocalRepository implements IRepository {
     return existed;
   }
 
-  public async addStudentToSection(sectionId: string, studentId: string): Promise<void> {
+  public async addStudentToSection(sectionId: string, studentId: string, scheduleDays?: number[]): Promise<void> {
     const ids = this.classSectionStudents.get(sectionId) || [];
     if (!ids.includes(studentId)) {
       ids.push(studentId);
       this.classSectionStudents.set(sectionId, ids);
+    }
+    // Lưu thứ riêng nếu học sinh chọn bớt buổi; rỗng (mảng rỗng) nghĩa là theo lịch ca.
+    if (scheduleDays !== undefined) {
+      const daysMap = this.classSectionStudentDays.get(sectionId) || {};
+      daysMap[studentId] = scheduleDays;
+      this.classSectionStudentDays.set(sectionId, daysMap);
     }
   }
 
   public async removeStudentFromSection(sectionId: string, studentId: string): Promise<void> {
     const ids = (this.classSectionStudents.get(sectionId) || []).filter(id => id !== studentId);
     this.classSectionStudents.set(sectionId, ids);
+    const daysMap = this.classSectionStudentDays.get(sectionId);
+    if (daysMap) {
+      delete daysMap[studentId];
+      this.classSectionStudentDays.set(sectionId, daysMap);
+    }
+  }
+
+  public async getSectionStudentScheduleDays(sectionId: string): Promise<Record<string, number[]>> {
+    return this.classSectionStudentDays.get(sectionId) || {};
+  }
+
+  public async getSlotSwaps(filter: { studentId?: string; toSlotId?: string; fromSlotId?: string; date?: string; status?: 'ACTIVE' | 'CANCELLED' }): Promise<StudentSlotSwap[]> {
+    let result = Array.from(this.slotSwaps.values());
+    if (filter.studentId) result = result.filter(s => s.studentId === filter.studentId);
+    if (filter.toSlotId) result = result.filter(s => s.toSlotId === filter.toSlotId);
+    if (filter.fromSlotId) result = result.filter(s => s.fromSlotId === filter.fromSlotId);
+    if (filter.date) result = result.filter(s => s.date === filter.date);
+    if (filter.status) result = result.filter(s => s.status === filter.status);
+    return result;
+  }
+
+  public async createSlotSwap(swap: StudentSlotSwap): Promise<StudentSlotSwap> {
+    this.slotSwaps.set(swap.id, { ...swap });
+    return swap;
   }
 
   // App Settings
@@ -367,16 +402,30 @@ export class LocalRepository implements IRepository {
 
   public async getScheduleSlotsByStudentId(studentId: string): Promise<ScheduleSlot[]> {
     // Học sinh chỉ thấy các buổi thuộc ca mà mình tham gia.
-    const studentSections = await this.getSectionsByStudentId(studentId);
-    const classIds = new Set(studentSections.map(s => s.classId));
-    const sectionIds = new Set(studentSections.map(s => s.id));
-    return Array.from(this.scheduleSlots.values()).filter(s => {
-      if (s.sectionId && sectionIds.size > 0) {
-        return sectionIds.has(s.sectionId);
-      }
-      return classIds.has(s.classId);
-    });
-  }
+   const studentSections = await this.getSectionsByStudentId(studentId);
+   const classIds = new Set(studentSections.map(s => s.classId));
+   const sectionIds = new Set(studentSections.map(s => s.id));
+    // Thứ riêng của từng học sinh trong từng ca.
+    const studentDaysBySection = new Map<string, number[]>();
+    for (const sec of studentSections) {
+      const daysMap = await this.getSectionStudentScheduleDays(sec.id);
+      studentDaysBySection.set(sec.id, daysMap[studentId] || []);
+    }
+   return Array.from(this.scheduleSlots.values()).filter(s => {
+     if (s.sectionId && sectionIds.size > 0) {
+       return sectionIds.has(s.sectionId);
+     }
+     return classIds.has(s.classId);
+    })
+      .filter(s => {
+        if (!s.sectionId) return true;
+        const days = studentDaysBySection.get(s.sectionId) || [];
+        // Mảng rỗng = theo đúng lịch ca (không lọc thêm).
+        if (days.length === 0) return true;
+        const dow = dateToDayOfWeek(s.date);
+        return dow !== null && days.includes(dow);
+      });
+ }
 
   public async createScheduleSlot(slot: ScheduleSlot): Promise<ScheduleSlot> {
     this.scheduleSlots.set(slot.id, { ...slot });
