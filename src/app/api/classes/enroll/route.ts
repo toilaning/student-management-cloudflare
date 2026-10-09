@@ -261,7 +261,9 @@ export async function POST(request: Request) {
       await repo.removeStudentFromSection(section.id, studentId);
       await syncClassFromSections(classId);
 
-      if (!cls.studentIds.includes(studentId)) {
+      // Re-fetch de lay danh sach hoc vien moi sau khi dong bo (dung cho ca local & supabase).
+      const clsAfterUnenroll = await repo.getClassById(classId);
+      if (!(clsAfterUnenroll?.studentIds || []).includes(studentId)) {
         student.enrolledClassIds = student.enrolledClassIds.filter(id => id !== classId);
         await repo.updateStudent(student);
       }

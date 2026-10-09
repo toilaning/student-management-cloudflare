@@ -171,3 +171,77 @@ describe('Ca riêng + Thứ riêng + Đổi ca trong ngày (schedule_days & stud
     assert.ok(!rosterA.includes(studentId), 'Roster ca xuất phát không còn học sinh: ' + JSON.stringify(rosterA));
   });
 });
+
+describe('Học sinh tự rời lớp (UNENROLL) trên portal học sinh', () => {
+  const classId = 'CLS_SD002';
+  const secOnly = 'SEC_SD002_ONLY';
+  const studentId = 'ST_SD002';
+
+  before(async () => {
+    await repo.createStudent({
+      id: studentId,
+      name: 'Học viên Test Rời Lớp',
+      phone: '0910000000',
+      status: 'Đang học',
+      enrolledClassIds: [classId],
+      createdAt: new Date().toISOString(),
+    });
+
+    const cls: ClassEntity = {
+      id: classId,
+      name: 'Vật Lý - Test Rời Lớp',
+      subject: 'Vật Lý',
+      teacherId: 'GV001',
+      roomId: 'P.202',
+      studentIds: [studentId],
+      tuitionFee: 3000000,
+      scheduleDays: [2],
+      shiftId: 1,
+      status: 'Đang mở',
+    };
+    await repo.createClass(cls);
+
+    const sec: ClassSection = {
+      id: secOnly,
+      classId,
+      name: 'Ca 1 (08:00 - 10:00)',
+      shiftId: 1,
+      startTime: '08:00',
+      endTime: '10:00',
+      scheduleDays: [2],
+      teacherId: 'GV001',
+      roomId: 'P.202',
+      isActive: true,
+      studentIds: [studentId],
+    };
+    await repo.createClassSection(sec);
+  });
+
+  it('1. UNENROLL gỡ học sinh khỏi ca và enrolledClassIds khi ca là ca duy nhất', async () => {
+    const res = await enrollPost(
+      enrollReq({
+        classId,
+        sectionId: secOnly,
+        studentId,
+        action: 'UNENROLL',
+        actorId: studentId,
+        actorRole: 'STUDENT',
+      })
+    );
+    const data = await res.json();
+    assert.equal(res.status, 200, 'UNENROLL phải 200: ' + JSON.stringify(data));
+    assert.ok(data.success);
+
+    const secAfter = await repo.getSectionById(secOnly);
+    assert.ok(!(secAfter?.studentIds || []).includes(studentId), 'Học sinh phải rời khỏi ca');
+
+    const studentAfter = await repo.getStudentById(studentId);
+    assert.ok(
+      !(studentAfter?.enrolledClassIds || []).includes(classId),
+      'enrolledClassIds phải gỡ classId khi rời ca duy nhất: ' + JSON.stringify(studentAfter?.enrolledClassIds)
+    );
+
+    const clsAfter = await repo.getClassById(classId);
+    assert.ok(!(clsAfter?.studentIds || []).includes(studentId), 'studentIds của lớp không còn học sinh');
+  });
+});

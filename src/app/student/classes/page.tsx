@@ -28,6 +28,7 @@ import {
   Video,
   ExternalLink,
   RefreshCw,
+  LogOut,
 } from 'lucide-react';
 
 const DAY_LABELS: Record<number, string> = {
@@ -95,6 +96,13 @@ export default function StudentClassesPage() {
     targetSectionId: string;
     targetSectionName: string;
     conflictClassName?: string;
+  } | null>(null);
+
+  // Yêu cầu tự rời lớp (học sinh xác nhận trước khi gỡ khỏi lớp).
+  const [pendingLeave, setPendingLeave] = useState<{
+    classId: string;
+    className: string;
+    sectionId?: string;
   } | null>(null);
 
   const loadData = async () => {
@@ -257,6 +265,38 @@ export default function StudentClassesPage() {
         await loadData();
       } else {
         toast.error(data.error || 'Đổi ca thất bại.');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Lỗi kết nối mạng.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleConfirmLeave = async () => {
+    if (!pendingLeave || !currentUser?.id) return;
+    const { classId, className, sectionId } = pendingLeave;
+    setActionLoadingId(classId);
+    try {
+      const res = await fetch('/api/classes/enroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          classId,
+          sectionId,
+          studentId: currentUser.id,
+          action: 'UNENROLL',
+          actorId: currentUser.id,
+          actorRole: 'STUDENT',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || 'Đã rời lớp ' + className + '.');
+        setPendingLeave(null);
+        await loadData();
+      } else {
+        toast.error(data.error || 'Rời lớp thất bại.');
       }
     } catch (e: any) {
       toast.error(e.message || 'Lỗi kết nối mạng.');
@@ -625,31 +665,47 @@ export default function StudentClassesPage() {
 
                             <div className="pt-3 border-t border-line space-y-3">
                               {renderSectionPicker(cls)}
-                              <Button
-                                variant="secondary"
-                                size="md"
-                                fullWidth
-                                loading={actionLoadingId === cls.id}
-                                disabled={!selectedSection}
-                                onClick={() => {
-                                  if (!selectedSection) {
-                                    toast.error('Chọn ca học mới trước khi đổi.');
-                                    return;
-                                  }
-                                  setPendingChange({
-                                    classId: cls.id,
-                                    className: cls.name,
-                                    targetSectionId: selectedSection.id,
-                                    targetSectionName:
-                                      selectedSection.name ||
-                                      (selectedSection.startTime || '') + ' – ' + (selectedSection.endTime || ''),
-                                    conflictClassName: conflictForSection(cls, selectedSection)?.className,
-                                  });
-                                }}
-                                icon={<RefreshCw size={14} />}
-                              >
-                                Đổi ca
-                              </Button>
+                              <div className="grid grid-cols-2 gap-2">
+                                <Button
+                                  variant="secondary"
+                                  size="md"
+                                  loading={actionLoadingId === cls.id}
+                                  disabled={!selectedSection}
+                                  onClick={() => {
+                                    if (!selectedSection) {
+                                      toast.error('Chọn ca học mới trước khi đổi.');
+                                      return;
+                                    }
+                                    setPendingChange({
+                                      classId: cls.id,
+                                      className: cls.name,
+                                      targetSectionId: selectedSection.id,
+                                      targetSectionName:
+                                        selectedSection.name ||
+                                        (selectedSection.startTime || '') + ' – ' + (selectedSection.endTime || ''),
+                                      conflictClassName: conflictForSection(cls, selectedSection)?.className,
+                                    });
+                                  }}
+                                  icon={<RefreshCw size={14} />}
+                                >
+                                  Đổi ca
+                                </Button>
+                                <Button
+                                  variant="danger"
+                                  size="md"
+                                  loading={actionLoadingId === cls.id}
+                                  onClick={() => {
+                                    setPendingLeave({
+                                      classId: cls.id,
+                                      className: cls.name,
+                                      sectionId: currentSectionByClass[cls.id],
+                                    });
+                                  }}
+                                  icon={<LogOut size={14} />}
+                                >
+                                  Rời lớp
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         </Card>
@@ -778,6 +834,35 @@ export default function StudentClassesPage() {
                   chuyển được, nhưng hai lớp sẽ chồng giờ nhau.
                 </p>
               )}
+            </div>
+          )}
+        </Sheet>
+
+        <Sheet
+          isOpen={!!pendingLeave}
+          onClose={() => setPendingLeave(null)}
+          title="Xác nhận rời lớp"
+          description="Bạn chắc chắn muốn rời khỏi lớp học này?"
+          footer={
+            <div className="flex items-center justify-end gap-2 w-full">
+              <Button variant="secondary" onClick={() => setPendingLeave(null)}>
+                Huỷ
+              </Button>
+              <Button variant="danger" loading={!!actionLoadingId} onClick={handleConfirmLeave}>
+                Đồng ý rời lớp
+              </Button>
+            </div>
+          }
+        >
+          {pendingLeave && (
+            <div className="space-y-3 py-2 text-[13px]">
+              <p className="text-foreground">
+                Bạn sẽ rời khỏi lớp <strong className="text-primary">{pendingLeave.className}</strong>?
+              </p>
+              <p className="text-[12px] text-muted-foreground flex items-start gap-1.5">
+                <AlertCircle size={13} className="shrink-0 mt-0.5" />
+                Sau khi rời lớp, bạn không còn thấy lớp này trong lịch học và sổ điểm danh. Lịch sử điểm danh đã ghi vẫn được giữ nguyên.
+              </p>
             </div>
           )}
         </Sheet>
