@@ -30,10 +30,19 @@ export async function GET(request: Request) {
   // Enrich normalized schedule rows with class-owned subject and meeting link.
   const allClasses = await repo.getAllClasses();
   const classMap = new Map(allClasses.map(cls => [cls.id, cls]));
+  // Giờ thật phải theo ca (class_sections). Slot cũ có thể lưu giờ lệch, nên
+  // ưu tiên giờ của ca để nút điểm danh / đổi ca tính đúng trạng thái.
+  const allSections = await repo.getAllClassSections();
+  const sectionTimeMap = new Map(
+    allSections.filter((s) => s.isActive !== false).map((s) => [s.id, s])
+  );
   slots = slots.map(slot => {
     const cls = classMap.get(slot.classId);
+    const sec = slot.sectionId ? sectionTimeMap.get(slot.sectionId) : undefined;
     return {
       ...slot,
+      startTime: (sec && sec.startTime) || slot.startTime,
+      endTime: (sec && sec.endTime) || slot.endTime,
       subject: slot.subject || cls?.subject || cls?.name || '',
       meetingLink: slot.meetingLink || cls?.meetingLink || '',
     };
