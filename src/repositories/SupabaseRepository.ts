@@ -1515,10 +1515,11 @@ export class SupabaseRepository implements IRepository {
      }
     const sectionSet = new Set(sectionIds);
     // Thứ riêng của từng học sinh trong từng ca: chỉ thấy buổi thuộc thứ mình đã chọn.
+    // Dữ liệu đã được nạp sẵn trong getSectionsByStudentId (studentScheduleDays),
+    // nên không cần gọi thêm query cho từng ca (tránh N+1).
     const studentDaysBySection = new Map<string, number[]>();
     for (const sec of studentSections) {
-      const daysMap = await this.getSectionStudentScheduleDays(sec.id);
-      studentDaysBySection.set(sec.id, daysMap[studentId] || []);
+      studentDaysBySection.set(sec.id, sec.studentScheduleDays?.[studentId] || []);
     }
     return (data || [])
       .map(mapScheduleSlotFromDb)
