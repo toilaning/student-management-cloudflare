@@ -113,33 +113,9 @@ function AttendanceContent() {
         }
         setStudents(stMap);
 
-        if (attData.records && attData.records.length > 0) {
-          setRecords(attData.records);
-        } else {
-          // Nếu slot chưa có record nào, tạo draft dựa trên danh sách lớp
-          const currentSlot = slots.find((s) => s.id === selectedSlotId);
-          if (currentSlot) {
-            const clsRes = await fetch(`/api/classes?id=${currentSlot.classId}`);
-            const clsData = await clsRes.json();
-            const cls = clsData.class;
-            if (cls && cls.studentIds) {
-              const drafts: AttendanceRecord[] = (cls.studentIds || []).map(
-                (stId: string, idx: number) => ({
-                  id: `ATT_NEW_${selectedSlotId}_${idx}`,
-                  scheduleSlotId: selectedSlotId,
-                  classId: currentSlot.classId,
-                  studentId: stId,
-                  date: currentSlot.date,
-                  status: 'Có mặt',
-                  checkinTime: currentSlot.startTime,
-                  updatedBy: currentUser?.id || '',
-                  updatedAt: new Date().toISOString(),
-                })
-              );
-              setRecords(drafts);
-            }
-          }
-        }
+        // GET /api/attendance?slotId= đã tự ghép roster đúng theo CA (bao gồm học viên
+        // đổi ca nhanh trong ngày), nên dùng thẳng kết quả, không tự dựng draft từ cả lớp.
+        setRecords(attData.records || []);
       } catch (e) {
         console.error(e);
       } finally {

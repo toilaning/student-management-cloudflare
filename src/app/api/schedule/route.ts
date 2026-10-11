@@ -36,15 +36,20 @@ export async function GET(request: Request) {
   const sectionTimeMap = new Map(
     allSections.filter((s) => s.isActive !== false).map((s) => [s.id, s])
   );
+  // Bổ sung tên giáo viên để portal hiển thị tên thay vì mã.
+  const allTeachers = await repo.getAllTeachers();
+  const teacherMap = new Map(allTeachers.map((t) => [t.id, t]));
   slots = slots.map(slot => {
     const cls = classMap.get(slot.classId);
     const sec = slot.sectionId ? sectionTimeMap.get(slot.sectionId) : undefined;
+    const teacher = teacherMap.get(slot.teacherId);
     return {
       ...slot,
       startTime: (sec && sec.startTime) || slot.startTime,
       endTime: (sec && sec.endTime) || slot.endTime,
       subject: slot.subject || cls?.subject || cls?.name || '',
       meetingLink: slot.meetingLink || cls?.meetingLink || '',
+      teacherName: teacher?.name || '',
     };
   });
 

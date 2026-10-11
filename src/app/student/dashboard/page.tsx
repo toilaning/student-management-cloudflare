@@ -309,7 +309,7 @@ export default function StudentDashboardPage() {
                       <h3 className="text-base font-bold text-foreground mt-1.5">{slot.subject}</h3>
                       <div className="flex items-center gap-3 mt-1 text-[13px] text-muted-foreground flex-wrap">
                         <span className="inline-flex items-center gap-1">
-                          <UserCheck size={13} /> GV {slot.teacherId}
+                          <UserCheck size={13} /> GV {slot.teacherName || slot.teacherId}
                         </span>
                       </div>
                     </div>

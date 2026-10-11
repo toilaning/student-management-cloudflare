@@ -55,10 +55,12 @@ type TabType = 'all' | 'attended' | 'notAttended' | 'excused' | 'unexcused';
 
 export function LiveSessionTracker({ 
   teacherId,
-  attendancePathPrefix = '/admin/attendance' 
+  attendancePathPrefix = '/admin/attendance',
+  onStudentClick,
 }: { 
   teacherId?: string;
   attendancePathPrefix?: string;
+  onStudentClick?: (studentId: string) => void;
 }) {
   const [data, setData] = useState<LiveSessionData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -398,9 +400,24 @@ export function LiveSessionTracker({
               {activeData.list.map(st => (
                 <div 
                   key={st.id} 
-                  className="bg-muted hover:bg-card border border-line rounded-field p-3 flex items-center justify-between gap-3 text-xs transition"
+                  className={cn(
+                    "bg-muted hover:bg-card border border-line rounded-field p-3 flex items-center justify-between gap-3 text-xs transition",
+                    onStudentClick && "cursor-pointer"
+                  )}
                 >
-                  <div className="min-w-0">
+                  <div
+                    className="min-w-0 flex-1"
+                    onClick={() => onStudentClick?.(st.id)}
+                    role={onStudentClick ? "button" : undefined}
+                    tabIndex={onStudentClick ? 0 : undefined}
+                    onKeyDown={onStudentClick ? (e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onStudentClick(st.id);
+                      }
+                    } : undefined}
+                    title={onStudentClick ? 'Xem thông tin học sinh' : undefined}
+                  >
                     <div className="font-bold text-foreground truncate">{st.name}</div>
                     <div className="text-[11px] text-muted-foreground mt-0.5 font-mono">
                       {st.id}

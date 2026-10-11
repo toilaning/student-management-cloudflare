@@ -7,6 +7,7 @@ import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Header } from '@/components/common/Header';
 import { RoleGuard } from '@/components/common/RoleGuard';
+import { QuickStudentModal } from '@/components/common/QuickStudentModal';
 import { AttendanceRecord, AttendanceStatus } from '@/types/attendance';
 import { ScheduleSlot } from '@/types/schedule';
 import { ClassEntity } from '@/types/classroom';
@@ -60,6 +61,7 @@ function AdminAttendanceContent() {
   const [editingAttendanceStudent, setEditingAttendanceStudent] = useState<any>(null);
   const [editRemainingInput, setEditRemainingInput] = useState<number>(12);
   const [studentDetailMap, setStudentDetailMap] = useState<Record<string, any>>({});
+  const [quickStudentId, setQuickStudentId] = useState<string | null>(null);
 
   const [selectedDate, setSelectedDate] = useState<string>(dateParam || getTodayDateStr());
   const [classes, setClasses] = useState<ClassEntity[]>([]);
@@ -483,10 +485,15 @@ function AdminAttendanceContent() {
       key: 'student',
       header: 'Học viên',
       render: (rec) => (
-        <div className="min-w-0">
+        <button
+          type="button"
+          onClick={() => setQuickStudentId(rec.studentId)}
+          className="min-w-0 text-left cursor-pointer hover:opacity-80 transition"
+          title="Xem thông tin học sinh"
+        >
           <p className="font-semibold text-foreground truncate">{rec.studentName}</p>
           <p className="font-mono text-[12px] text-muted-foreground">{rec.studentId}</p>
-        </div>
+        </button>
       ),
     },
     {
@@ -733,7 +740,14 @@ function AdminAttendanceContent() {
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="font-semibold text-foreground truncate">{rec.studentName}</p>
+                      <button
+                        type="button"
+                        onClick={() => setQuickStudentId(rec.studentId)}
+                        className="font-semibold text-foreground truncate text-left cursor-pointer hover:opacity-80 transition"
+                        title="Xem thông tin học sinh"
+                      >
+                        {rec.studentName}
+                      </button>
                       <p className="font-mono text-[12px] text-muted-foreground">
                         {rec.studentId} · {d?.gradeLevel || '—'}
                       </p>
@@ -916,6 +930,8 @@ function AdminAttendanceContent() {
           </div>
         </div>
       </Sheet>
+
+      <QuickStudentModal studentId={quickStudentId} onClose={() => setQuickStudentId(null)} />
     </div>
   );
 }

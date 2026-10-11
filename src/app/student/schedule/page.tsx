@@ -450,7 +450,7 @@ export default function StudentSchedulePage() {
                                   <div className="flex-1 min-h-0 overflow-hidden space-y-0.5 mt-1 pt-1 border-t border-line/60">
                                     <div className="text-[11px] text-muted-foreground flex items-center gap-1">
                                       <UserCheck size={11} className="shrink-0 text-primary" />
-                                      <span className="truncate">{slot.teacherId}</span>
+                                      <span className="truncate">{slot.teacherName || slot.teacherId}</span>
                                     </div>
                                     {meetingLink ? (
                                       <a

@@ -5,6 +5,7 @@ import { Header } from '@/components/common/Header';
 import { RoleGuard } from '@/components/common/RoleGuard';
 import { useApp } from '@/context/AppContext';
 import { ClassRequest } from '@/types/schedule';
+import { QuickStudentModal } from '@/components/common/QuickStudentModal';
 import {
   StatCard,
   Button,
@@ -29,6 +30,7 @@ interface RequestRowItem extends ClassRequest {
 export default function TeacherRequestsPage() {
   const { currentUser, isReady } = useApp();
   const [requests, setRequests] = useState<ClassRequest[]>([]);
+  const [studentsMap, setStudentsMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -40,6 +42,7 @@ export default function TeacherRequestsPage() {
   const [selectedRequest, setSelectedRequest] = useState<ClassRequest | null>(null);
   const [reviewSheetOpen, setReviewSheetOpen] = useState(false);
   const [reviewNote, setReviewNote] = useState('');
+  const [quickStudentId, setQuickStudentId] = useState<string | null>(null);
 
   const toast = useToast();
 
@@ -47,9 +50,20 @@ export default function TeacherRequestsPage() {
     if (!isReady || !currentUser?.id) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/requests?teacherId=${currentUser.id}`);
+      const [res, stRes] = await Promise.all([
+        fetch(`/api/requests?teacherId=${currentUser.id}`),
+        fetch('/api/students?limit=all'),
+      ]);
       const data = await res.json();
       setRequests(data.requests || []);
+      const stData = await stRes.json();
+      const stMap: Record<string, any> = {};
+      if (stData.students) {
+        stData.students.forEach((s: any) => {
+          stMap[s.id] = s;
+        });
+      }
+      setStudentsMap(stMap);
     } catch (e) {
       console.error(e);
     } finally {
@@ -147,15 +161,20 @@ export default function TeacherRequestsPage() {
       key: 'student',
       header: 'Học viên & Lớp',
       render: (r) => (
-        <div className="flex items-center gap-3 min-w-[140px]">
+        <button
+          type="button"
+          onClick={() => setQuickStudentId(r.studentId)}
+          className="flex items-center gap-3 min-w-[140px] text-left cursor-pointer hover:opacity-80 transition"
+          title="Xem thông tin học sinh"
+        >
           <Avatar name={r.studentId} size={36} />
           <div className="min-w-0">
             <p className="font-semibold text-foreground text-sm truncate">
-              Học viên {r.studentId}
+              {studentsMap[r.studentId]?.name || 'Học viên ' + r.studentId}
             </p>
             <p className="text-[12px] text-muted-foreground">Lớp {r.classId}</p>
           </div>
-        </div>
+        </button>
       ),
     },
     {
@@ -307,11 +326,16 @@ export default function TeacherRequestsPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <Avatar name={r.studentId} size={36} />
+                    <Avatar name={studentsMap[r.studentId]?.name || r.studentId} size={36} />
                     <div className="min-w-0">
-                      <p className="font-semibold text-foreground text-sm truncate">
-                        Học viên {r.studentId}
-                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setQuickStudentId(r.studentId)}
+                        className="font-semibold text-foreground text-sm truncate text-left cursor-pointer hover:opacity-80 transition"
+                        title="Xem thông tin học sinh"
+                      >
+                        {studentsMap[r.studentId]?.name || 'Học viên ' + r.studentId}
+                      </button>
                       <p className="text-[12px] text-muted-foreground">Lớp {r.classId}</p>
                     </div>
                   </div>
@@ -487,6 +511,7 @@ export default function TeacherRequestsPage() {
           )}
         </Sheet>
       </div>
+      <QuickStudentModal studentId={quickStudentId} onClose={() => setQuickStudentId(null)} />
     </RoleGuard>
   );
 }

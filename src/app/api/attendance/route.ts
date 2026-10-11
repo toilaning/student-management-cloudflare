@@ -54,7 +54,6 @@ export async function GET(request: Request) {
        if (slot.sectionId) {
          const section = await repo.getSectionById(slot.sectionId);
          rosterIds = section?.studentIds || [];
-          legacyClassFallback = rosterIds.length === 0;
          // Học sinh có chọn "thứ riêng" thì chỉ vào sổ ở đúng thứ đã chọn.
          const daysMap = await repo.getSectionStudentScheduleDays(slot.sectionId);
          const slotDow = dateToDayOfWeek(slot.date);
@@ -159,8 +158,20 @@ export async function POST(request: Request) {
       }
 
       // Kiểm tra HS có trong lớp của slot không
-      const cls = await repo.getClassById(slot.classId);
-      const isEnrolled = cls?.studentIds?.includes(studentId);
+      // Ưu tiên kiểm tra theo ca (class_sections); buổi cũ chưa gắn ca thì theo lớp.
+      // Học sinh đổi ca nhanh SANG ca này (student_slot_swaps) cũng được phép tự điểm danh.
+      let isEnrolled = false;
+      if (slot.sectionId) {
+        const section = await repo.getSectionById(slot.sectionId);
+        isEnrolled = (section?.studentIds || []).includes(studentId);
+      } else {
+        const cls = await repo.getClassById(slot.classId);
+        isEnrolled = cls?.studentIds?.includes(studentId) || false;
+      }
+      if (!isEnrolled) {
+        const swapsIn = await repo.getSlotSwaps({ toSlotId: scheduleSlotId, status: 'ACTIVE' });
+        isEnrolled = swapsIn.some((sw) => sw.studentId === studentId);
+      }
       if (!isEnrolled) {
         return NextResponse.json(
           { success: false, error: 'Học sinh không thuộc danh sách lớp học của ca này' },

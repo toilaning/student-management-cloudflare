@@ -19,7 +19,14 @@ export async function GET(request: Request) {
 
   let classes = await repo.getAllClasses();
   if (teacherId) {
-    classes = classes.filter(c => c.teacherId === teacherId);
+    // Giáo viên có thể chỉ phụ trách một ca (class_sections) của lớp đa giáo viên;
+    // hợp thêm lớp từ các ca mà giáo viên đó đảm nhận.
+    const sectionClasses = await repo.getSectionsByTeacherId(teacherId);
+    const classIds = new Set<string>([
+      ...classes.filter(c => c.teacherId === teacherId).map(c => c.id),
+      ...sectionClasses.map(s => s.classId),
+    ]);
+    classes = classes.filter(c => classIds.has(c.id));
   }
   if (studentId) {
     classes = classes.filter(c => c.studentIds.includes(studentId));

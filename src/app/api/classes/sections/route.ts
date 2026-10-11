@@ -249,6 +249,19 @@ export async function DELETE(request: Request) {
 
     await repo.deleteClassSection(id);
 
+    // Đồng bộ lại danh sách học viên lớp (class_students) = hợp các ca còn lại,
+    // tránh class.studentIds bị lệch so với membership theo ca.
+    const remainingSections = await repo.getClassSections(sec.classId);
+    const unionIds = new Set<string>();
+    for (const rs of remainingSections) {
+      for (const sid of rs.studentIds || []) unionIds.add(sid);
+    }
+    const clsAfter = await repo.getClassById(sec.classId);
+    if (clsAfter) {
+      clsAfter.studentIds = Array.from(unionIds);
+      await repo.updateClass(clsAfter);
+    }
+
     await repo.addAuditLog({
       action: 'DELETE',
       userId: actorId,

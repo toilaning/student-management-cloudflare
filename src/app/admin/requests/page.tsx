@@ -5,6 +5,7 @@ import { Header } from '@/components/common/Header';
 import { useApp } from '@/context/AppContext';
 import { RoleGuard } from '@/components/common/RoleGuard';
 import { ClassRequest, RequestStatus, ScheduleSlot, TIME_SHIFTS } from '@/types/schedule';
+import { QuickStudentModal } from '@/components/common/QuickStudentModal';
 import {
   Inbox,
   CheckCircle2,
@@ -44,6 +45,7 @@ export default function AdminRequestsPage() {
 
   // Detail / Decision Sheet State
   const [selectedRequest, setSelectedRequest] = useState<ClassRequest | null>(null);
+  const [quickStudentId, setQuickStudentId] = useState<string | null>(null);
   const [decisionAction, setDecisionAction] = useState<'ĐÃ_DUYỆT' | 'TỪ_CHỐI'>('ĐÃ_DUYỆT');
   const [decisionNote, setDecisionNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -249,14 +251,19 @@ export default function AdminRequestsPage() {
       render: (req) => {
         const student = studentMap.get(req.studentId);
         return (
-          <div>
+          <button
+            type="button"
+            onClick={() => setQuickStudentId(req.studentId)}
+            className="text-left cursor-pointer hover:opacity-80 transition"
+            title="Xem thông tin học sinh"
+          >
             <p className="font-semibold text-foreground text-sm">
               {student?.fullName || student?.name || 'Học viên ' + req.studentId}
             </p>
             <p className="text-[12px] text-muted-foreground font-mono">
               {req.studentId}
             </p>
-          </div>
+          </button>
         );
       },
     },
@@ -426,9 +433,14 @@ export default function AdminRequestsPage() {
                   </div>
 
                   <div>
-                    <p className="font-semibold text-foreground text-sm">
+                    <button
+                      type="button"
+                      onClick={() => setQuickStudentId(req.studentId)}
+                      className="font-semibold text-foreground text-sm text-left cursor-pointer hover:opacity-80 transition"
+                      title="Xem thông tin học sinh"
+                    >
                       {student?.fullName || student?.name || 'Học viên ' + req.studentId}
-                    </p>
+                    </button>
                     <p className="text-[12px] text-muted-foreground">
                       {cls?.name || req.classId}
                     </p>
@@ -664,6 +676,8 @@ export default function AdminRequestsPage() {
           )}
         </Sheet>
       </div>
+
+      <QuickStudentModal studentId={quickStudentId} onClose={() => setQuickStudentId(null)} />
     </RoleGuard>
   );
 }

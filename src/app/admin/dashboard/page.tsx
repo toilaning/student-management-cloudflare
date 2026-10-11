@@ -200,7 +200,10 @@ export default function AdminDashboardPage() {
             </div>
             {openLiveTab && (
               <div className="p-4 sm:p-5">
-                <LiveSessionTracker attendancePathPrefix="/admin/attendance" />
+                <LiveSessionTracker
+                  attendancePathPrefix="/admin/attendance"
+                  onStudentClick={(id) => setSelectedStudentId(id)}
+                />
               </div>
             )}
           </Card>

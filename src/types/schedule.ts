@@ -27,6 +27,7 @@ export interface ScheduleSlot {
   subject: string;
   topic?: string;
   meetingLink?: string; // Link phòng học online (Google Meet, Zoom...)
+  teacherName?: string; // Tên giáo viên (bổ sung bởi /api/schedule để hiển thị)
   status: 'Đã lên lịch' | 'Đã hoàn thành' | 'Đã hủy' | 'Đổi lịch';
 
   // Chấm công giáo viên theo ca

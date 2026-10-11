@@ -5,6 +5,7 @@ import { Header } from '@/components/common/Header';
 import { RoleGuard } from '@/components/common/RoleGuard';
 import { LiveSessionTracker } from '@/components/attendance/LiveSessionTracker';
 import { TeacherCheckinCard } from '@/components/attendance/TeacherCheckinCard';
+import { QuickStudentModal } from '@/components/common/QuickStudentModal';
 import { useApp } from '@/context/AppContext';
 import { StatCard, Card, CardHeader, Badge, Button, EmptyState, LinkButton } from '@/components/ui';
 import { BookOpen, CheckCircle2, Inbox, Clock, CalendarDays, ArrowRight, Headphones } from 'lucide-react';
@@ -16,6 +17,7 @@ export default function TeacherDashboardPage() {
   const [requests, setRequests] = useState<any[]>([]);
   const [payroll, setPayroll] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [quickStudentId, setQuickStudentId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isReady || !currentUser?.id) return;
@@ -102,6 +104,7 @@ export default function TeacherDashboardPage() {
             <LiveSessionTracker
               teacherId={currentUser?.id}
               attendancePathPrefix="/teacher/attendance"
+              onStudentClick={(id) => setQuickStudentId(id)}
             />
           </div>
 
@@ -269,6 +272,11 @@ export default function TeacherDashboardPage() {
             </Card>
           </div>
         </main>
+
+        <QuickStudentModal
+          studentId={quickStudentId}
+          onClose={() => setQuickStudentId(null)}
+        />
       </div>
     </RoleGuard>
   );
