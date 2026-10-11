@@ -4,6 +4,22 @@ import { AuthService } from '@/services/AuthService';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Sinh username cho giáo viên theo cú pháp gv_<tên>:
+ * - Bỏ dấu tiếng Việt, chuyển thường, bỏ ký tự đặc biệt, nối từ bằng dấu gạch ngang.
+ * - Ví dụ: "Nguyễn Văn Hòa" -> gv_nguyen-van-hoa.
+ */
+function slugifyTeacherUsername(name: string): string {
+  const s = String(name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return 'gv_' + (s || 'giangvien');
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
@@ -52,9 +68,20 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, specialty, hourlyRate = 300000, phone, bio } = body;
+    const { name, specialty, hourlyRate = 300000, phone, bio, fastOnboarding = false } = body;
 
-    if (!name || !specialty || !phone) {
+    if (!name || !name.trim()) {
+      return NextResponse.json({ error: 'Vui lòng nhập họ và tên giáo viên' }, { status: 400 });
+    }
+
+    const trimmedName = String(name).trim();
+
+    // Tiếp nhận nhanh: chỉ cần họ tên, các trường còn lại điền giá trị mặc định.
+    const effectiveSpecialty = fastOnboarding ? (specialty || 'Bộ môn chung') : specialty;
+    const effectivePhone = fastOnboarding ? (phone || '0901234567') : phone;
+    const effectiveBio = fastOnboarding ? (bio || 'Giảng viên phụ trách bộ môn chung') : bio;
+
+    if (!effectiveSpecialty || !effectivePhone) {
       return NextResponse.json({ error: 'Vui lòng điền đủ họ tên, chuyên môn và số điện thoại' }, { status: 400 });
     }
 
@@ -68,12 +95,12 @@ export async function POST(request: Request) {
 
     const newTeacher = {
       id: newId,
-      name,
-      specialty,
+      name: trimmedName,
+      specialty: effectiveSpecialty,
       hourlyRate: Number(hourlyRate) || 300000,
-      phone,
+      phone: effectivePhone,
       ratePerSession: Number(body.ratePerSession) || 250000,
-      bio: bio || `Giảng viên phụ trách bộ môn ${specialty}`,
+      bio: effectiveBio || `Giảng viên phụ trách bộ môn ${effectiveSpecialty}`,
       status: 'Đang dạy' as const,
       assignedClassIds: [],
       createdAt: new Date().toISOString(),
@@ -82,18 +109,26 @@ export async function POST(request: Request) {
     // Bảng teachers có khoá ngoại trỏ sang users, nên tạo tài khoản đăng nhập trước.
     // Mật khẩu mặc định 123456.
     const defaultPassword = '123456';
+    let finalUsername = fastOnboarding ? slugifyTeacherUsername(trimmedName) : newId.toLowerCase();
     try {
       const authService = new AuthService(repo);
       const existingUser = await repo.getUserById(newId);
       if (!existingUser) {
+        let suffix = 2;
+        while (await repo.getUserByUsername(finalUsername)) {
+          finalUsername = `${fastOnboarding ? slugifyTeacherUsername(trimmedName) : newId.toLowerCase()}${suffix}`;
+          suffix += 1;
+        }
         await repo.createUser({
           id: newId,
-          username: newId.toLowerCase(),
+          username: finalUsername,
           passwordHash: authService.hashPassword(defaultPassword),
           role: 'TEACHER',
           name: newTeacher.name,
           isActive: true,
         });
+      } else {
+        finalUsername = existingUser.username;
       }
     } catch (userErr: any) {
       return NextResponse.json(
@@ -111,14 +146,17 @@ export async function POST(request: Request) {
       userRole: 'ADMIN',
       targetResource: 'TEACHER',
       targetId: newId,
-      details: `Thêm giảng viên mới ${newId} - ${name} (${specialty})`,
+      details: `Thêm giảng viên mới ${newId} - ${trimmedName} (${effectiveSpecialty})${fastOnboarding ? ' [Tiếp nhận nhanh]' : ''}`,
     });
 
     return NextResponse.json({
       success: true,
       teacher: newTeacher,
       defaultPassword,
-      message: `Thêm giảng viên ${newId} thành công`,
+      username: finalUsername,
+      message: fastOnboarding
+        ? `Tiếp nhận nhanh giáo viên ${newId} (${trimmedName}) thành công`
+        : `Thêm giảng viên ${newId} thành công`,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Lỗi khi tạo giảng viên' }, { status: 500 });

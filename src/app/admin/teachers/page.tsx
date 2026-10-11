@@ -23,6 +23,9 @@ import {
   Trash2,
   AlertTriangle,
   Coins,
+  Zap,
+  Copy,
+  Check,
 } from 'lucide-react';
 
 function money(v?: number) {
@@ -68,6 +71,24 @@ export default function AdminTeachersPage() {
   // Sheet Xác nhận xóa
   const [deletingTeacher, setDeletingTeacher] = useState<Teacher | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Sheet Tiếp nhận nhanh giáo viên
+  const [showFastSheet, setShowFastSheet] = useState(false);
+  const [fastLoading, setFastLoading] = useState(false);
+  const [fastData, setFastData] = useState({
+    name: '',
+    phone: '',
+  });
+
+  // Sheet Kết quả bàn giao tài khoản giáo viên vừa tạo
+  const [createdTeacherInfo, setCreatedTeacherInfo] = useState<{
+    id: string;
+    name: string;
+    username: string;
+    defaultPassword: string;
+    phone: string;
+  } | null>(null);
+  const [copiedHandover, setCopiedHandover] = useState(false);
 
   const loadTeachers = async () => {
     try {
@@ -179,6 +200,62 @@ export default function AdminTeachersPage() {
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const handleFastOnboarding = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fastData.name.trim()) {
+      toast.error('Vui lòng nhập họ và tên giáo viên');
+      return;
+    }
+    setFastLoading(true);
+    try {
+      const res = await fetch('/api/teachers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: fastData.name.trim(),
+          phone: fastData.phone.trim(),
+          fastOnboarding: true,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setShowFastSheet(false);
+        setCreatedTeacherInfo({
+          id: data.teacher.id,
+          name: data.teacher.name,
+          username: data.username || data.teacher.id.toLowerCase(),
+          defaultPassword: data.defaultPassword || '123456',
+          phone: data.teacher.phone || '',
+        });
+        setFastData({ name: '', phone: '' });
+        toast.success('Tiếp nhận nhanh giáo viên thành công');
+        await loadTeachers();
+      } else {
+        toast.error(data.error || 'Tạo nhanh giáo viên thất bại');
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Lỗi kết nối máy chủ');
+    } finally {
+      setFastLoading(false);
+    }
+  };
+
+  const copyHandoverText = () => {
+    if (!createdTeacherInfo) return;
+    const handoverText = `THÔNG TIN TÀI KHOẢN GIÁO VIÊN
+Họ và tên: ${createdTeacherInfo.name}
+Mã giáo viên: ${createdTeacherInfo.id}
+Tên đăng nhập: ${createdTeacherInfo.username}
+Mật khẩu mặc định: ${createdTeacherInfo.defaultPassword}
+Hệ thống quản lý: https://student-management.local
+Lưu ý: Vui lòng đăng nhập và đổi mật khẩu trong lần đầu sử dụng.`;
+
+    navigator.clipboard.writeText(handoverText);
+    setCopiedHandover(true);
+    toast.success('Đã sao chép thông tin bàn giao');
+    setTimeout(() => setCopiedHandover(false), 2500);
   };
 
   // Thống kê nhanh
@@ -363,13 +440,22 @@ export default function AdminTeachersPage() {
                 className="w-full sm:w-80"
               />
 
-              <Button
-                variant="primary"
-                icon={<Plus size={16} />}
-                onClick={() => setShowAddSheet(true)}
-              >
-                Thêm giáo viên
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="primary"
+                  icon={<Plus size={16} />}
+                  onClick={() => setShowAddSheet(true)}
+                >
+                  Thêm giáo viên
+                </Button>
+                <Button
+                  variant="secondary"
+                  icon={<Zap size={16} />}
+                  onClick={() => setShowFastSheet(true)}
+                >
+                  Tiếp nhận nhanh
+                </Button>
+              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 border-t border-line">
@@ -656,6 +742,112 @@ export default function AdminTeachersPage() {
                 <span>
                   Thao tác này sẽ gỡ phân công giáo viên khỏi các lớp hiện tại, gỡ liên kết trong lịch học và xóa tài khoản đăng nhập tương ứng. Không thể hoàn tác.
                 </span>
+              </div>
+            </div>
+          )}
+        </Sheet>
+
+        {/* Sheet Tiếp nhận nhanh giáo viên */}
+        <Sheet
+          isOpen={showFastSheet}
+          onClose={() => setShowFastSheet(false)}
+          title="Tiếp nhận nhanh giáo viên"
+          description="Hệ thống tự động cấp mã, tài khoản đăng nhập và mật khẩu mặc định"
+          size="md"
+          footer={
+            <div className="flex items-center justify-end gap-2 w-full">
+              <Button variant="secondary" onClick={() => setShowFastSheet(false)}>
+                Hủy
+              </Button>
+              <Button
+                variant="primary"
+                loading={fastLoading}
+                icon={<Zap size={15} />}
+                onClick={handleFastOnboarding}
+              >
+                Khởi tạo tài khoản
+              </Button>
+            </div>
+          }
+        >
+          <form onSubmit={handleFastOnboarding} className="space-y-4 pt-1">
+            <Field label="Họ và tên giáo viên" required>
+              <Input
+                required
+                placeholder="Ví dụ: Thầy Trần Quang Huy"
+                value={fastData.name}
+                onChange={(e) => setFastData({ ...fastData, name: e.target.value })}
+                autoFocus
+              />
+            </Field>
+
+            <Field label="Số điện thoại" hint="Tùy chọn, dùng để liên hệ và tra cứu">
+              <Input
+                placeholder="0913..."
+                value={fastData.phone}
+                onChange={(e) => setFastData({ ...fastData, phone: e.target.value })}
+              />
+            </Field>
+
+            <div className="p-3.5 bg-muted rounded-card border border-line space-y-1.5 text-xs text-muted-foreground">
+              <p className="font-semibold text-foreground">Thiết lập tự động:</p>
+              <ul className="list-disc pl-4 space-y-1">
+                <li>Mã giáo viên tự sinh dạng GVxxx</li>
+                <li>Tên đăng nhập: gv_&lt;tên&gt; (bỏ dấu, chữ thường), mật khẩu mặc định 123456</li>
+                <li>Chuyên môn mặc định "Bộ môn chung", đơn giá giờ 300.000đ</li>
+                <li>Hiển thị thẻ bàn giao ngay sau khi tạo xong</li>
+              </ul>
+            </div>
+          </form>
+        </Sheet>
+
+        {/* Sheet Kết quả bàn giao tài khoản giáo viên */}
+        <Sheet
+          isOpen={!!createdTeacherInfo}
+          onClose={() => setCreatedTeacherInfo(null)}
+          title="Thông tin bàn giao tài khoản"
+          description="Gửi thông tin này cho giáo viên để đăng nhập vào hệ thống"
+          size="md"
+          footer={
+            <div className="flex items-center justify-end gap-2 w-full">
+              <Button
+                variant="primary"
+                icon={copiedHandover ? <Check size={16} /> : <Copy size={16} />}
+                onClick={copyHandoverText}
+              >
+                {copiedHandover ? 'Đã sao chép' : 'Sao chép thông tin'}
+              </Button>
+              <Button variant="secondary" onClick={() => setCreatedTeacherInfo(null)}>
+                Đóng
+              </Button>
+            </div>
+          }
+        >
+          {createdTeacherInfo && (
+            <div className="space-y-3">
+              <div className="bg-muted p-4 rounded-card border border-line space-y-2.5 text-sm font-mono">
+                <div className="flex justify-between border-b border-line pb-2 font-sans">
+                  <span className="text-muted-foreground">Họ và tên:</span>
+                  <span className="font-bold text-foreground">{createdTeacherInfo.name}</span>
+                </div>
+                <div className="flex justify-between border-b border-line pb-2">
+                  <span className="text-muted-foreground font-sans">Mã giáo viên:</span>
+                  <span className="font-bold text-primary">{createdTeacherInfo.id}</span>
+                </div>
+                <div className="flex justify-between border-b border-line pb-2">
+                  <span className="text-muted-foreground font-sans">Tên đăng nhập:</span>
+                  <span className="font-bold text-foreground">{createdTeacherInfo.username}</span>
+                </div>
+                <div className="flex justify-between border-b border-line pb-2">
+                  <span className="text-muted-foreground font-sans">Mật khẩu mặc định:</span>
+                  <Badge tone="success">{createdTeacherInfo.defaultPassword}</Badge>
+                </div>
+                {createdTeacherInfo.phone && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground font-sans">Số điện thoại:</span>
+                    <span className="text-foreground">{createdTeacherInfo.phone}</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
