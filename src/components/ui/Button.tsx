@@ -4,7 +4,7 @@ import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
-export type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
+export type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-outline' | 'success';
 export type Size = 'sm' | 'md' | 'lg' | 'icon';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -22,6 +22,8 @@ const variants: Record<Variant, string> = {
     'bg-white text-foreground border border-line-strong hover:bg-muted active:scale-[0.98]',
   ghost: 'bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
   danger: 'bg-danger text-white hover:brightness-95 active:scale-[0.98]',
+  'danger-outline':
+    'bg-transparent text-danger border border-danger hover:bg-danger-soft active:scale-[0.98]',
   success: 'bg-success text-white hover:brightness-95 active:scale-[0.98]',
 };
 

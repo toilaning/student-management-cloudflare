@@ -691,7 +691,7 @@ export default function StudentClassesPage() {
                                   Đổi ca
                                 </Button>
                                 <Button
-                                  variant="danger"
+                                  variant="danger-outline"
                                   size="md"
                                   loading={actionLoadingId === cls.id}
                                   onClick={() => {
