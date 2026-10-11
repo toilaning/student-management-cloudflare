@@ -320,7 +320,11 @@ export default function StudentClassesPage() {
     // Lớp đang học: ưu tiên hiển thị giờ/thứ theo ca học sinh đã chọn; legacy fallback theo lớp.
     const startTime = section?.startTime || getClassTimeRange(cls, shifts).startTime;
     const endTime = section?.endTime || getClassTimeRange(cls, shifts).endTime;
-    const displayDays = section ? (section.scheduleDays?.length ? section.scheduleDays : cls.scheduleDays) : cls.scheduleDays;
+    // Ưu tiên ngày học mà chính học sinh này đã chọn trong ca; không có thì lấy lịch ca, rồi lịch lớp.
+    const myChosenDays = section ? (section.studentScheduleDays?.[currentUser?.id || ''] || []) : [];
+    const displayDays = section
+      ? (myChosenDays.length ? myChosenDays : section.scheduleDays?.length ? section.scheduleDays : cls.scheduleDays)
+      : cls.scheduleDays;
     const displayTeacher = section?.teacherId || cls.teacherId;
     return (
       <div className="bg-muted rounded-field p-3.5 border border-line space-y-2 text-[13px]">

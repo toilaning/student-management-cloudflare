@@ -194,6 +194,18 @@ function mapClassSectionFromDb(row: any): ClassSection {
     ? row.class_section_students.map((css: any) => css.student_id)
     : (row.studentIds || []);
 
+  // Thứ riêng của từng học sinh trong ca (class_section_students.schedule_days).
+  const studentScheduleDays: Record<string, number[]> = {};
+  if (Array.isArray(row.class_section_students)) {
+    for (const css of row.class_section_students) {
+      if (css.student_id === undefined || css.student_id === null) continue;
+      const days = Array.isArray(css.schedule_days)
+        ? css.schedule_days.map(Number).filter((d: number) => Number.isInteger(d))
+        : [];
+      studentScheduleDays[css.student_id] = days;
+    }
+  }
+
   return {
     id: row.id,
     classId: row.class_id,
@@ -205,6 +217,7 @@ function mapClassSectionFromDb(row: any): ClassSection {
     teacherId: row.teacher_id || undefined,
     isActive: row.is_active !== undefined ? Boolean(row.is_active) : true,
     studentIds,
+    studentScheduleDays,
     createdAt: row.created_at || undefined,
     updatedAt: row.updated_at || undefined,
   };
@@ -1125,7 +1138,7 @@ export class SupabaseRepository implements IRepository {
 
     const { data, error } = await client
       .from('class_sections')
-      .select('*, class_section_students(student_id)')
+      .select('*, class_section_students(student_id, schedule_days)')
       .eq('class_id', classId)
       .order('created_at', { ascending: true });
     if (error) throw new Error(error.message);
@@ -1138,7 +1151,7 @@ export class SupabaseRepository implements IRepository {
 
     const { data, error } = await client
       .from('class_sections')
-      .select('*, class_section_students(student_id)')
+      .select('*, class_section_students(student_id, schedule_days)')
       .eq('id', id)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -1159,7 +1172,7 @@ export class SupabaseRepository implements IRepository {
 
     const { data: sections, error: secErr } = await client
       .from('class_sections')
-      .select('*, class_section_students(student_id)')
+      .select('*, class_section_students(student_id, schedule_days)')
       .in('id', sectionIds);
     if (secErr) throw new Error(secErr.message);
     return (sections || []).map(mapClassSectionFromDb);
@@ -1171,7 +1184,7 @@ export class SupabaseRepository implements IRepository {
 
     const { data, error } = await client
       .from('class_sections')
-      .select('*, class_section_students(student_id)')
+      .select('*, class_section_students(student_id, schedule_days)')
       .eq('teacher_id', teacherId)
       .eq('is_active', true)
       .order('created_at', { ascending: true });
@@ -1185,7 +1198,7 @@ export class SupabaseRepository implements IRepository {
 
     const { data, error } = await client
       .from('class_sections')
-      .select('*, class_section_students(student_id)')
+      .select('*, class_section_students(student_id, schedule_days)')
       .order('created_at', { ascending: true });
     if (error) throw new Error(error.message);
     return (data || []).map(mapClassSectionFromDb);

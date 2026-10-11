@@ -52,6 +52,8 @@ export default function TeacherClassesPage() {
   const [filterMode, setFilterMode] = useState<'ALL' | 'MINE' | 'AVAILABLE'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [quickStudentId, setQuickStudentId] = useState<string | null>(null);
+  const [viewSection, setViewSection] = useState<ClassSection | null>(null);
+  const [filterDay, setFilterDay] = useState<number | null>(null);
 
   const loadData = async () => {
     if (!isReady || !currentUser?.id) return;
@@ -81,14 +83,19 @@ export default function TeacherClassesPage() {
     loadData();
   }, [currentUser, isReady]);
 
-  const handleOpenClassStudents = async (cls: ClassEntity) => {
+  const handleOpenClassStudents = async (cls: ClassEntity, section?: ClassSection) => {
     setSelectedClassForView(cls);
+    setViewSection(section || null);
+    setFilterDay(null);
     setLoadingStudents(true);
     try {
       const res = await fetch('/api/students?limit=1000');
       const data = await res.json();
       const allSt = data.students || [];
-      const enrolled = allSt.filter((s: any) => (cls.studentIds || []).includes(s.id)).map((s: any, i: number) => ({ ...s, _idx: i + 1 }));
+      const rosterIds = section?.studentIds?.length ? section.studentIds : (cls.studentIds || []);
+      const enrolled = allSt
+        .filter((s: any) => rosterIds.includes(s.id))
+        .map((s: any, i: number) => ({ ...s, _idx: i + 1 }));
       setClassStudents(enrolled);
     } catch (e) {
       console.error(e);
@@ -224,6 +231,35 @@ export default function TeacherClassesPage() {
       ),
     },
     {
+      key: 'days',
+      header: 'Thứ học',
+      align: 'center',
+      render: (st) => {
+        if (!viewSection) {
+          const days = selectedClassForView?.scheduleDays || [];
+          return (
+            <span className="text-[11px] text-muted-foreground">
+              {days.length ? days.map((d) => dayLabel(d)).join(', ') : 'Chưa xếp thứ'}
+            </span>
+          );
+        }
+        const days = sectionDaysFor(st.id);
+        return (
+          <div className="flex flex-wrap gap-1 justify-center">
+            {days.length > 0 ? (
+              days.map((d) => (
+                <span key={d} className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-semibold text-muted-foreground">
+                  {dayLabel(d)}
+                </span>
+              ))
+            ) : (
+              <span className="text-[10px] text-muted-foreground">Cả tuần</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       key: 'sessions',
       header: 'Buổi còn',
       align: 'center',
@@ -251,6 +287,21 @@ export default function TeacherClassesPage() {
       ),
     },
   ];
+
+  /** Thứ thực tế của học sinh trong ca: thứ riêng nếu có, rỗng = theo đủ lịch ca. */
+  const sectionDaysFor = (studentId: string): number[] => {
+    if (!viewSection) return [];
+    const own = viewSection.studentScheduleDays?.[studentId];
+    if (own && own.length > 0) return own;
+    return viewSection.scheduleDays || [];
+  };
+
+  const dayLabel = (d: number) => (d === 8 ? 'CN' : 'T' + d);
+
+  const filteredClassStudents = useMemo(() => {
+    if (filterDay === null || !viewSection) return classStudents;
+    return classStudents.filter((st) => sectionDaysFor(st.id).includes(filterDay));
+  }, [classStudents, filterDay, viewSection]);
 
   return (
     <RoleGuard allowedRoles={['TEACHER', 'ADMIN']}>
@@ -399,7 +450,7 @@ export default function TeacherClassesPage() {
 
                         <button
                           type="button"
-                          onClick={() => handleOpenClassStudents(cls)}
+                          onClick={() => handleOpenClassStudents(cls, section)}
                           className="flex items-center justify-between w-full pt-2 border-t border-line hover:text-primary transition cursor-pointer text-left"
                           title="Bấm để xem danh sách học viên"
                         >
@@ -407,7 +458,7 @@ export default function TeacherClassesPage() {
                             <Users size={13} className="text-primary" /> Sĩ số đăng ký:
                           </span>
                           <span className="font-bold text-primary-ink bg-primary-soft px-2 py-0.5 rounded-pill text-xs flex items-center gap-1 tabular">
-                            {cls.studentIds.length} học viên <ChevronRight size={12} />
+                            {(section.studentIds?.length ?? cls.studentIds.length)} học viên <ChevronRight size={12} />
                           </span>
                         </button>
                       </div>
@@ -455,7 +506,10 @@ export default function TeacherClassesPage() {
           title={selectedClassForView ? 'Danh sách học viên: ' + selectedClassForView.name : ''}
           description={
             selectedClassForView
-              ? 'Môn: ' + selectedClassForView.subject + ' • Thứ ' + (selectedClassForView.scheduleDays?.join(', ') || '')
+              ? 'Môn: ' + selectedClassForView.subject + ' • ' +
+                (viewSection
+                  ? viewSection.name + ' (' + (viewSection.startTime || '') + ' - ' + (viewSection.endTime || '') + ')'
+                  : 'Thứ ' + (selectedClassForView.scheduleDays?.join(', ') || ''))
               : ''
           }
           size="lg"
@@ -486,9 +540,41 @@ export default function TeacherClassesPage() {
                 </div>
               )}
 
+              {viewSection && (
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  <button
+                    type="button"
+                    onClick={() => setFilterDay(null)}
+                    className={
+                      'px-2.5 py-1 rounded-pill text-[11px] font-semibold border transition ' +
+                      (filterDay === null
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-card text-muted-foreground border-line hover:bg-muted')
+                    }
+                  >
+                    Tất cả
+                  </button>
+                  {[2, 3, 4, 5, 6, 7, 8].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setFilterDay(filterDay === d ? null : d)}
+                      className={
+                        'px-2.5 py-1 rounded-pill text-[11px] font-semibold border transition ' +
+                        (filterDay === d
+                          ? 'bg-primary text-white border-primary'
+                          : 'bg-card text-muted-foreground border-line hover:bg-muted')
+                      }
+                    >
+                      {dayLabel(d)}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <DataTable
                 columns={studentColumns}
-                rows={classStudents}
+                rows={filteredClassStudents}
                 rowKey={(st) => st.id}
                 loading={loadingStudents}
                 emptyTitle="Lớp chưa có học viên nào đăng ký"

@@ -168,12 +168,9 @@ function AdminAttendanceContent() {
         const data = await res.json();
         const existingRecords: AttendanceRecord[] = data.records || [];
 
-        const clsRes = await fetch('/api/classes?id=' + slot.classId);
-        const clsData = await clsRes.json();
-        const targetClass: ClassEntity = clsData.class;
-        const rosterStudentIds: string[] = targetClass?.studentIds || [];
-
-        const allStudentIds = new Set<string>([...rosterStudentIds]);
+        // API đã trả roster theo ca (kèm placeholder 'Chưa điểm danh').
+        // Chỉ dựng danh sách từ chính bản ghi ca, không trộn lại studentIds cấp lớp.
+        const allStudentIds = new Set<string>();
         existingRecords.forEach((r) => allStudentIds.add(r.studentId));
 
         const mergedRecords: ExtendedAttendanceRecord[] = Array.from(allStudentIds).map((stId) => {

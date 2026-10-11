@@ -27,6 +27,8 @@ export interface ClassSection {
   teacherId?: string;
   isActive: boolean;
   studentIds?: string[];  // Danh sách học sinh thuộc ca (nạp khi cần)
+  // Thứ riêng từng học sinh trong ca: studentId -> danh sách thứ (2..8). Rỗng = theo đủ lịch ca.
+  studentScheduleDays?: Record<string, number[]>;
   createdAt?: string;
   updatedAt?: string;
 }

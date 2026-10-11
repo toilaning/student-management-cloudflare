@@ -223,19 +223,26 @@ export class LocalRepository implements IRepository {
   }
 
   // Class Sections
+  private withStudentScheduleDays(section: ClassSection): ClassSection {
+    const studentIds = this.classSectionStudents.get(section.id) || section.studentIds || [];
+    const studentScheduleDays: Record<string, number[]> = {};
+    const daysMap = this.classSectionStudentDays.get(section.id) || {};
+    for (const stId of studentIds) {
+      studentScheduleDays[stId] = daysMap[stId] || [];
+    }
+    return { ...section, studentIds, studentScheduleDays };
+  }
+
   public async getClassSections(classId: string): Promise<ClassSection[]> {
     const list = Array.from(this.classSections.values()).filter(s => s.classId === classId);
-    const joined = list.map(s => ({
-      ...s,
-      studentIds: this.classSectionStudents.get(s.id) || s.studentIds || [],
-    }));
+    const joined = list.map(s => this.withStudentScheduleDays(s));
     return joined.sort((a, b) => (a.shiftId || 0) - (b.shiftId || 0));
   }
 
   public async getSectionById(id: string): Promise<ClassSection | null> {
     const sec = this.classSections.get(id) || null;
     if (sec) {
-      return { ...sec, studentIds: this.classSectionStudents.get(id) || sec.studentIds || [] };
+      return this.withStudentScheduleDays(sec);
     }
     return null;
   }
@@ -245,7 +252,7 @@ export class LocalRepository implements IRepository {
     for (const sec of this.classSections.values()) {
       const ids = this.classSectionStudents.get(sec.id) || sec.studentIds || [];
       if (ids.includes(studentId)) {
-        result.push({ ...sec, studentIds: ids });
+        result.push(this.withStudentScheduleDays(sec));
       }
     }
     return result;
@@ -255,7 +262,7 @@ export class LocalRepository implements IRepository {
     const result: ClassSection[] = [];
     for (const sec of this.classSections.values()) {
       if (sec.teacherId === teacherId && sec.isActive !== false) {
-        result.push({ ...sec, studentIds: this.classSectionStudents.get(sec.id) || sec.studentIds || [] });
+        result.push(this.withStudentScheduleDays(sec));
       }
     }
     return result.sort((a, b) => (a.shiftId || 0) - (b.shiftId || 0));
@@ -264,7 +271,7 @@ export class LocalRepository implements IRepository {
   public async getAllClassSections(): Promise<ClassSection[]> {
     const result: ClassSection[] = [];
     for (const sec of this.classSections.values()) {
-      result.push({ ...sec, studentIds: this.classSectionStudents.get(sec.id) || sec.studentIds || [] });
+      result.push(this.withStudentScheduleDays(sec));
     }
     return result.sort((a, b) => (a.shiftId || 0) - (b.shiftId || 0));
   }

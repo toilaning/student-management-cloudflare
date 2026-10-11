@@ -129,6 +129,8 @@ export default function AdminClassesPage() {
   const [modalLoading, setModalLoading] = useState(false);
   const [sections, setSections] = useState<ClassSection[]>([]);
   const [selectedSectionId, setSelectedSectionId] = useState('');
+  // Lọc học viên theo thứ (null = tất cả). Chỉ áp dụng cho ca đang chọn.
+  const [filterDay, setFilterDay] = useState<number | null>(null);
   // Popup thêm/sửa một ca trong lớp đã có
   const [editingSection, setEditingSection] = useState<ClassSection | null>(null);
   const [sectionFormOpen, setSectionFormOpen] = useState(false);
@@ -174,6 +176,14 @@ export default function AdminClassesPage() {
     if (!days || days.length === 0) return 'Chưa xếp thứ';
     const sorted = [...days].sort((a, b) => a - b);
     return sorted.map((d) => (d === 8 ? 'CN' : 'T' + d)).join(', ');
+  };
+
+  /** Thứ thực tế của một học sinh trong ca: ưu tiên thứ riêng, rỗng = theo đủ lịch ca. */
+  const studentDaysInSection = (sec: ClassSection | undefined, studentId: string): number[] => {
+    if (!sec) return [];
+    const own = sec.studentScheduleDays?.[studentId];
+    if (own && own.length > 0) return own;
+    return sec.scheduleDays || [];
   };
 
   const loadData = async () => {
@@ -336,6 +346,7 @@ export default function AdminClassesPage() {
       const firstSec = secList[0] || null;
       const selectedId = firstSec ? firstSec.id : '';
       setSelectedSectionId(selectedId);
+      setFilterDay(null);
       setEnrolledStudents(
         firstSec
           ? studentsList.filter((s) => (firstSec.studentIds || []).includes(s.id))
@@ -350,6 +361,7 @@ export default function AdminClassesPage() {
 
   const handleSectionChange = (sectionId: string) => {
     setSelectedSectionId(sectionId);
+    setFilterDay(null);
     const sec = sections.find((x) => x.id === sectionId);
     setEnrolledStudents(sec ? allStudents.filter((s) => (sec.studentIds || []).includes(s.id)) : []);
   };
@@ -1767,9 +1779,50 @@ export default function AdminClassesPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Học viên đang học ({enrolledStudents.length})
+                  Học viên đang học (
+                  {(() => {
+                    const activeSec = sections.find((x) => x.id === selectedSectionId);
+                    return enrolledStudents.filter((st) => {
+                      if (filterDay === null) return true;
+                      return studentDaysInSection(activeSec, st.id).includes(filterDay);
+                    }).length;
+                  })()}
+                  )
                 </span>
               </div>
+
+              {/* Bộ lọc theo thứ (chỉ lọc trong ca đang chọn) */}
+              {sections.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  <button
+                    type="button"
+                    onClick={() => setFilterDay(null)}
+                    className={
+                      'px-2.5 py-1 rounded-pill text-[11px] font-semibold border transition ' +
+                      (filterDay === null
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-card text-muted-foreground border-line hover:bg-muted')
+                    }
+                  >
+                    Tất cả
+                  </button>
+                  {WEEK_DAY_OPTIONS.map((d) => (
+                    <button
+                      key={d.value}
+                      type="button"
+                      onClick={() => setFilterDay(filterDay === d.value ? null : d.value)}
+                      className={
+                        'px-2.5 py-1 rounded-pill text-[11px] font-semibold border transition ' +
+                        (filterDay === d.value
+                          ? 'bg-primary text-white border-primary'
+                          : 'bg-card text-muted-foreground border-line hover:bg-muted')
+                      }
+                    >
+                      {d.short}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               <div className="border border-line rounded-card overflow-hidden divide-y divide-line max-h-52 overflow-y-auto">
                 {modalLoading ? (
@@ -1779,30 +1832,60 @@ export default function AdminClassesPage() {
                     Lớp hiện chưa có học viên nào.
                   </div>
                 ) : (
-                  enrolledStudents.map((st) => (
-                    <div
-                      key={st.id}
-                      className="p-3 flex items-center justify-between text-xs hover:bg-muted/40 transition-colors"
-                    >
-                      <div>
-                        <div className="font-semibold text-foreground">
-                          {st.id} - {st.name}
+                  (() => {
+                    const activeSec = sections.find((x) => x.id === selectedSectionId);
+                    const visible = enrolledStudents.filter((st) => {
+                      if (filterDay === null) return true;
+                      return studentDaysInSection(activeSec, st.id).includes(filterDay);
+                    });
+                    if (visible.length === 0) {
+                      return (
+                        <div className="p-6 text-center text-xs text-muted-foreground">
+                          Không có học viên học vào thứ này.
                         </div>
-                        <div className="text-[11px] text-muted-foreground">
-                          {st.phone || '—'}
+                      );
+                    }
+                    return visible.map((st) => {
+                      const days = studentDaysInSection(activeSec, st.id);
+                      return (
+                        <div
+                          key={st.id}
+                          className="p-3 flex items-center justify-between text-xs hover:bg-muted/40 transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <div className="font-semibold text-foreground">
+                              {st.id} - {st.name}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5 flex-wrap">
+                              {st.phone || '—'}
+                              <span className="text-line">•</span>
+                              <span className="inline-flex items-center gap-1">
+                                {days.length > 0
+                                  ? days.map((d) => (
+                                      <span
+                                        key={d}
+                                        className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-semibold text-muted-foreground"
+                                      >
+                                        {d === 8 ? 'CN' : 'T' + d}
+                                      </span>
+                                    ))
+                                  : 'Cả tuần'}
+                              </span>
+                            </div>
+                          </div>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-muted-foreground hover:text-danger h-8 w-8 shrink-0"
+                            onClick={() => handleEnrollAction(st.id, 'UNENROLL')}
+                            title="Xoá học viên khỏi lớp"
+                          >
+                            <Trash2 size={14} />
+                          </Button>
                         </div>
-                      </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-muted-foreground hover:text-danger h-8 w-8"
-                        onClick={() => handleEnrollAction(st.id, 'UNENROLL')}
-                        title="Xoá học viên khỏi lớp"
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    </div>
-                  ))
+                      );
+                    });
+                  })()
                 )}
               </div>
             </div>
