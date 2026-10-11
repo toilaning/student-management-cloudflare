@@ -10,6 +10,9 @@ export async function GET(request: Request) {
   const teacherId = searchParams.get('teacherId');
 
   let requests = await repo.getAllRequests();
+  // Gộp sẵn tên học sinh vào response để portal giáo viên không phải gọi thêm /api/students?limit=all.
+  const allStudents = await repo.getAllStudents();
+  const studentNameMap = new Map(allStudents.map(s => [s.id, s.name]));
   if (studentId) {
     requests = requests.filter(r => r.studentId === studentId);
   }
@@ -26,7 +29,12 @@ export async function GET(request: Request) {
   // Sắp xếp đơn mới nhất lên đầu
   requests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  return NextResponse.json({ requests });
+  return NextResponse.json({
+    requests: requests.map(r => ({
+      ...r,
+      studentName: studentNameMap.get(r.studentId) || r.studentId,
+    })),
+  });
 }
 
 export async function POST(request: Request) {

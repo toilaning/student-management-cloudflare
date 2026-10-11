@@ -67,6 +67,7 @@ export interface StudentSlotSwap {
 export interface ClassRequest {
   id: string; // REQ001..
   studentId: string;
+  studentName?: string; // Tên học sinh (do /api/requests bổ sung để portal không cần fetch thêm)
   classId: string;
   scheduleSlotId: string;
   type: RequestType;

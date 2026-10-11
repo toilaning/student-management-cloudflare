@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { User } from '@/types/auth';
 
 interface AppContextType {
@@ -20,11 +20,17 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUserState] = useState<User | null>(null);
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isReady, setIsReady] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const currentUserRef = useRef<User | null>(null);
+
+  const applyUser = (user: User | null) => {
+    currentUserRef.current = user;
+    setCurrentUserState(user);
+  };
 
   // Khởi tạo nhanh từ localStorage ngay khi mount ở client
   useEffect(() => {
@@ -34,18 +40,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (savedUserJson) {
           const parsedUser = JSON.parse(savedUserJson);
           if (parsedUser && parsedUser.id && parsedUser.role) {
-            setCurrentUser(parsedUser);
+            applyUser(parsedUser);
           } else {
-            setCurrentUser(null);
+            applyUser(null);
           }
         } else {
-          setCurrentUser(null);
+          applyUser(null);
         }
       } catch (err) {
         console.error('Lỗi khi đọc user từ localStorage:', err);
-        setCurrentUser(null);
+        applyUser(null);
       } finally {
         setIsReady(true);
+        setIsLoading(false);
       }
     }
   }, []);
@@ -58,7 +65,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const users: User[] = data.users || [];
         setAvailableUsers(users);
 
-        if (typeof window !== 'undefined') {
+        if (!currentUserRef.current && typeof window !== 'undefined') {
           const savedUserId = localStorage.getItem('active_user_id');
           const savedUserJson = localStorage.getItem('active_user');
           let targetUser: User | undefined;
@@ -79,7 +86,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
 
           if (targetUser) {
-            setCurrentUser(targetUser);
+            applyUser(targetUser);
             localStorage.setItem('active_user_id', targetUser.id);
             localStorage.setItem('active_user', JSON.stringify(targetUser));
           }
@@ -99,7 +106,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = (user: User) => {
-    setCurrentUser(user);
+    applyUser(user);
     if (typeof window !== 'undefined') {
       localStorage.setItem('active_user_id', user.id);
       localStorage.setItem('active_user', JSON.stringify(user));
@@ -111,13 +118,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('active_user_id');
       localStorage.removeItem('active_user');
       localStorage.removeItem('auth_token');
-      setCurrentUser(null);
+      applyUser(null);
       window.location.href = '/login';
     }
   };
 
   const handleSetCurrentUser = (user: User | null) => {
-    setCurrentUser(user);
+    applyUser(user);
     if (typeof window !== 'undefined') {
       if (user) {
         localStorage.setItem('active_user_id', user.id);

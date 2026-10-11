@@ -30,7 +30,6 @@ interface RequestRowItem extends ClassRequest {
 export default function TeacherRequestsPage() {
   const { currentUser, isReady } = useApp();
   const [requests, setRequests] = useState<ClassRequest[]>([]);
-  const [studentsMap, setStudentsMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -50,20 +49,9 @@ export default function TeacherRequestsPage() {
     if (!isReady || !currentUser?.id) return;
     setLoading(true);
     try {
-      const [res, stRes] = await Promise.all([
-        fetch(`/api/requests?teacherId=${currentUser.id}`),
-        fetch('/api/students?limit=all'),
-      ]);
+      const res = await fetch(`/api/requests?teacherId=${currentUser.id}`);
       const data = await res.json();
       setRequests(data.requests || []);
-      const stData = await stRes.json();
-      const stMap: Record<string, any> = {};
-      if (stData.students) {
-        stData.students.forEach((s: any) => {
-          stMap[s.id] = s;
-        });
-      }
-      setStudentsMap(stMap);
     } catch (e) {
       console.error(e);
     } finally {
@@ -170,7 +158,7 @@ export default function TeacherRequestsPage() {
           <Avatar name={r.studentId} size={36} />
           <div className="min-w-0">
             <p className="font-semibold text-foreground text-sm truncate">
-              {studentsMap[r.studentId]?.name || 'Học viên ' + r.studentId}
+              {r.studentName || 'Học viên ' + r.studentId}
             </p>
             <p className="text-[12px] text-muted-foreground">Lớp {r.classId}</p>
           </div>
@@ -326,7 +314,7 @@ export default function TeacherRequestsPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <Avatar name={studentsMap[r.studentId]?.name || r.studentId} size={36} />
+                    <Avatar name={r.studentName || r.studentId} size={36} />
                     <div className="min-w-0">
                       <button
                         type="button"
@@ -334,7 +322,7 @@ export default function TeacherRequestsPage() {
                         className="font-semibold text-foreground text-sm truncate text-left cursor-pointer hover:opacity-80 transition"
                         title="Xem thông tin học sinh"
                       >
-                        {studentsMap[r.studentId]?.name || 'Học viên ' + r.studentId}
+                        {r.studentName || 'Học viên ' + r.studentId}
                       </button>
                       <p className="text-[12px] text-muted-foreground">Lớp {r.classId}</p>
                     </div>
