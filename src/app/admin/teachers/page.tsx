@@ -18,7 +18,6 @@ import {
   Users,
   UserCheck,
   UserX,
-  Plus,
   Edit,
   Trash2,
   AlertTriangle,
@@ -44,17 +43,6 @@ export default function AdminTeachersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Sheet Thêm giảng viên
-  const [showAddSheet, setShowAddSheet] = useState(false);
-  const [isSubmittingAdd, setIsSubmittingAdd] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    specialty: '',
-    hourlyRate: 350000,
-    phone: '',
-    bio: '',
-  });
-
   // Sheet Sửa giảng viên
   const [showEditSheet, setShowEditSheet] = useState(false);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
@@ -72,7 +60,7 @@ export default function AdminTeachersPage() {
   const [deletingTeacher, setDeletingTeacher] = useState<Teacher | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Sheet Tiếp nhận nhanh giáo viên
+  // Sheet Thêm tài khoản giáo viên
   const [showFastSheet, setShowFastSheet] = useState(false);
   const [fastLoading, setFastLoading] = useState(false);
   const [fastData, setFastData] = useState({
@@ -106,36 +94,6 @@ export default function AdminTeachersPage() {
   useEffect(() => {
     loadTeachers();
   }, []);
-
-  const handleAddTeacher = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name.trim() || !formData.phone.trim() || !formData.specialty.trim()) {
-      toast.error('Vui lòng điền đủ họ tên, chuyên môn và số điện thoại');
-      return;
-    }
-
-    setIsSubmittingAdd(true);
-    try {
-      const res = await fetch('/api/teachers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success(data.message || 'Thêm giáo viên mới thành công');
-        setShowAddSheet(false);
-        setFormData({ name: '', specialty: '', hourlyRate: 350000, phone: '', bio: '' });
-        await loadTeachers();
-      } else {
-        toast.error(data.error || 'Thêm giáo viên thất bại');
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Lỗi mạng khi thêm giáo viên');
-    } finally {
-      setIsSubmittingAdd(false);
-    }
-  };
 
   const handleOpenEdit = (tc: Teacher) => {
     setEditFormData({
@@ -230,7 +188,7 @@ export default function AdminTeachersPage() {
           phone: data.teacher.phone || '',
         });
         setFastData({ name: '', phone: '' });
-        toast.success('Tiếp nhận nhanh giáo viên thành công');
+        toast.success('Thêm tài khoản giáo viên thành công');
         await loadTeachers();
       } else {
         toast.error(data.error || 'Tạo nhanh giáo viên thất bại');
@@ -440,22 +398,13 @@ Lưu ý: Vui lòng đăng nhập và đổi mật khẩu trong lần đầu sử
                 className="w-full sm:w-80"
               />
 
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="primary"
-                  icon={<Plus size={16} />}
-                  onClick={() => setShowAddSheet(true)}
-                >
-                  Thêm giáo viên
-                </Button>
-                <Button
-                  variant="secondary"
-                  icon={<Zap size={16} />}
-                  onClick={() => setShowFastSheet(true)}
-                >
-                  Tiếp nhận nhanh
-                </Button>
-              </div>
+              <Button
+                variant="primary"
+                icon={<Zap size={16} />}
+                onClick={() => setShowFastSheet(true)}
+              >
+                Thêm tài khoản giáo viên
+              </Button>
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 border-t border-line">
@@ -553,78 +502,6 @@ Lưu ý: Vui lòng đăng nhập và đổi mật khẩu trong lần đầu sử
             }
           />
         </main>
-
-        {/* Sheet Thêm giáo viên */}
-        <Sheet
-          isOpen={showAddSheet}
-          onClose={() => setShowAddSheet(false)}
-          title="Thêm giáo viên mới"
-          description="Khai báo hồ sơ giáo viên để phân công giảng dạy và tính thù lao"
-          footer={
-            <div className="flex flex-col-reverse sm:flex-row gap-2 w-full sm:w-auto">
-              <Button variant="secondary" onClick={() => setShowAddSheet(false)}>
-                Hủy
-              </Button>
-              <Button
-                variant="primary"
-                loading={isSubmittingAdd}
-                onClick={handleAddTeacher}
-              >
-                Lưu giáo viên
-              </Button>
-            </div>
-          }
-        >
-          <form onSubmit={handleAddTeacher} className="space-y-4 pt-1">
-            <Field label="Họ và tên" required>
-              <Input
-                required
-                placeholder="Ví dụ: Thầy Trần Quang Huy"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </Field>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Field label="Chuyên môn giảng dạy" required>
-                <Input
-                  required
-                  placeholder="Ví dụ: Toán Nâng Cao, IELTS..."
-                  value={formData.specialty}
-                  onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
-                />
-              </Field>
-              <Field label="Đơn giá giờ dạy (VNĐ)" required>
-                <Input
-                  type="number"
-                  required
-                  step={10000}
-                  value={formData.hourlyRate}
-                  onChange={(e) => setFormData({ ...formData, hourlyRate: Number(e.target.value) })}
-                />
-              </Field>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Field label="Số điện thoại" required>
-                <Input
-                  required
-                  placeholder="0913..."
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </Field>
-            </div>
-
-            <Field label="Mô tả / Tiểu sử ngắn">
-              <Textarea
-                placeholder="Kinh nghiệm giảng dạy, chứng chỉ chuyên môn..."
-                value={formData.bio}
-                onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-              />
-            </Field>
-          </form>
-        </Sheet>
 
         {/* Sheet Chỉnh sửa giáo viên */}
         <Sheet
@@ -747,11 +624,11 @@ Lưu ý: Vui lòng đăng nhập và đổi mật khẩu trong lần đầu sử
           )}
         </Sheet>
 
-        {/* Sheet Tiếp nhận nhanh giáo viên */}
+        {/* Sheet Thêm tài khoản giáo viên */}
         <Sheet
           isOpen={showFastSheet}
           onClose={() => setShowFastSheet(false)}
-          title="Tiếp nhận nhanh giáo viên"
+          title="Thêm tài khoản giáo viên"
           description="Hệ thống tự động cấp mã, tài khoản đăng nhập và mật khẩu mặc định"
           size="md"
           footer={
