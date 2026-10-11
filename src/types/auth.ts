@@ -6,7 +6,6 @@ export interface User {
   passwordHash: string; // SHA-256
   role: Role;
   name: string;
-  email?: string;
   avatar?: string;
   isActive: boolean;
 }
@@ -17,7 +16,7 @@ export interface SessionContext {
 }
 
 export type PermissionAction = 'CREATE' | 'READ' | 'UPDATE' | 'DELETE' | 'APPROVE';
-export type Resource = 'STUDENT' | 'TEACHER' | 'CLASSROOM' | 'SCHEDULE' | 'ATTENDANCE' | 'PAYROLL' | 'TUITION' | 'AUDIT' | 'REQUEST';
+export type Resource = 'STUDENT' | 'TEACHER' | 'SCHEDULE' | 'ATTENDANCE' | 'PAYROLL' | 'TUITION' | 'AUDIT' | 'REQUEST';
 
 export interface Permission {
   role: Role;

@@ -1,7 +1,7 @@
 import { User } from '@/types/auth';
 import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
-import { Classroom, ClassEntity, ClassSection } from '@/types/classroom';
+import { ClassEntity, ClassSection } from '@/types/classroom';
 import { ScheduleSlot, ClassRequest, TIME_SHIFTS } from '@/types/schedule';
 import { AttendanceRecord } from '@/types/attendance';
 import { TuitionInvoice, PayrollRecord } from '@/types/finance';
@@ -53,7 +53,6 @@ export function generateSeedData() {
     passwordHash: '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', // SHA-256 của 'admin123'
     role: 'ADMIN',
     name: 'Quản Trị Viên Hệ Thống',
-    email: 'admin@trungtam.edu.vn',
     isActive: true,
   };
 
@@ -76,7 +75,6 @@ export function generateSeedData() {
     const teacher: Teacher = {
       id,
       name,
-      email: `${id.toLowerCase()}@trungtam.edu.vn`,
       phone: `09${getRandomNumber(10000000, 99999999)}`,
       specialty: mon.specialty,
       hourlyRate: rate,
@@ -93,24 +91,9 @@ export function generateSeedData() {
       passwordHash: 'cde383eee8ee7a4400adf7a15f716f179a2eb97646b37e089eb8d6d04e663416', // 'teacher123'
       role: 'TEACHER',
       name,
-      email: teacher.email,
       isActive: true,
     });
   }
-
-  // 3. 10 Phòng học (P.101..P.305)
-  const classrooms: Classroom[] = [
-    { id: 'P.101', name: 'Phòng Lý Thuyết 101', capacity: 35, facilities: ['Máy chiếu', 'Điều hòa', 'Loa âm trần'], status: 'Khả dụng' },
-    { id: 'P.102', name: 'Phòng Lý Thuyết 102', capacity: 35, facilities: ['Máy chiếu', 'Điều hòa', 'Loa âm trần'], status: 'Khả dụng' },
-    { id: 'P.103', name: 'Phòng Hội Thảo 103', capacity: 50, facilities: ['Màn hình LED', 'Điều hòa', 'Hệ thống Micro'], status: 'Khả dụng' },
-    { id: 'P.201', name: 'Phòng Lab Máy Tính 201', capacity: 30, facilities: ['30 Máy PC Core i7', 'Điều hòa', 'Mạng LAN gigabit'], status: 'Khả dụng' },
-    { id: 'P.202', name: 'Phòng Lab Máy Tính 202', capacity: 30, facilities: ['30 Máy PC Core i7', 'Điều hòa', 'Mạng LAN gigabit'], status: 'Khả dụng' },
-    { id: 'P.203', name: 'Phòng Ngoại Ngữ 203', capacity: 25, facilities: ['Tai nghe trợ thính', 'Bảng thông minh', 'Điều hòa'], status: 'Khả dụng' },
-    { id: 'P.301', name: 'Phòng Đa Năng 301', capacity: 30, facilities: ['Bảng viết kính', 'Điều hòa', 'Máy chiếu tương tác'], status: 'Khả dụng' },
-    { id: 'P.302', name: 'Phòng Thí Nghiệm 302', capacity: 25, facilities: ['Dụng cụ thí nghiệm', 'Tủ hút', 'Điều hòa'], status: 'Khả dụng' },
-    { id: 'P.303', name: 'Phòng Tự Học 303', capacity: 40, facilities: ['Bàn học cá nhân', 'Wifi High-speed', 'Điều hòa'], status: 'Khả dụng' },
-    { id: 'P.305', name: 'Phòng Đào Tạo Chuyên Sâu 305', capacity: 20, facilities: ['Bảng Flipchart', 'Điều hòa', 'Smart TV 75 inch'], status: 'Khả dụng' },
-  ];
 
   // 4. 400 Học viên (ST001..ST400)
   const students: Student[] = [];
@@ -128,7 +111,6 @@ export function generateSeedData() {
     const student: Student = {
       id,
       name,
-      email: `${id.toLowerCase()}@hocvien.edu.vn`,
       phone: `03${getRandomNumber(10000000, 99999999)}`,
       dateOfBirth: `${birthYear}-${birthMonth}-${birthDay}`,
       gender: isMale ? 'Nam' : 'Nữ',
@@ -145,7 +127,6 @@ export function generateSeedData() {
       passwordHash: '703b0a3d6ad75b649a28adde7d83c6251da457549263bc7ff45ec709b0a8448b', // 'student123'
       role: 'STUDENT',
       name,
-      email: student.email,
       isActive: true,
     });
   }
@@ -154,7 +135,7 @@ export function generateSeedData() {
   // - 15 lớp chạy Thứ 2, 4, 6 (days: [2, 4, 6])
   // - 15 lớp chạy Thứ 3, 5, 7 (days: [3, 5, 7])
   // Trong mỗi nhóm 15 lớp, chia đều vào 5 ca (mỗi ca 3 lớp).
-  // 3 lớp trong cùng ca sử dụng 3 phòng khác nhau và 3 giáo viên khác nhau!
+  // 3 lớp trong cùng ca sử dụng 3 giáo viên khác nhau!
   const classes: ClassEntity[] = [];
 
   // Sinh ca học cho từng lớp (mỗi lớp có 1 ca mặc định trong seed, thừa kế thông tin lớp).
@@ -167,9 +148,6 @@ export function generateSeedData() {
 
     const days = isGroupA ? [2, 4, 6] : [3, 5, 7];
     const shiftId = Math.floor(groupIndex / 3) + 1; // 1, 2, 3, 4, 5
-    const roomInShift = groupIndex % 3; // 0, 1, 2
-    const room = isGroupA ? classrooms[roomInShift] : classrooms[3 + roomInShift];
-
     // Giáo viên trong ca phải khác nhau
     const teacher = isGroupA ? teachers[groupIndex] : teachers[groupIndex % teachers.length];
 
@@ -196,7 +174,6 @@ export function generateSeedData() {
       name: `Lớp ${mon.name} - K${idx + 1}`,
       subject: mon.name,
       teacherId: teacher.id,
-      roomId: room.id,
       studentIds: classStudentIds,
       tuitionFee: mon.fee,
       meetingLink: `https://meet.google.com/room-${classId.toLowerCase()}`,
@@ -215,7 +192,6 @@ export function generateSeedData() {
       endTime: shift.endTime,
       scheduleDays: [...days],
       teacherId: teacher.id,
-      roomId: room.id,
       isActive: true,
       studentIds: [...classStudentIds],
     });
@@ -264,7 +240,6 @@ export function generateSeedData() {
           classId: cls.id,
           sectionId: 'SEC_' + cls.id,
           teacherId: cls.teacherId,
-          roomId: cls.roomId,
           date: dateStr,
           shiftId: cls.shiftId ?? 1,
           startTime: shift.startTime,
@@ -463,7 +438,6 @@ export function generateSeedData() {
   return {
     users,
     teachers,
-    classrooms,
     students,
     classes,
     sections,

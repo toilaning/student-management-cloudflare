@@ -17,7 +17,6 @@ test('ConflictEngine Suite: Phát hiện xung đột lịch học', async (t) =>
     const multiClassSlot: Omit<ScheduleSlot, 'id'> = {
       classId: 'CLS_OTHER',
       teacherId: baseSlot.teacherId, // Cùng giáo viên dạy song song lớp khác
-      roomId: 'P.ROOM_DIFF',          // Phòng khác
       date: baseSlot.date,           // Cùng ngày
       shiftId: baseSlot.shiftId,     // Cùng ca
       startTime: baseSlot.startTime,
@@ -31,29 +30,10 @@ test('ConflictEngine Suite: Phát hiện xung đột lịch học', async (t) =>
     assert.equal(teacherConflict, undefined, 'Giáo viên được phép dạy nhiều lớp cùng lúc');
   });
 
-  await t.test('2. Trung tâm 100% Online: Nhiều lớp có thể dùng chung link Discord/Phòng Online', async () => {
-    const onlineSlot: Omit<ScheduleSlot, 'id'> = {
-      classId: 'CLS_OTHER',
-      teacherId: 'GV_OTHER',
-      roomId: 'ONLINE',
-      date: baseSlot.date,
-      shiftId: baseSlot.shiftId,
-      startTime: baseSlot.startTime,
-      endTime: baseSlot.endTime,
-      subject: 'Môn Khác',
-      status: 'Đã lên lịch',
-    };
-
-    const result = await conflictEngine.checkScheduleConflict(onlineSlot);
-    const roomConflict = result.conflicts.find(c => c.type === 'ROOM_CONFLICT');
-    assert.equal(roomConflict, undefined, 'Mô hình 100% Online không báo lỗi trùng phòng vật lý');
-  });
-
   await t.test('3. Phát hiện trùng lớp khi 1 lớp bị xếp 2 môn trong cùng 1 ca', async () => {
     const conflictingSlot: Omit<ScheduleSlot, 'id'> = {
       classId: baseSlot.classId,     // Cùng lớp học
       teacherId: 'GV_OTHER',         // Giáo viên khác
-      roomId: 'P.ROOM_DIFF',         // Phòng khác
       date: baseSlot.date,           // Cùng ngày
       shiftId: baseSlot.shiftId,     // Cùng ca
       startTime: baseSlot.startTime,
@@ -72,7 +52,6 @@ test('ConflictEngine Suite: Phát hiện xung đột lịch học', async (t) =>
     const validSlotDiffDate: Omit<ScheduleSlot, 'id'> = {
       classId: baseSlot.classId,
       teacherId: baseSlot.teacherId,
-      roomId: baseSlot.roomId,
       date: '2026-10-15',            // Khác ngày hoàn toàn
       shiftId: baseSlot.shiftId,
       startTime: baseSlot.startTime,
@@ -87,7 +66,6 @@ test('ConflictEngine Suite: Phát hiện xung đột lịch học', async (t) =>
     const validSlotDiffShift: Omit<ScheduleSlot, 'id'> = {
       classId: baseSlot.classId,
       teacherId: baseSlot.teacherId,
-      roomId: baseSlot.roomId,
       date: baseSlot.date,
       shiftId: (baseSlot.shiftId % 5) + 1, // Khác ca
       startTime: '18:30',
@@ -100,7 +78,7 @@ test('ConflictEngine Suite: Phát hiện xung đột lịch học', async (t) =>
     const existingInSameShift = existingSlots.some(
       s => s.date === baseSlot.date && 
            s.shiftId === validSlotDiffShift.shiftId && 
-           (s.teacherId === baseSlot.teacherId || s.roomId === baseSlot.roomId || s.classId === baseSlot.classId)
+           (s.teacherId === baseSlot.teacherId || s.classId === baseSlot.classId)
     );
     if (!existingInSameShift) {
       const res2 = await conflictEngine.checkScheduleConflict(validSlotDiffShift);
@@ -112,7 +90,6 @@ test('ConflictEngine Suite: Phát hiện xung đột lịch học', async (t) =>
     const sameSlotData: Omit<ScheduleSlot, 'id'> = {
       classId: baseSlot.classId,
       teacherId: baseSlot.teacherId,
-      roomId: baseSlot.roomId,
       date: baseSlot.date,
       shiftId: baseSlot.shiftId,
       startTime: baseSlot.startTime,

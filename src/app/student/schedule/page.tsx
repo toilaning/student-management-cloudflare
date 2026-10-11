@@ -452,10 +452,6 @@ export default function StudentSchedulePage() {
                                       <UserCheck size={11} className="shrink-0 text-primary" />
                                       <span className="truncate">{slot.teacherId}</span>
                                     </div>
-                                    <div className="text-[11px] text-muted-foreground flex items-center gap-1">
-                                      <MapPin size={11} className="shrink-0 text-muted-foreground" />
-                                      <span className="truncate">{slot.roomId}</span>
-                                    </div>
                                     {meetingLink ? (
                                       <a
                                         href={meetingLink}

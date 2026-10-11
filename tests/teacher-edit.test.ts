@@ -18,7 +18,6 @@ describe('Teacher Management & Edit Profile Suite', () => {
         name: 'Thầy Nguyễn Văn A (Master)',
         specialty: 'Toán Olympic & Luyện Thi Chuyên', // Text tự do theo yêu cầu người dùng
         phone: '0988776655',
-        email: 'nguyenvana.olympic@teacher.local',
         bio: 'Hơn 10 năm kinh nghiệm bồi dưỡng học sinh giỏi',
         status: 'Đang dạy'
       })

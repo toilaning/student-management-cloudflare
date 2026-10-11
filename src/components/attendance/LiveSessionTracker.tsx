@@ -28,7 +28,6 @@ interface LiveSessionData {
     id: string;
     classId: string;
     subject: string;
-    roomId: string;
     teacherId: string;
     startTime: string;
     endTime: string;
@@ -214,11 +213,6 @@ export function LiveSessionTracker({
             </Badge>
           </div>
           <div className="flex items-center gap-3.5 mt-2 text-xs text-muted-foreground flex-wrap">
-            <span className="flex items-center gap-1.5">
-              <MapPin size={13} className="text-subtle-foreground" />
-              Phòng: <strong className="text-foreground font-semibold">{slot.roomId}</strong>
-            </span>
-            <span className="text-line-strong">•</span>
             <span className="flex items-center gap-1.5">
               <User size={13} className="text-subtle-foreground" />
               Giáo viên: <strong className="text-foreground font-semibold">{slot.teacherId}</strong>

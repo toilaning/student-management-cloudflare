@@ -20,7 +20,6 @@ export interface ScheduleSlot {
   classId: string;
   sectionId?: string; // Ca học (class_sections) mà buổi này thuộc về; nullable với dữ liệu cũ
   teacherId: string;
-  roomId: string;
   date: string; // YYYY-MM-DD (e.g. "2026-09-01")
   shiftId: number; // 1..5
   startTime: string; // "08:00"
@@ -45,7 +44,7 @@ export type TeacherCheckinStatus = 'Chưa chấm công' | 'Đúng giờ' | 'Đi 
 export type TeacherCheckinMethod = 'TEACHER_SELF' | 'ADMIN' | 'SYSTEM';
 
 export interface ScheduleConflict {
-  type: 'TEACHER_CONFLICT' | 'ROOM_CONFLICT' | 'CLASS_CONFLICT';
+  type: 'TEACHER_CONFLICT' | 'CLASS_CONFLICT';
   message: string;
   conflictingSlot: ScheduleSlot;
 }

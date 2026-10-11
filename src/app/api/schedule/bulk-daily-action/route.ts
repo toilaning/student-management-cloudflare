@@ -5,7 +5,7 @@ import { ConflictEngine } from '@/services/ConflictEngine';
 
 export const dynamic = 'force-dynamic';
 
-export type DailyActionType = 'RESCHEDULE_DAY' | 'SHIFT_MIGRATION' | 'CANCEL_DAY' | 'ROOM_MIGRATION';
+export type DailyActionType = 'RESCHEDULE_DAY' | 'SHIFT_MIGRATION' | 'CANCEL_DAY';
 
 export async function POST(request: Request) {
   try {
@@ -16,7 +16,6 @@ export async function POST(request: Request) {
       targetDate,
       fromShiftId,
       toShiftId,
-      targetRoomId,
       cancelStatus = 'Đã hủy', // 'Đã hủy' | 'Đổi lịch'
       actorId = 'ADMIN001',
     } = body;
@@ -136,48 +135,6 @@ export async function POST(request: Request) {
           targetResource: 'SCHEDULE',
           targetId: currentDate,
           details: `Chuyển ca học trong ngày ${currentDate} từ Ca ${fromShiftId} sang ${targetShift.name}: thành công ${updatedSlots.length}/${matchingSlots.length} ca.`,
-        });
-
-        break;
-      }
-
-      case 'ROOM_MIGRATION': {
-        if (!targetRoomId) {
-          return NextResponse.json(
-            { success: false, error: 'Vui lòng cung cấp targetRoomId' },
-            { status: 400 }
-          );
-        }
-
-        for (const slot of daySlots) {
-          const candidateSlot = {
-            ...slot,
-            roomId: targetRoomId,
-          };
-
-          const check = await conflictEngine.checkScheduleConflict(candidateSlot, slot.id);
-          if (check.hasConflict) {
-            conflicts.push({
-              slotId: slot.id,
-              classId: slot.classId,
-              shiftId: slot.shiftId,
-              error: check.message,
-            });
-            continue;
-          }
-
-          const saved = await repo.updateScheduleSlot(candidateSlot);
-          updatedSlots.push(saved);
-        }
-
-        await repo.addAuditLog({
-          action: 'SCHEDULE_CHANGE',
-          userId: actorId,
-          userName: actorId === 'ADMIN001' ? 'Quản trị viên' : actorId,
-          userRole: 'ADMIN',
-          targetResource: 'SCHEDULE',
-          targetId: currentDate,
-          details: `Chuyển toàn bộ phòng học ngày ${currentDate} sang phòng ${targetRoomId}: thành công ${updatedSlots.length}/${daySlots.length} ca.`,
         });
 
         break;

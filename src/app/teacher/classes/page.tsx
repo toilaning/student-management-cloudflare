@@ -164,8 +164,7 @@ export default function TeacherClassesPage() {
         const q = searchTerm.toLowerCase();
         const matchesName = i.cls.name?.toLowerCase().includes(q);
         const matchesSubj = i.cls.subject?.toLowerCase().includes(q);
-        const matchesRoom = i.section.roomId?.toLowerCase().includes(q);
-        return matchesName || matchesSubj || matchesRoom;
+        return matchesName || matchesSubj;
       }
       return true;
     });
@@ -391,13 +390,6 @@ export default function TeacherClassesPage() {
 
                         <div className="flex items-center justify-between">
                           <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
-                            <MapPin size={13} className="text-primary" /> Phòng học:
-                          </span>
-                          <span className="font-semibold text-foreground">{section.roomId || cls.roomId}</span>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
                             <Calendar size={13} className="text-primary" /> Lịch trong tuần:
                           </span>
                           <span className="font-semibold text-foreground">
@@ -463,7 +455,7 @@ export default function TeacherClassesPage() {
           title={selectedClassForView ? 'Danh sách học viên: ' + selectedClassForView.name : ''}
           description={
             selectedClassForView
-              ? 'Môn: ' + selectedClassForView.subject + ' • Phòng: ' + selectedClassForView.roomId + ' • Thứ ' + (selectedClassForView.scheduleDays?.join(', ') || '')
+              ? 'Môn: ' + selectedClassForView.subject + ' • Thứ ' + (selectedClassForView.scheduleDays?.join(', ') || '')
               : ''
           }
           size="lg"

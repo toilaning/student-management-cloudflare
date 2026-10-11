@@ -160,8 +160,6 @@ export default function TeacherDashboardPage() {
                               <span>
                                 {slot.startTime} - {slot.endTime}
                               </span>
-                              <span>•</span>
-                              <span>Phòng {slot.roomId}</span>
                             </div>
                           </div>
                         </div>

@@ -17,7 +17,6 @@ test('Bulk Schedule Generation & 2-Way Sync Suite', async (t) => {
       name: 'Lớp Lập trình Python Căn bản',
       subject: 'Python Cơ bản',
       teacherId: 'GV001',
-      roomId: 'P.101',
       studentIds: [],
       tuitionFee: 2000000,
       scheduleDays: [2, 4, 6], // Thứ 2, 4, 6
@@ -61,7 +60,6 @@ test('Bulk Schedule Generation & 2-Way Sync Suite', async (t) => {
     assert.equal(firstSlot.classId, 'CLS_TEST_REC');
     assert.equal(firstSlot.date, '2026-10-02'); // Ngày T6 đầu tiên
     assert.equal(firstSlot.teacherId, 'GV001');
-    assert.equal(firstSlot.roomId, 'P.101');
     assert.equal(firstSlot.shiftId, 1);
 
     // Kiểm tra nếu chạy lại với overwriteExisting = false -> skippedCount = 13
@@ -83,7 +81,6 @@ test('Bulk Schedule Generation & 2-Way Sync Suite', async (t) => {
       name: 'Lớp Thiết kế Đồ họa AI',
       subject: 'Photoshop AI',
       teacherId: 'GV002',
-      roomId: 'P.102',
       studentIds: [],
       tuitionFee: 1800000,
       scheduleDays: [3, 5], // Thứ 3, Thứ 5
@@ -120,7 +117,6 @@ test('Bulk Schedule Generation & 2-Way Sync Suite', async (t) => {
         code: 'AUTOGEN1',
         subject: 'ReactJS Nâng Cao',
         teacherId: 'GV003',
-        roomId: 'P.103',
         shiftId: 3,
         scheduleDays: [2, 4, 6],
         tuitionFee: 2500000,
@@ -141,7 +137,7 @@ test('Bulk Schedule Generation & 2-Way Sync Suite', async (t) => {
     assert.ok(slots.length > 0, 'Lớp mới phải có các ca học trong repo');
   });
 
-  await t.test('4. Kiểm thử đồng bộ 2 chiều: Khi đổi giáo viên/phòng/ca thì các ca tương lai (date >= today) đổi theo', async () => {
+  await t.test('4. Kiểm thử đồng bộ 2 chiều: Khi đổi giáo viên/ca thì các ca tương lai (date >= today) đổi theo', async () => {
     const today = new Date().toISOString().split('T')[0];
     const testClassId = 'CLS_SYNC_TEST';
 
@@ -152,7 +148,6 @@ test('Bulk Schedule Generation & 2-Way Sync Suite', async (t) => {
       name: 'Lớp Test Đồng Bộ',
       subject: 'Tiếng Anh Giao Tiếp',
       teacherId: 'GV001',
-      roomId: 'P.101',
       studentIds: [],
       tuitionFee: 1500000,
       scheduleDays: [2, 4, 6],
@@ -168,7 +163,6 @@ test('Bulk Schedule Generation & 2-Way Sync Suite', async (t) => {
       id: 'SCH_PAST_01',
       classId: testClassId,
       teacherId: 'GV001',
-      roomId: 'P.101',
       date: '2026-01-01',
       shiftId: 1,
       startTime: '08:00',
@@ -182,7 +176,6 @@ test('Bulk Schedule Generation & 2-Way Sync Suite', async (t) => {
       id: 'SCH_FUT_01',
       classId: testClassId,
       teacherId: 'GV001',
-      roomId: 'P.101',
       date: '2029-12-01',
       shiftId: 1,
       startTime: '08:00',
@@ -196,7 +189,6 @@ test('Bulk Schedule Generation & 2-Way Sync Suite', async (t) => {
       id: 'SCH_FUT_02',
       classId: testClassId,
       teacherId: 'GV001',
-      roomId: 'P.101',
       date: '2029-12-03',
       shiftId: 1,
       startTime: '08:00',
@@ -206,14 +198,13 @@ test('Bulk Schedule Generation & 2-Way Sync Suite', async (t) => {
       status: 'Đã lên lịch',
     });
 
-    // Cập nhật lớp: Đổi sang GV002, phòng P.202, shift 2, link mới
+    // Cập nhật lớp: Đổi sang GV002, shift 2, link mới
     const req = new Request('http://localhost/api/classes', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         classId: testClassId,
         teacherId: 'GV002',
-        roomId: 'P.202',
         shiftId: 2,
         meetingLink: 'https://new-link.com/room',
       }),
@@ -224,21 +215,18 @@ test('Bulk Schedule Generation & 2-Way Sync Suite', async (t) => {
     assert.ok(data.success);
     assert.ok(data.syncedSlotsCount >= 2, 'Phải đồng bộ ít nhất 2 ca tương lai');
 
-    // Kiểm tra ca trong quá khứ không bị đổi teacherId/roomId
+    // Kiểm tra ca trong quá khứ không bị đổi teacherId
     const pastSlot = await repo.getScheduleSlotById('SCH_PAST_01');
     assert.equal(pastSlot?.teacherId, 'GV001', 'Ca trong quá khứ không được đổi teacherId');
-    assert.equal(pastSlot?.roomId, 'P.101', 'Ca trong quá khứ không được đổi roomId');
 
     // Kiểm tra ca tương lai được cập nhật toàn diện
     const fut1 = await repo.getScheduleSlotById('SCH_FUT_01');
     assert.equal(fut1?.teacherId, 'GV002');
-    assert.equal(fut1?.roomId, 'P.202');
     assert.equal(fut1?.shiftId, 2);
     assert.equal(fut1?.meetingLink, 'https://new-link.com/room');
 
     const fut2 = await repo.getScheduleSlotById('SCH_FUT_02');
     assert.equal(fut2?.teacherId, 'GV002');
-    assert.equal(fut2?.roomId, 'P.202');
     assert.equal(fut2?.shiftId, 2);
   });
 
@@ -250,7 +238,6 @@ test('Bulk Schedule Generation & 2-Way Sync Suite', async (t) => {
       name: 'Lớp Chuẩn Bị Xóa',
       subject: 'Kiểm thử Xóa',
       teacherId: 'GV001',
-      roomId: 'P.101',
       studentIds: [],
       tuitionFee: 1000000,
       scheduleDays: [2, 4],
@@ -263,7 +250,6 @@ test('Bulk Schedule Generation & 2-Way Sync Suite', async (t) => {
       id: 'SCH_DEL_FUT',
       classId: delClassId,
       teacherId: 'GV001',
-      roomId: 'P.101',
       date: '2029-12-10',
       shiftId: 1,
       startTime: '08:00',

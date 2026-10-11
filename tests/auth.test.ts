@@ -128,7 +128,6 @@ test('Auth API Suite: Kiểm tra xác thực đăng nhập qua /api/auth/login',
       passwordHash: '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', // admin123
       role: 'STUDENT' as const,
       name: 'Người dùng bị khóa',
-      email: 'inactive@edu.vn',
       isActive: false,
     };
     await repo.createUser(disabledUser);

@@ -117,7 +117,7 @@ function hasTimeOverlap(startA: number, endA: number, startB: number, endB: numb
 
 /** Dựng ClassEntity tạm từ ClassSection để kiểm tra trùng giờ/ca. */
 function sectionAsClass(
-  section: { classId: string; name: string; shiftId?: number; startTime?: string; endTime?: string; scheduleDays: number[]; teacherId?: string; roomId?: string },
+  section: { classId: string; name: string; shiftId?: number; startTime?: string; endTime?: string; scheduleDays: number[]; teacherId?: string },
   cls: ClassEntity | null,
 ): ClassEntity {
   return {
@@ -125,7 +125,6 @@ function sectionAsClass(
     name: cls?.name || section.name,
     subject: cls?.subject || '',
     teacherId: section.teacherId || cls?.teacherId || '',
-    roomId: section.roomId || cls?.roomId || 'ONLINE',
     studentIds: cls?.studentIds || [],
     tuitionFee: cls?.tuitionFee || 0,
     scheduleDays: section.scheduleDays.length > 0 ? section.scheduleDays : (cls?.scheduleDays || []),
@@ -171,7 +170,6 @@ async function resolveSection(classId: string, sectionId?: string | null) {
     endTime: cls.endTime,
     scheduleDays: cls.scheduleDays || [],
     teacherId: cls.teacherId,
-    roomId: cls.roomId,
     isActive: true,
     studentIds: cls.studentIds || [],
   };

@@ -56,7 +56,6 @@ export async function GET(request: Request) {
           const syncedStudent = {
             id: u.id,
             name: u.name,
-            email: u.email || `${u.username}@student.local`,
             phone: '0900000000',
             dateOfBirth: '2008-01-01',
             gender: 'Nam' as const,
@@ -93,8 +92,7 @@ export async function GET(request: Request) {
     students = students.filter(s => 
       s.id.toLowerCase().includes(search) ||
       s.name.toLowerCase().includes(search) ||
-      (s.phone && s.phone.includes(search)) ||
-      (s.email && s.email.toLowerCase().includes(search))
+      (s.phone && s.phone.includes(search))
     );
   }
   if (status && status !== 'ALL') {
@@ -123,7 +121,6 @@ export async function POST(request: Request) {
       phone,
       dateOfBirth,
       gender = 'Nam',
-      email,
       address,
       enrolledClassIds = [],
       fastOnboarding = false,
@@ -172,11 +169,6 @@ export async function POST(request: Request) {
       student.address = address;
       updatedDetails = true;
     }
-    if (email && email.trim()) {
-      student.email = email.trim();
-      updatedDetails = true;
-    }
-
     if (homeTown) { student.homeTown = homeTown.trim(); updatedDetails = true; }
     if (gradeLevel) { student.gradeLevel = gradeLevel; updatedDetails = true; }
     if (targetUniversity) { student.targetUniversity = targetUniversity; updatedDetails = true; }

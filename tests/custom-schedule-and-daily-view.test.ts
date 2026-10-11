@@ -14,7 +14,6 @@ describe('Custom Schedule Hours & Daily View Suite: Giai đoạn 1 & 2', () => {
       name: 'Lớp Python Chuyên Sâu Tối',
       subject: 'Lập trình',
       teacherId: 'GV001',
-      roomId: 'P.101',
       studentIds: ['ST001'],
       tuitionFee: 2000000,
       scheduleDays: [2, 4, 6, 8],
@@ -39,7 +38,6 @@ describe('Custom Schedule Hours & Daily View Suite: Giai đoạn 1 & 2', () => {
       name: 'IELTS Cấp Tốc Sáng',
       subject: 'Tiếng Anh',
       teacherId: 'GV002',
-      roomId: 'P.201',
       studentIds: ['ST002'],
       tuitionFee: 2500000,
       scheduleDays: [2, 4], // Thứ 2, Thứ 4
@@ -76,7 +74,6 @@ describe('Custom Schedule Hours & Daily View Suite: Giai đoạn 1 & 2', () => {
       name: 'Toán Tư Duy',
       subject: 'Toán',
       teacherId: 'GV001',
-      roomId: 'P.101',
       studentIds: [],
       tuitionFee: 1500000,
       scheduleDays: [3, 5],
@@ -92,7 +89,6 @@ describe('Custom Schedule Hours & Daily View Suite: Giai đoạn 1 & 2', () => {
       id: 'SCH_TEST_01',
       classId: 'CLS77',
       teacherId: 'GV001',
-      roomId: 'P.101',
       date: todayStr,
       shiftId: 1,
       startTime: '18:00',
@@ -102,14 +98,14 @@ describe('Custom Schedule Hours & Daily View Suite: Giai đoạn 1 & 2', () => {
     };
     await repo.createScheduleSlot(futureSlot);
 
-    // Cập nhật lớp học sang giờ mới: 18:30 - 20:30, GV mới: GV003, phòng mới: P.301
+    // Cập nhật lớp học sang giờ mới: 18:30 - 20:30, GV mới: GV003, link học mới
     const allSlots = await repo.getAllScheduleSlots();
     for (const slot of allSlots) {
       if (slot.classId === 'CLS77' && slot.date >= todayStr && slot.status !== 'Đã hủy') {
         slot.startTime = '18:30';
         slot.endTime = '20:30';
         slot.teacherId = 'GV003';
-        slot.roomId = 'P.301';
+        slot.meetingLink = 'https://meet.google.com/updated-room';
         await repo.updateScheduleSlot(slot);
       }
     }
@@ -118,6 +114,6 @@ describe('Custom Schedule Hours & Daily View Suite: Giai đoạn 1 & 2', () => {
     assert.equal(updatedSlot?.startTime, '18:30');
     assert.equal(updatedSlot?.endTime, '20:30');
     assert.equal(updatedSlot?.teacherId, 'GV003');
-    assert.equal(updatedSlot?.roomId, 'P.301');
+    assert.equal(updatedSlot?.meetingLink, 'https://meet.google.com/updated-room');
   });
 });

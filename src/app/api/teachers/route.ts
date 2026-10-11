@@ -26,7 +26,6 @@ export async function GET(request: Request) {
           const syncedTeacher = {
             id: u.id,
             name: u.name,
-            email: u.email || `${u.username}@edu.vn`,
             phone: '0901234567',
             specialty: 'Bộ môn chung',
             hourlyRate: 300000,
@@ -53,7 +52,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, specialty, hourlyRate = 300000, phone, email, bio } = body;
+    const { name, specialty, hourlyRate = 300000, phone, bio } = body;
 
     if (!name || !specialty || !phone) {
       return NextResponse.json({ error: 'Vui lòng điền đủ họ tên, chuyên môn và số điện thoại' }, { status: 400 });
@@ -73,7 +72,6 @@ export async function POST(request: Request) {
       specialty,
       hourlyRate: Number(hourlyRate) || 300000,
       phone,
-      email: email?.trim() || undefined,
       ratePerSession: Number(body.ratePerSession) || 250000,
       bio: bio || `Giảng viên phụ trách bộ môn ${specialty}`,
       status: 'Đang dạy' as const,
@@ -84,7 +82,6 @@ export async function POST(request: Request) {
     // Bảng teachers có khoá ngoại trỏ sang users, nên tạo tài khoản đăng nhập trước.
     // Mật khẩu mặc định 123456.
     const defaultPassword = '123456';
-    const teacherEmail = newTeacher.email || `${newId.toLowerCase()}@edu.vn`;
     try {
       const authService = new AuthService(repo);
       const existingUser = await repo.getUserById(newId);
@@ -95,7 +92,6 @@ export async function POST(request: Request) {
           passwordHash: authService.hashPassword(defaultPassword),
           role: 'TEACHER',
           name: newTeacher.name,
-          email: teacherEmail,
           isActive: true,
         });
       }
@@ -196,7 +192,7 @@ export async function DELETE(request: Request) {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const { id, name, specialty, phone, email, bio, status, ratePerSession, hourlyRate } = body;
+    const { id, name, specialty, phone, bio, status, ratePerSession, hourlyRate } = body;
 
     if (!id || !name || !specialty) {
       return NextResponse.json({ error: "Vui lòng cung cấp ID, họ tên và chuyên môn" }, { status: 400 });
@@ -212,7 +208,6 @@ export async function PUT(request: Request) {
       name,
       specialty,
       phone: phone || existing.phone,
-      email: email || existing.email,
       bio: bio !== undefined ? bio : existing.bio,
       status: status || existing.status,
       ratePerSession: ratePerSession !== undefined ? Number(ratePerSession) : existing.ratePerSession,
@@ -220,13 +215,12 @@ export async function PUT(request: Request) {
     };
     const updated = await repo.updateTeacher(updatedTeacher);
 
-    // Đồng bộ ngược lại bảng Users nếu có thay đổi tên/email
+    // Đồng bộ ngược lại bảng Users nếu có thay đổi tên
     try {
       const u = await repo.getUserById(id);
       if (u) {
         let uChanged = false;
         if (name && u.name !== name) { u.name = name; uChanged = true; }
-        if (email && u.email !== email) { u.email = email; uChanged = true; }
         if (uChanged) await repo.updateUser(u);
       }
     } catch (err) {

@@ -12,7 +12,6 @@ export async function POST(request: Request) {
       classId,
       fromDate,
       targetShiftId,
-      targetRoomId,
       targetTeacherId,
       targetMeetingLink,
       actorId = 'ADMIN001',
@@ -60,7 +59,6 @@ export async function POST(request: Request) {
         shiftId: targetShift ? targetShift.id : slot.shiftId,
         startTime: targetShift ? targetShift.startTime : slot.startTime,
         endTime: targetShift ? targetShift.endTime : slot.endTime,
-        roomId: targetRoomId !== undefined && targetRoomId !== '' ? targetRoomId : slot.roomId,
         teacherId: targetTeacherId !== undefined && targetTeacherId !== '' ? targetTeacherId : slot.teacherId,
         meetingLink: targetMeetingLink !== undefined && targetMeetingLink !== '' ? targetMeetingLink : slot.meetingLink,
       };
@@ -88,7 +86,7 @@ export async function POST(request: Request) {
       userRole: 'ADMIN',
       targetResource: 'SCHEDULE',
       targetId: classId,
-      details: `Thay đổi lịch từ ngày ${fromDate} về sau cho lớp ${classId}: đã cập nhật ${updatedSlots.length}/${targetSlots.length} ca.${targetShift ? ` Ca mới: ${targetShift.name}.` : ''}${targetRoomId ? ` Phòng mới: ${targetRoomId}.` : ''}${targetTeacherId ? ` GV mới: ${targetTeacherId}.` : ''}`,
+      details: `Thay đổi lịch từ ngày ${fromDate} về sau cho lớp ${classId}: đã cập nhật ${updatedSlots.length}/${targetSlots.length} ca.${targetShift ? ` Ca mới: ${targetShift.name}.` : ''}${targetTeacherId ? ` GV mới: ${targetTeacherId}.` : ''}`,
     });
 
     return NextResponse.json({

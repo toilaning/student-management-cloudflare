@@ -145,7 +145,6 @@ export default function AdminStudentsPage() {
   const [newStudentData, setNewStudentData] = useState({
     name: '',
     phone: '',
-    email: '',
     gender: 'Nam' as 'Nam' | 'Nữ',
     dateOfBirth: '2008-01-01',
     address: 'TP. Hà Nội',
@@ -329,7 +328,6 @@ export default function AdminStudentsPage() {
         body: JSON.stringify({
           name: newStudentData.name,
           phone: newStudentData.phone,
-          email: newStudentData.email,
           gender: newStudentData.gender,
           dateOfBirth: newStudentData.dateOfBirth,
           address: newStudentData.address,
@@ -360,7 +358,6 @@ export default function AdminStudentsPage() {
         setNewStudentData({
           name: '',
           phone: '',
-          email: '',
           gender: 'Nam',
           dateOfBirth: '2008-01-01',
           address: 'TP. Hà Nội',
@@ -1281,7 +1278,7 @@ Lưu ý: Vui lòng đăng nhập và đổi mật khẩu trong lần đầu sử
                         </span>
                       </div>
                       <div className="text-[12px] text-muted-foreground mt-0.5">
-                        Phòng: {cls.roomId} • Lịch: Thứ {cls.scheduleDays?.join(', ') || '—'} •{' '}
+                        Lịch: Thứ {cls.scheduleDays?.join(', ') || '—'} •{' '}
                         {formatClassTimeLabel(cls)}
                       </div>
                     </div>

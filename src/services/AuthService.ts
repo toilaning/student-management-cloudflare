@@ -36,8 +36,6 @@ export class AuthService {
           return ['READ', 'UPDATE'].includes(action);
         case 'ATTENDANCE':
           return ['READ', 'CREATE', 'UPDATE'].includes(action);
-        case 'CLASSROOM':
-          return action === 'READ';
         case 'STUDENT':
           return action === 'READ';
         case 'TEACHER':
@@ -60,8 +58,6 @@ export class AuthService {
         case 'SCHEDULE':
           return action === 'READ';
         case 'ATTENDANCE':
-          return action === 'READ';
-        case 'CLASSROOM':
           return action === 'READ';
         case 'STUDENT':
           return ['READ', 'UPDATE'].includes(action);

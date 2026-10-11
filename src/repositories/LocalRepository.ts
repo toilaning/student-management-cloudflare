@@ -3,7 +3,7 @@ import { IRepository } from './IRepository';
 import { User } from '@/types/auth';
 import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
-import { Classroom, ClassEntity, ClassSection } from '@/types/classroom';
+import { ClassEntity, ClassSection } from '@/types/classroom';
 import { TimeShift, TIME_SHIFTS } from '@/types/schedule';
 import { ScheduleSlot, ClassRequest, StudentSlotSwap } from '@/types/schedule';
 import { AttendanceRecord } from '@/types/attendance';
@@ -20,7 +20,6 @@ export class LocalRepository implements IRepository {
   private users: Map<string, User> = new Map();
   private students: Map<string, Student> = new Map();
   private teachers: Map<string, Teacher> = new Map();
-  private classrooms: Map<string, Classroom> = new Map();
   private classes: Map<string, ClassEntity> = new Map();
  private classSections: Map<string, ClassSection> = new Map();
  private classSectionStudents: Map<string, string[]> = new Map(); // sectionId -> studentIds
@@ -58,7 +57,6 @@ export class LocalRepository implements IRepository {
     seed.users.forEach(u => this.users.set(u.id, u));
     seed.students.forEach(s => this.students.set(s.id, s));
     seed.teachers.forEach(t => this.teachers.set(t.id, t));
-    seed.classrooms.forEach(c => this.classrooms.set(c.id, c));
     seed.classes.forEach(cl => this.classes.set(cl.id, cl));
     seed.sections.forEach(sec => this.classSections.set(sec.id, sec));
     seed.sections.forEach(sec => {
@@ -80,7 +78,6 @@ export class LocalRepository implements IRepository {
     this.users.clear();
     this.students.clear();
     this.teachers.clear();
-    this.classrooms.clear();
     this.classes.clear();
    this.classSections.clear();
    this.classSectionStudents.clear();
@@ -193,15 +190,7 @@ export class LocalRepository implements IRepository {
     return this.teachers.delete(id);
   }
 
-  // Classrooms & Classes
-  public async getAllClassrooms(): Promise<Classroom[]> {
-    return Array.from(this.classrooms.values());
-  }
-
-  public async getClassroomById(id: string): Promise<Classroom | null> {
-    return this.classrooms.get(id) || null;
-  }
-
+  // Classes
   public async getAllClasses(): Promise<ClassEntity[]> {
     return Array.from(this.classes.values());
   }

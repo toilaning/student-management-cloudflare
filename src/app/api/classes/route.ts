@@ -36,8 +36,6 @@ export async function PUT(request: Request) {
       name,
       subject,
       teacherId,
-      // Không mặc định 'ONLINE': giáo viên nhận ca (chỉ gửi classId + teacherId) sẽ vô tình ghi đè phòng thật.
-      roomId,
       shiftId,
       startTime,
       endTime,
@@ -70,10 +68,6 @@ export async function PUT(request: Request) {
         return NextResponse.json({ error: 'Không tìm thấy giảng viên được chỉ định' }, { status: 404 });
       }
       cls.teacherId = teacherId;
-    }
-
-    if (roomId !== undefined) {
-      cls.roomId = roomId;
     }
 
     if (shiftId !== undefined) {
@@ -119,7 +113,7 @@ export async function PUT(request: Request) {
       }
     }
 
-    // 3. Đồng bộ 2 chiều: Khi Admin đổi teacherId, roomId: roomId || "ONLINE", startTime, endTime, scheduleDays, shiftId, hoặc meetingLink:
+    // 3. Đồng bộ 2 chiều: Khi Admin đổi teacherId, startTime, endTime, scheduleDays, shiftId, hoặc meetingLink:
     // Quét tất cả ScheduleSlot của lớp đó có date >= today, cập nhật các thuộc tính mới
     const today = new Date().toISOString().split('T')[0];
     const allSlots = await repo.getAllScheduleSlots();
@@ -138,11 +132,6 @@ export async function PUT(request: Request) {
 
         if (teacherId !== undefined && slot.teacherId !== teacherId) {
           slot.teacherId = teacherId;
-          changed = true;
-        }
-
-        if (roomId !== undefined && slot.roomId !== roomId) {
-          slot.roomId = roomId;
           changed = true;
         }
 
@@ -216,7 +205,6 @@ export async function POST(request: Request) {
       name,
       subject,
       teacherId,
-      roomId,
       shiftId = 1,
       startTime = '18:30',
       endTime = '20:30',
@@ -259,7 +247,6 @@ export async function POST(request: Request) {
       name: name.trim(),
       subject: subject.trim(),
       teacherId,
-      roomId,
       shiftId: resolvedShiftId,
       startTime: parsedStartTime,
       endTime: parsedEndTime,
@@ -283,7 +270,6 @@ export async function POST(request: Request) {
       endTime?: string;
       scheduleDays?: number[];
       teacherId?: string;
-      roomId?: string;
     }> = Array.isArray(sections) && sections.length > 0
       ? sections
       : [
@@ -296,7 +282,6 @@ export async function POST(request: Request) {
             endTime: parsedEndTime,
             scheduleDays: newClass.scheduleDays,
             teacherId,
-            roomId,
           },
         ];
 
@@ -318,7 +303,6 @@ export async function POST(request: Request) {
           ? input.scheduleDays.map(Number)
           : newClass.scheduleDays,
         teacherId: input.teacherId || teacherId,
-        roomId: input.roomId || roomId,
         isActive: true,
         studentIds: [],
       };

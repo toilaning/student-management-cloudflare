@@ -3,7 +3,7 @@ import { IRepository } from './IRepository';
 import { User } from '@/types/auth';
 import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
-import { Classroom, ClassEntity, ClassSection } from '@/types/classroom';
+import { ClassEntity, ClassSection } from '@/types/classroom';
 import { ScheduleSlot, ClassRequest, TimeShift, StudentSlotSwap } from '@/types/schedule';
 import { AttendanceRecord } from '@/types/attendance';
 import { TuitionInvoice, PayrollRecord } from '@/types/finance';
@@ -24,7 +24,6 @@ function mapUserFromDb(row: any): User {
     passwordHash: row.password_hash,
     role: row.role,
     name: row.name,
-    email: row.email,
     avatar: row.avatar || undefined,
     isActive: Boolean(row.is_active),
   };
@@ -37,30 +36,9 @@ function mapUserToDb(user: User): any {
     password_hash: user.passwordHash,
     role: user.role,
     name: user.name,
-    email: user.email,
     avatar: user.avatar || null,
     is_active: user.isActive,
     updated_at: new Date().toISOString(),
-  };
-}
-
-function mapClassroomFromDb(row: any): Classroom {
-  return {
-    id: row.id,
-    name: row.name,
-    capacity: Number(row.capacity),
-    facilities: row.facilities || [],
-    status: row.status,
-  };
-}
-
-function mapClassroomToDb(room: Classroom): any {
-  return {
-    id: room.id,
-    name: room.name,
-    capacity: room.capacity,
-    facilities: room.facilities,
-    status: room.status,
   };
 }
 
@@ -72,7 +50,6 @@ function mapTeacherFromDb(row: any): Teacher {
   return {
     id: row.id,
     name: row.name,
-    email: row.email,
     phone: row.phone,
     specialty: row.specialty,
     hourlyRate: Number(row.hourly_rate),
@@ -92,7 +69,6 @@ function mapTeacherToDb(teacher: Teacher): any {
   return {
     id: teacher.id,
     name: teacher.name,
-    email: teacher.email,
     phone: teacher.phone,
     specialty: teacher.specialty,
     hourly_rate: teacher.hourlyRate,
@@ -111,7 +87,6 @@ function mapStudentFromDb(row: any): Student {
   return {
     id: row.id,
     name: row.name,
-    email: row.email,
     phone: row.phone,
     dateOfBirth: typeof row.date_of_birth === 'string' ? row.date_of_birth.split('T')[0] : row.date_of_birth,
     gender: row.gender,
@@ -143,7 +118,6 @@ function mapStudentToDb(student: Student): any {
   return {
     id: student.id,
     name: student.name,
-    email: student.email || null,
     phone: student.phone,
     date_of_birth: student.dateOfBirth || null,
     gender: student.gender || 'Nam',
@@ -182,7 +156,6 @@ function mapClassFromDb(row: any): ClassEntity {
     name: row.name,
     subject: row.subject,
     teacherId: row.teacher_id,
-    roomId: row.room_id,
     studentIds,
     tuitionFee: Number(row.tuition_fee),
     scheduleDays: row.schedule_days || [],
@@ -204,7 +177,6 @@ function mapClassToDb(cls: ClassEntity): any {
     name: cls.name,
     subject: cls.subject,
     teacher_id: cls.teacherId,
-    room_id: cls.roomId,
     tuition_fee: cls.tuitionFee,
     schedule_days: cls.scheduleDays,
     shift_id: cls.shiftId || 1,
@@ -231,7 +203,6 @@ function mapClassSectionFromDb(row: any): ClassSection {
     endTime: row.end_time ? String(row.end_time).substring(0, 5) : undefined,
     scheduleDays: row.schedule_days || [],
     teacherId: row.teacher_id || undefined,
-    roomId: row.room_id || undefined,
     isActive: row.is_active !== undefined ? Boolean(row.is_active) : true,
     studentIds,
     createdAt: row.created_at || undefined,
@@ -249,7 +220,6 @@ function mapClassSectionToDb(section: ClassSection): any {
     end_time: section.endTime || null,
     schedule_days: section.scheduleDays || [],
     teacher_id: section.teacherId || null,
-    room_id: section.roomId || null,
     is_active: section.isActive,
     updated_at: new Date().toISOString(),
   };
@@ -261,7 +231,6 @@ function mapScheduleSlotFromDb(row: any): ScheduleSlot {
     classId: row.class_id,
     sectionId: row.section_id || undefined,
     teacherId: row.teacher_id,
-    roomId: row.room_id,
     date: typeof row.date === 'string' ? row.date.split('T')[0] : row.date,
     shiftId: Number(row.shift_id),
     // Postgres trả 'HH:mm:ss'; giao diện chỉ cần 'HH:mm'.
@@ -285,7 +254,6 @@ function mapScheduleSlotToDb(slot: ScheduleSlot): any {
     class_id: slot.classId,
     section_id: slot.sectionId || null,
     teacher_id: slot.teacherId,
-    room_id: slot.roomId,
     date: slot.date,
     shift_id: slot.shiftId,
     start_time: slot.startTime,
@@ -953,43 +921,8 @@ export class SupabaseRepository implements IRepository {
   }
 
   // --------------------------------------------------------------------------
-  // CLASSROOMS & CLASSES
+  // CLASSES
   // --------------------------------------------------------------------------
-
-  public async getAllClassrooms(): Promise<Classroom[]> {
-    const client = this.getClient();
-    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local"); // getAllClassrooms();
-
-    try {
-      const { data, error } = await client.from('classrooms').select('*');
-      if (error) {
-        throw new Error(error.message);
-      }
-      return (data || []).map(mapClassroomFromDb);
-    } catch (err) {
-      throw err;
-    }
-  }
-
-  public async getClassroomById(id: string): Promise<Classroom | null> {
-    const client = this.getClient();
-    if (!client) throw new Error("Supabase Cloud client is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local"); // getClassroomById(id);
-
-    try {
-      const { data, error } = await client
-        .from('classrooms')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
-
-      if (error) {
-        throw new Error(error.message);
-      }
-      return data ? mapClassroomFromDb(data) : null;
-    } catch (err) {
-      throw err;
-    }
-  }
 
   public async getAllClasses(): Promise<ClassEntity[]> {
     const client = this.getClient();
@@ -2271,7 +2204,6 @@ export class SupabaseRepository implements IRepository {
       'classes',
       'students',
       'teachers',
-      'classrooms',
       'users',
     ];
 

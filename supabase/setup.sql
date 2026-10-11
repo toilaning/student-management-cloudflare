@@ -32,7 +32,6 @@ create table if not exists public.users (
     password_hash varchar(255) not null,
     role          varchar(20)  not null,
     name          varchar(255) not null,
-    email         citext,
     avatar        text,
     is_active     boolean      not null default true,
     created_at    timestamptz  not null default now(),
@@ -40,22 +39,10 @@ create table if not exists public.users (
     constraint users_role_check check (role in ('ADMIN', 'TEACHER', 'STUDENT'))
 );
 
--- Phòng học
-create table if not exists public.classrooms (
-    id         varchar(50)  primary key,
-    name       varchar(255) not null,
-    capacity   integer      not null default 30,
-    facilities text[]       not null default '{}',
-    status     varchar(50)  not null default 'Khả dụng',
-    created_at timestamptz  not null default now(),
-    constraint classrooms_status_check check (status in ('Khả dụng', 'Bảo trì'))
-);
-
 -- Giáo viên (hồ sơ mở rộng của users)
 create table if not exists public.teachers (
     id          varchar(50)  primary key references public.users(id) on delete cascade,
     name        varchar(255) not null,
-    email       citext,
     phone       varchar(50)  not null,
     specialty   varchar(255) not null,
     hourly_rate numeric(12,2) not null default 0,
@@ -70,7 +57,6 @@ create table if not exists public.teachers (
 create table if not exists public.students (
     id                       varchar(50)  primary key references public.users(id) on delete cascade,
     name                     varchar(255) not null,
-    email                    citext,
     phone                    varchar(50)  not null,
     date_of_birth            date,
     gender                   varchar(10)  not null default 'Nam',
@@ -105,7 +91,6 @@ create table if not exists public.classes (
     name         varchar(255) not null,
     subject      varchar(255) not null,
     teacher_id   varchar(50)  references public.teachers(id) on delete set null,
-    room_id      varchar(50)  references public.classrooms(id) on delete set null,
     tuition_fee  numeric(12,2) not null default 0,
     schedule_days integer[]   not null default '{}',
     shift_id     integer,
@@ -133,7 +118,6 @@ create table if not exists public.schedule_slots (
     id             varchar(50)  primary key,
     class_id       varchar(50)  not null references public.classes(id) on delete cascade,
     teacher_id     varchar(50)  references public.teachers(id) on delete set null,
-    room_id        varchar(50)  references public.classrooms(id) on delete set null,
     date           date         not null,
     shift_id       integer      not null default 1,
     start_time     varchar(10)  not null,
@@ -348,20 +332,13 @@ alter table public.tuition_invoices
 -- 3. CHUẨN HOÁ RÀNG BUỘC
 -- ============================================================================
 
--- Email không bắt buộc: ứng dụng cho phép tạo tài khoản không có email.
-alter table public.users    alter column email drop not null;
-alter table public.teachers alter column email drop not null;
-alter table public.students alter column email drop not null;
-
 -- Hồ sơ học sinh có thể để trống ngày sinh và địa chỉ.
 alter table public.students alter column date_of_birth drop not null;
 alter table public.students alter column address       drop not null;
 
 -- Giáo viên có thể bị gỡ khỏi lớp/buổi học, nên các cột này phải cho phép null.
 alter table public.classes        alter column teacher_id drop not null;
-alter table public.classes        alter column room_id    drop not null;
 alter table public.schedule_slots alter column teacher_id drop not null;
-alter table public.schedule_slots alter column room_id    drop not null;
 
 -- Hoá đơn mua gói dùng mã lớp quy ước 'CHUNG' nên bỏ khoá ngoại tới classes.
 alter table public.tuition_invoices drop constraint if exists tuition_invoices_class_id_fkey;
@@ -374,9 +351,6 @@ alter table public.attendance_records   drop constraint if exists attendance_rec
 -- Ràng buộc giá trị hợp lệ: xoá rồi tạo lại để database cũ nhận định nghĩa mới.
 alter table public.users drop constraint if exists users_role_check;
 alter table public.users add constraint users_role_check check (role in ('ADMIN', 'TEACHER', 'STUDENT'));
-
-alter table public.classrooms drop constraint if exists classrooms_status_check;
-alter table public.classrooms add constraint classrooms_status_check check (status in ('Khả dụng', 'Bảo trì'));
 
 alter table public.teachers drop constraint if exists teachers_status_check;
 alter table public.teachers add constraint teachers_status_check check (status in ('Đang dạy', 'Nghỉ phép'));
@@ -434,7 +408,6 @@ alter table public.teacher_payroll_periods drop constraint if exists uq_teacher_
 alter table public.teacher_payroll_periods add constraint uq_teacher_payroll_month unique (teacher_id, month);
 
 create unique index if not exists uq_users_username    on public.users (username);
-create unique index if not exists uq_users_email       on public.users (email) where email is not null;
 create unique index if not exists uq_classes_code      on public.classes (code);
 
 -- ============================================================================
@@ -446,13 +419,11 @@ create index if not exists idx_users_is_active          on public.users (is_acti
 create index if not exists idx_teachers_status          on public.teachers (status);
 create index if not exists idx_students_status          on public.students (status);
 create index if not exists idx_classes_teacher_id       on public.classes (teacher_id);
-create index if not exists idx_classes_room_id          on public.classes (room_id);
 create index if not exists idx_classes_status           on public.classes (status);
 create index if not exists idx_class_students_class_id  on public.class_students (class_id);
 create index if not exists idx_class_students_student_id on public.class_students (student_id);
 create index if not exists idx_schedule_slots_class_id  on public.schedule_slots (class_id);
 create index if not exists idx_schedule_slots_teacher_id on public.schedule_slots (teacher_id);
-create index if not exists idx_schedule_slots_room_id   on public.schedule_slots (room_id);
 create index if not exists idx_schedule_slots_date      on public.schedule_slots (date);
 create index if not exists idx_schedule_slots_checkin_status on public.schedule_slots (checkin_status);
 create index if not exists idx_attendance_slot_id       on public.attendance_records (schedule_slot_id);
@@ -476,8 +447,8 @@ create index if not exists idx_notifications_is_read    on public.notifications 
 create index if not exists idx_session_packages_active  on public.session_packages (is_active);
 
 -- ============================================================================
--- 5. ĐỒNG BỘ TÊN/EMAIL GIỮA USERS VÀ HỒ SƠ
--- Sửa tên hoặc email ở bất kỳ đâu cũng tự lan sang bảng còn lại.
+-- 5. ĐỒNG BỘ TÊN GIỮA USERS VÀ HỒ SƠ
+-- Sửa tên ở bất kỳ đâu cũng tự lan sang bảng còn lại.
 -- ============================================================================
 
 create or replace function public.sync_user_to_profiles()
@@ -494,15 +465,13 @@ begin
     if new.role = 'TEACHER' then
         update public.teachers
            set name = new.name,
-               email = coalesce(new.email, email),
                updated_at = now()
          where id = new.id;
     end if;
 
     if new.role = 'STUDENT' then
         update public.students
-           set name = new.name,
-               email = coalesce(new.email, email)
+           set name = new.name
          where id = new.id;
     end if;
 
@@ -523,7 +492,6 @@ begin
 
     update public.users
        set name = new.name,
-           email = coalesce(new.email, email),
            updated_at = now()
      where id = new.id;
 
@@ -533,17 +501,17 @@ $$;
 
 drop trigger if exists trg_sync_user_to_profiles on public.users;
 create trigger trg_sync_user_to_profiles
-    after update of name, email on public.users
+    after update of name on public.users
     for each row execute function public.sync_user_to_profiles();
 
 drop trigger if exists trg_sync_teacher_to_user on public.teachers;
 create trigger trg_sync_teacher_to_user
-    after update of name, email on public.teachers
+    after update of name on public.teachers
     for each row execute function public.sync_profile_to_user();
 
 drop trigger if exists trg_sync_student_to_user on public.students;
 create trigger trg_sync_student_to_user
-    after update of name, email on public.students
+    after update of name on public.students
     for each row execute function public.sync_profile_to_user();
 
 -- ============================================================================
@@ -553,7 +521,6 @@ create trigger trg_sync_student_to_user
 -- ============================================================================
 
 alter table public.users                  enable row level security;
-alter table public.classrooms             enable row level security;
 alter table public.teachers               enable row level security;
 alter table public.students               enable row level security;
 alter table public.classes                enable row level security;
@@ -610,24 +577,6 @@ on conflict (id) do update set
     is_active     = excluded.is_active,
     updated_at    = now();
 
--- Phòng học. Lớp học bắt buộc trỏ tới một phòng, nên cần có sẵn danh mục này.
-insert into public.classrooms (id, name, capacity, facilities, status) values
-    ('P.101', 'Phòng Lý Thuyết 101', 35, array['Máy chiếu', 'Điều hòa', 'Loa âm trần'], 'Khả dụng'),
-    ('P.102', 'Phòng Lý Thuyết 102', 35, array['Máy chiếu', 'Điều hòa', 'Loa âm trần'], 'Khả dụng'),
-    ('P.103', 'Phòng Hội Thảo 103',  50, array['Màn hình LED', 'Điều hòa', 'Hệ thống Micro'], 'Khả dụng'),
-    ('P.201', 'Phòng Lab Máy Tính 201', 30, array['30 Máy PC Core i7', 'Điều hòa', 'Mạng LAN gigabit'], 'Khả dụng'),
-    ('P.202', 'Phòng Lab Máy Tính 202', 30, array['30 Máy PC Core i7', 'Điều hòa', 'Mạng LAN gigabit'], 'Khả dụng'),
-    ('P.203', 'Phòng Ngoại Ngữ 203', 25, array['Tai nghe', 'Bảng thông minh', 'Điều hòa'], 'Khả dụng'),
-    ('P.301', 'Phòng Đa Năng 301',   30, array['Bảng viết kính', 'Điều hòa', 'Máy chiếu tương tác'], 'Khả dụng'),
-    ('P.302', 'Phòng Thí Nghiệm 302', 25, array['Dụng cụ thí nghiệm', 'Tủ hút', 'Điều hòa'], 'Khả dụng'),
-    ('P.303', 'Phòng Tự Học 303',    40, array['Bàn học cá nhân', 'Wifi tốc độ cao', 'Điều hòa'], 'Khả dụng'),
-    ('P.305', 'Phòng Đào Tạo Chuyên Sâu 305', 20, array['Bảng Flipchart', 'Điều hòa', 'Smart TV 75 inch'], 'Khả dụng')
-on conflict (id) do update set
-    name       = excluded.name,
-    capacity   = excluded.capacity,
-    facilities = excluded.facilities,
-    status     = excluded.status;
-
 -- ============================================================================
 -- 8. HOÀN TẤT
 -- ============================================================================
@@ -641,11 +590,11 @@ notify pgrst, 'reload schema';
 -- Tài khoản quản trị đầu tiên — chạy riêng, chỉ một lần.
 -- Hash bên dưới là SHA-256 của 'admin123'. Đổi mật khẩu ngay sau khi đăng nhập.
 -- ----------------------------------------------------------------------------
--- insert into public.users (id, username, password_hash, role, name, email, is_active)
+-- insert into public.users (id, username, password_hash, role, name, is_active)
 -- values (
 --     'ADMIN001', 'admin',
 --     '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9',
---     'ADMIN', 'Quản trị viên', 'admin@trungtam.edu.vn', true
+--     'ADMIN', 'Quản trị viên', true
 -- )
 -- on conflict (id) do nothing;
 

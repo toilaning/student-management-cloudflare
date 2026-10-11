@@ -73,7 +73,6 @@ export default function AdminCalendarPage() {
   // Filters
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED'>('ALL');
   const [selectedTeacher, setSelectedTeacher] = useState<string>('ALL');
-  const [selectedRoom, setSelectedRoom] = useState<string>('ALL');
   const [selectedShift, setSelectedShift] = useState<string>('ALL');
 
   // Modal xem chi tiết học sinh buổi học
@@ -84,18 +83,16 @@ export default function AdminCalendarPage() {
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
 
   // State cho Thao tác ngày (bulk-daily-action)
-  const [dailyAction, setDailyAction] = useState<'RESCHEDULE_DAY' | 'SHIFT_MIGRATION' | 'ROOM_MIGRATION' | 'CANCEL_DAY'>('RESCHEDULE_DAY');
+  const [dailyAction, setDailyAction] = useState<'RESCHEDULE_DAY' | 'SHIFT_MIGRATION' | 'CANCEL_DAY'>('RESCHEDULE_DAY');
   const [dailyTargetDate, setDailyTargetDate] = useState('');
   const [dailyFromShiftId, setDailyFromShiftId] = useState<number>(1);
   const [dailyToShiftId, setDailyToShiftId] = useState<number>(2);
-  const [dailyTargetRoomId, setDailyTargetRoomId] = useState('P.101');
   const [dailyCancelStatus, setDailyCancelStatus] = useState<'Đã hủy' | 'Đổi lịch'>('Đã hủy');
 
   // State cho Cập nhật tương lai (bulk-update-future)
   const [futureClassId, setFutureClassId] = useState('');
   const [futureFromDate, setFutureFromDate] = useState('');
   const [futureShiftId, setFutureShiftId] = useState<number | ''>('');
-  const [futureRoomId, setFutureRoomId] = useState('');
   const [futureTeacherId, setFutureTeacherId] = useState('');
   const [futureMeetingLink, setFutureMeetingLink] = useState('');
 
@@ -169,13 +166,6 @@ export default function AdminCalendarPage() {
     return map;
   }, [students]);
 
-  // Danh sách phòng học
-  const availableRooms = useMemo(() => {
-    const set = new Set(['P.101', 'P.102', 'P.103']);
-    slots.forEach(s => { if (s.roomId) set.add(s.roomId); });
-    return Array.from(set).sort();
-  }, [slots]);
-
   // Trạng thái vận hành của slot
   const getSlotRuntimeStatus = (slot: ScheduleSlot) => {
     if (slot.status === 'Đã hủy') return { label: 'Đã hủy', tone: 'danger' as const };
@@ -242,10 +232,9 @@ export default function AdminCalendarPage() {
         return true;
       })
       .filter(s => selectedTeacher === 'ALL' || s.teacherId === selectedTeacher)
-      .filter(s => selectedRoom === 'ALL' || s.roomId === selectedRoom)
       .filter(s => selectedShift === 'ALL' || String(s.shiftId) === selectedShift)
       .sort((a, b) => (a.startTime || '00:00').localeCompare(b.startTime || '00:00'));
-  }, [slots, statusFilter, selectedTeacher, selectedRoom, selectedShift]);
+  }, [slots, statusFilter, selectedTeacher, selectedShift]);
 
   // Khung giờ hiển thị vừa đủ cho các ca trong ngày (thay vì luôn 06:00 – 23:00)
   const bounds = useMemo(() => computeTimelineBounds(filteredSlots), [filteredSlots]);
@@ -334,7 +323,6 @@ export default function AdminCalendarPage() {
           targetDate: dailyAction === 'RESCHEDULE_DAY' ? dailyTargetDate : undefined,
           fromShiftId: dailyAction === 'SHIFT_MIGRATION' ? Number(dailyFromShiftId) : undefined,
           toShiftId: dailyAction === 'SHIFT_MIGRATION' ? Number(dailyToShiftId) : undefined,
-          targetRoomId: dailyAction === 'ROOM_MIGRATION' ? dailyTargetRoomId : undefined,
           cancelStatus: dailyAction === 'CANCEL_DAY' ? dailyCancelStatus : undefined,
           actorId: 'ADMIN001',
         }),
@@ -370,7 +358,6 @@ export default function AdminCalendarPage() {
           classId: futureClassId,
           fromDate: futureFromDate || selectedDate,
           targetShiftId: futureShiftId !== '' ? Number(futureShiftId) : undefined,
-          targetRoomId: futureRoomId || undefined,
           targetTeacherId: futureTeacherId || undefined,
           targetMeetingLink: futureMeetingLink || undefined,
           actorId: 'ADMIN001',
@@ -613,7 +600,7 @@ export default function AdminCalendarPage() {
             </div>
           </Card>
 
-          {/* Thanh bộ lọc: Trạng thái, Giảng viên, Phòng, Ca */}
+          {/* Thanh bộ lọc: Trạng thái, Giảng viên, Ca */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-card p-3 sm:p-4 border border-line rounded-card shadow-card">
             <SegmentedControl
               value={statusFilter}
@@ -636,19 +623,6 @@ export default function AdminCalendarPage() {
                   <option value="ALL">Tất cả giáo viên</option>
                   {teachers.map(t => (
                     <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </Select>
-              </div>
-
-              <div className="w-32 sm:w-36">
-                <Select
-                  value={selectedRoom}
-                  onChange={e => setSelectedRoom(e.target.value)}
-                  className="h-9 text-[13px]"
-                >
-                  <option value="ALL">Tất cả phòng</option>
-                  {availableRooms.map(r => (
-                    <option key={r} value={r}>Phòng {r}</option>
                   ))}
                 </Select>
               </div>
@@ -812,10 +786,6 @@ export default function AdminCalendarPage() {
                                     <UserCheck size={11} className="text-primary shrink-0" />
                                     <span className="truncate">{teacherName}</span>
                                   </span>
-                                  <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                                    <MapPin size={11} className="text-subtle-foreground" />
-                                    {slot.roomId}
-                                  </span>
                                   <span className="inline-flex items-center gap-1 font-bold text-primary tabular whitespace-nowrap">
                                     <Users size={11} />
                                     {studentCount} HS
@@ -863,14 +833,13 @@ export default function AdminCalendarPage() {
                 title="Không có ca học nào"
                 description={`Ngày ${selectedDate} không có ca học nào phù hợp với bộ lọc hiện tại.`}
                 action={
-                  (statusFilter !== 'ALL' || selectedTeacher !== 'ALL' || selectedRoom !== 'ALL' || selectedShift !== 'ALL') ? (
+                  (statusFilter !== 'ALL' || selectedTeacher !== 'ALL' || selectedShift !== 'ALL') ? (
                     <Button
                       variant="secondary"
                       size="sm"
                       onClick={() => {
                         setStatusFilter('ALL');
                         setSelectedTeacher('ALL');
-                        setSelectedRoom('ALL');
                         setSelectedShift('ALL');
                       }}
                     >
@@ -890,7 +859,7 @@ export default function AdminCalendarPage() {
           title="Danh sách học viên ca học"
           description={
             selectedSlotForStudents
-              ? `${selectedSlotForStudents.subject} (${selectedSlotForStudents.classId}) • ${formatTimeHM(selectedSlotForStudents.startTime)} - ${formatTimeHM(selectedSlotForStudents.endTime)} • Phòng ${selectedSlotForStudents.roomId}`
+              ? `${selectedSlotForStudents.subject} (${selectedSlotForStudents.classId}) • ${formatTimeHM(selectedSlotForStudents.startTime)} - ${formatTimeHM(selectedSlotForStudents.endTime)}`
               : ''
           }
           footer={
@@ -936,7 +905,7 @@ export default function AdminCalendarPage() {
                             {st ? st.name : stId} <span className="font-mono text-[11px] text-muted-foreground font-normal">({stId})</span>
                           </p>
                           <p className="text-[12px] text-muted-foreground mt-0.5 truncate">
-                            {st?.phone || 'Chưa cập nhật SĐT'} {st?.email ? `• ${st.email}` : ''}
+                            {st?.phone || 'Chưa cập nhật SĐT'}
                           </p>
                         </div>
                       </div>
@@ -1028,7 +997,6 @@ export default function AdminCalendarPage() {
                 >
                   <option value="RESCHEDULE_DAY">Dời toàn bộ ca sang ngày khác</option>
                   <option value="SHIFT_MIGRATION">Chuyển ca học trong ngày</option>
-                  <option value="ROOM_MIGRATION">Chuyển toàn bộ phòng học trong ngày</option>
                   <option value="CANCEL_DAY">Đổi trạng thái / Hủy toàn bộ ca</option>
                 </Select>
               </Field>
@@ -1066,16 +1034,6 @@ export default function AdminCalendarPage() {
                     </Select>
                   </Field>
                 </div>
-              )}
-
-              {dailyAction === 'ROOM_MIGRATION' && (
-                <Field label="Phòng học đích" required hint="Toàn bộ ca trong ngày sẽ học tại phòng này">
-                  <Input
-                    value={dailyTargetRoomId}
-                    onChange={e => setDailyTargetRoomId(e.target.value)}
-                    placeholder="Ví dụ: P.201"
-                  />
-                </Field>
               )}
 
               {dailyAction === 'CANCEL_DAY' && (
@@ -1125,13 +1083,6 @@ export default function AdminCalendarPage() {
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </Select>
-                </Field>
-                <Field label="Phòng học mới" hint="Để trống nếu giữ nguyên">
-                  <Input
-                    value={futureRoomId}
-                    onChange={e => setFutureRoomId(e.target.value)}
-                    placeholder="Ví dụ: P.102"
-                  />
                 </Field>
               </div>
 

@@ -34,8 +34,7 @@ export class ConflictEngine {
   /**
    * Kiểm tra trùng lịch toàn diện:
    * 1. Giáo viên có bị trùng lịch trong cùng ngày và cùng khoảng thời gian không?
-   * 2. Phòng học có bị trùng lịch trong cùng ngày và cùng khoảng thời gian không? (Bỏ qua phòng 'ONLINE')
-   * 3. Lớp học có bị xếp 2 ca/môn cùng ngày và cùng khoảng thời gian không?
+   * 2. Lớp học có bị xếp 2 ca/môn cùng ngày và cùng khoảng thời gian không?
    */
   public async checkScheduleConflict(
     newSlot: Omit<ScheduleSlot, 'id'>, 
@@ -62,8 +61,7 @@ export class ConflictEngine {
         // 1. Giáo viên có thể dạy nhiều lớp cùng lúc (Đặc thù trung tâm luyện thi: 1 giáo viên kèm song song nhiều nhóm/lớp)
         // Không coi trùng giáo viên là xung đột chặn lịch học nữa.
 
-        // 2. Trung tâm vận hành 100% Online (Google Meet / phòng họp trực tuyến)
-        // Không có phòng học vật lý -> Bỏ hoàn toàn ràng buộc ROOM_CONFLICT
+        // 2. Trung tâm vận hành 100% Online (Google Meet / Zoom) — không có phòng học vật lý.
 
         // 3. Trùng lớp học
         if (slot.classId && newSlot.classId && slot.classId === newSlot.classId) {

@@ -2,7 +2,7 @@ import { AppNotification } from '@/types/notification';
 import { User } from '@/types/auth';
 import { Student } from '@/types/student';
 import { Teacher } from '@/types/teacher';
-import { Classroom, ClassEntity, ClassSection } from '@/types/classroom';
+import { ClassEntity, ClassSection } from '@/types/classroom';
 import { ScheduleSlot, ClassRequest, TimeShift, StudentSlotSwap } from '@/types/schedule';
 import { AttendanceRecord } from '@/types/attendance';
 import { TuitionInvoice, PayrollRecord } from '@/types/finance';
@@ -40,9 +40,7 @@ export interface IRepository {
   createTeacher(teacher: Teacher): Promise<Teacher>;
   deleteTeacher(id: string): Promise<boolean>;
 
-  // Classrooms & Classes
-  getAllClassrooms(): Promise<Classroom[]>;
-  getClassroomById(id: string): Promise<Classroom | null>;
+  // Classes
   getAllClasses(): Promise<ClassEntity[]>;
   getClassById(id: string): Promise<ClassEntity | null>;
   getClassesByTeacherId(teacherId: string): Promise<ClassEntity[]>;

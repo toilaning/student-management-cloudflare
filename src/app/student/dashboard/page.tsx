@@ -309,9 +309,6 @@ export default function StudentDashboardPage() {
                       <h3 className="text-base font-bold text-foreground mt-1.5">{slot.subject}</h3>
                       <div className="flex items-center gap-3 mt-1 text-[13px] text-muted-foreground flex-wrap">
                         <span className="inline-flex items-center gap-1">
-                          <MapPin size={13} /> {slot.roomId || 'Chưa xếp phòng'}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
                           <UserCheck size={13} /> GV {slot.teacherId}
                         </span>
                       </div>
@@ -428,7 +425,7 @@ export default function StudentDashboardPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-[14px] font-bold text-foreground truncate">{slot.subject}</p>
                         <p className="text-[12px] text-muted-foreground tabular">
-                          {slot.startTime} – {slot.endTime} • {slot.roomId || 'Chưa xếp phòng'}
+                          {slot.startTime} – {slot.endTime}
                         </p>
                       </div>
                       {slot.meetingLink && (

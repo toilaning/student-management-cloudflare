@@ -41,7 +41,6 @@ describe('Multi-Section Class: nhiều ca, đổi giáo viên theo từng ca', (
         name: 'Lớp Nhiều Ca Test',
         subject: 'Mỹ thuật',
         teacherId: 'GV001',
-        roomId: 'P.101',
         shiftId: 1,
         startTime: '08:00',
         endTime: '10:00',
@@ -50,9 +49,9 @@ describe('Multi-Section Class: nhiều ca, đổi giáo viên theo từng ca', (
         isRecurring: false,
         autoGenerateSchedule: false,
         sections: [
-          { shiftId: 1, startTime: '08:00', endTime: '10:00', scheduleDays: [2, 4, 6], teacherId: 'GV001', roomId: 'P.101' },
-          { shiftId: 2, startTime: '10:15', endTime: '12:15', scheduleDays: [2, 4, 6], teacherId: 'GV002', roomId: 'P.102' },
-          { shiftId: 3, startTime: '13:30', endTime: '15:30', scheduleDays: [3, 5], teacherId: 'GV003', roomId: 'P.103' },
+          { shiftId: 1, startTime: '08:00', endTime: '10:00', scheduleDays: [2, 4, 6], teacherId: 'GV001' },
+          { shiftId: 2, startTime: '10:15', endTime: '12:15', scheduleDays: [2, 4, 6], teacherId: 'GV002' },
+          { shiftId: 3, startTime: '13:30', endTime: '15:30', scheduleDays: [3, 5], teacherId: 'GV003' },
         ],
       }),
     });
@@ -76,14 +75,13 @@ describe('Multi-Section Class: nhiều ca, đổi giáo viên theo từng ca', (
         name: 'Lớp Sinh Lịch Theo Ca',
         subject: 'Tiếng Anh',
         teacherId: 'GV001',
-        roomId: 'P.101',
         scheduleDays: [2, 4],
         tuitionFee: 1200000,
         isRecurring: false,
         autoGenerateSchedule: false,
         sections: [
-          { shiftId: 1, startTime: '08:00', endTime: '10:00', scheduleDays: [2, 4], teacherId: 'GV001', roomId: 'P.101' },
-          { shiftId: 2, startTime: '10:15', endTime: '12:15', scheduleDays: [2, 4], teacherId: 'GV002', roomId: 'P.102' },
+          { shiftId: 1, startTime: '08:00', endTime: '10:00', scheduleDays: [2, 4], teacherId: 'GV001' },
+          { shiftId: 2, startTime: '10:15', endTime: '12:15', scheduleDays: [2, 4], teacherId: 'GV002' },
         ],
       }),
     });
@@ -131,13 +129,12 @@ describe('Multi-Section Class: nhiều ca, đổi giáo viên theo từng ca', (
         name: 'Lớp Đổi GV Ca',
         subject: 'Toán',
         teacherId: 'GV001',
-        roomId: 'P.101',
         scheduleDays: [2, 4],
         isRecurring: false,
         autoGenerateSchedule: false,
         sections: [
-          { shiftId: 1, startTime: '08:00', endTime: '10:00', scheduleDays: [2, 4], teacherId: 'GV001', roomId: 'P.101' },
-          { shiftId: 2, startTime: '10:15', endTime: '12:15', scheduleDays: [2, 4], teacherId: 'GV002', roomId: 'P.102' },
+          { shiftId: 1, startTime: '08:00', endTime: '10:00', scheduleDays: [2, 4], teacherId: 'GV001' },
+          { shiftId: 2, startTime: '10:15', endTime: '12:15', scheduleDays: [2, 4], teacherId: 'GV002' },
         ],
       }),
     });
@@ -181,12 +178,11 @@ describe('Multi-Section Class: nhiều ca, đổi giáo viên theo từng ca', (
         name: 'Lớp Đổi Thứ Ca',
         subject: 'Văn',
         teacherId: 'GV001',
-        roomId: 'P.101',
         scheduleDays: [2],
         isRecurring: false,
         autoGenerateSchedule: false,
         sections: [
-          { shiftId: 1, startTime: '08:00', endTime: '10:00', scheduleDays: [2, 4], teacherId: 'GV001', roomId: 'P.101' },
+          { shiftId: 1, startTime: '08:00', endTime: '10:00', scheduleDays: [2, 4], teacherId: 'GV001' },
         ],
       }),
     });
@@ -223,12 +219,11 @@ describe('Multi-Section Class: nhiều ca, đổi giáo viên theo từng ca', (
         name: 'Lớp Xóa Ca',
         subject: 'Lý',
         teacherId: 'GV001',
-        roomId: 'P.101',
         scheduleDays: [2],
         isRecurring: false,
         autoGenerateSchedule: false,
         sections: [
-          { shiftId: 1, startTime: '08:00', endTime: '10:00', scheduleDays: [2, 4], teacherId: 'GV001', roomId: 'P.101' },
+          { shiftId: 1, startTime: '08:00', endTime: '10:00', scheduleDays: [2, 4], teacherId: 'GV001' },
         ],
       }),
     });
@@ -256,13 +251,12 @@ describe('Multi-Section Class: nhiều ca, đổi giáo viên theo từng ca', (
         name: 'Lớp Batch A',
         subject: 'Lý',
         teacherId: 'GV001',
-        roomId: 'P.101',
         scheduleDays: [2, 4],
         isRecurring: false,
         autoGenerateSchedule: false,
         sections: [
-          { shiftId: 1, startTime: '08:00', endTime: '10:00', scheduleDays: [2, 4], teacherId: 'GV001', roomId: 'P.101' },
-          { shiftId: 2, startTime: '10:15', endTime: '12:15', scheduleDays: [2, 4], teacherId: 'GV002', roomId: 'P.102' },
+          { shiftId: 1, startTime: '08:00', endTime: '10:00', scheduleDays: [2, 4], teacherId: 'GV001' },
+          { shiftId: 2, startTime: '10:15', endTime: '12:15', scheduleDays: [2, 4], teacherId: 'GV002' },
         ],
       }),
     });
@@ -276,12 +270,11 @@ describe('Multi-Section Class: nhiều ca, đổi giáo viên theo từng ca', (
         name: 'Lớp Batch B',
         subject: 'Hóa',
         teacherId: 'GV001',
-        roomId: 'P.103',
         scheduleDays: [2, 4],
         isRecurring: false,
         autoGenerateSchedule: false,
         sections: [
-          { shiftId: 1, startTime: '08:00', endTime: '10:00', scheduleDays: [2, 4], teacherId: 'GV001', roomId: 'P.103' },
+          { shiftId: 1, startTime: '08:00', endTime: '10:00', scheduleDays: [2, 4], teacherId: 'GV001' },
         ],
       }),
     });

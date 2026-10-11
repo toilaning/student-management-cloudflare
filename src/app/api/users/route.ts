@@ -29,7 +29,6 @@ export async function GET(request: Request) {
     users = users.filter(u => 
       u.id.toLowerCase().includes(search) || 
       u.name.toLowerCase().includes(search) ||
-      (u.email || "").toLowerCase().includes(search) ||
       u.username.toLowerCase().includes(search)
     );
   }
@@ -40,7 +39,7 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const { userId, newPassword, newName, newEmail, isActive, actorId = 'ADMIN001' } = body;
+    const { userId, newPassword, newName, isActive, actorId = 'ADMIN001' } = body;
 
     if (!userId) {
       return NextResponse.json({ error: 'Thiếu thông tin userId' }, { status: 400 });
@@ -62,18 +61,16 @@ export async function PUT(request: Request) {
     }
 
     if (newName) user.name = newName;
-    if (newEmail) user.email = newEmail;
     if (typeof isActive === 'boolean') user.isActive = isActive;
 
     await repo.updateUser(user);
 
-    // Đồng bộ 2 chiều: Khi đổi tên/email ở Quản lý tài khoản, tự động cập nhật sang Hồ sơ Học sinh hoặc Giảng viên
+    // Đồng bộ 2 chiều: Khi đổi tên ở Quản lý tài khoản, tự động cập nhật sang Hồ sơ Học sinh hoặc Giảng viên
     if (user.role === 'STUDENT') {
       try {
         const student = await repo.getStudentById(user.id);
         if (student) {
           if (newName) student.name = newName;
-          if (newEmail) student.email = newEmail;
           await repo.updateStudent(student);
         }
       } catch (err) {
@@ -84,7 +81,6 @@ export async function PUT(request: Request) {
         const teacher = await repo.getTeacherById(user.id);
         if (teacher) {
           if (newName) teacher.name = newName;
-          if (newEmail) teacher.email = newEmail;
           await repo.updateTeacher(teacher);
         }
       } catch (err) {
@@ -118,7 +114,7 @@ export async function PUT(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { username, name, role = 'STUDENT', email, password = 'password123', actorId = 'ADMIN001' } = body;
+    const { username, name, role = 'STUDENT', password = 'password123', actorId = 'ADMIN001' } = body;
 
     if (!username || !name) {
       return NextResponse.json({ error: 'Vui lòng nhập tên đăng nhập và họ tên' }, { status: 400 });
@@ -132,15 +128,12 @@ export async function POST(request: Request) {
     const authService = new AuthService(repo);
     const id = username.toUpperCase();
 
-    const userEmail = email?.trim() ? email.trim() : (role === 'STUDENT' ? `${username.toLowerCase()}@student.local` : `${username.toLowerCase()}@edu.vn`);
-
     const newUser = {
       id,
       username: username.toLowerCase(),
       passwordHash: authService.hashPassword(password),
       role,
       name,
-      email: userEmail,
       isActive: true,
       createdAt: new Date().toISOString(),
     };
@@ -165,7 +158,6 @@ export async function POST(request: Request) {
           const newTeacher = {
             id,
             name: newUser.name,
-            email: newUser.email,
             phone: body.phone || '0901234567',
             specialty: body.specialty || 'Bộ môn chung',
             hourlyRate: 300000,
@@ -199,7 +191,6 @@ export async function POST(request: Request) {
           const newStudent = {
             id,
             name: newUser.name,
-            email: newUser.email,
             phone: body.phone || '0900000000',
             dateOfBirth: body.dateOfBirth || '2008-01-01',
             gender: (body.gender || 'Nam') as 'Nam' | 'Nữ',

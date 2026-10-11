@@ -15,7 +15,6 @@ test('Isolation Suite: Đảm bảo cách ly dữ liệu giữa các User', asyn
       passwordHash: '',
       role: 'STUDENT',
       name: 'Nguyễn Văn A',
-      email: 'st001@hocvien.edu.vn',
       isActive: true,
     };
 
@@ -34,7 +33,6 @@ test('Isolation Suite: Đảm bảo cách ly dữ liệu giữa các User', asyn
       passwordHash: '',
       role: 'TEACHER',
       name: 'Thầy GV001',
-      email: 'gv001@trungtam.edu.vn',
       isActive: true,
     };
 
@@ -63,7 +61,6 @@ test('Isolation Suite: Đảm bảo cách ly dữ liệu giữa các User', asyn
       passwordHash: '',
       role: 'ADMIN',
       name: 'Admin',
-      email: 'admin@trungtam.edu.vn',
       isActive: true,
     };
 

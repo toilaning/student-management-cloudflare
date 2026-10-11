@@ -654,9 +654,6 @@ function AdminAttendanceContent() {
             <div className="mt-4 pt-4 border-t border-line flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px]">
               <Badge tone="primary">{currentSlot.id}</Badge>
               <span className="text-muted-foreground">
-                Phòng <strong className="text-foreground">{currentSlot.roomId}</strong>
-              </span>
-              <span className="text-muted-foreground">
                 Môn <strong className="text-foreground">{currentSlot.subject}</strong>
               </span>
               <span className="text-muted-foreground">

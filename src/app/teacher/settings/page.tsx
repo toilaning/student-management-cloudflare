@@ -21,7 +21,7 @@ export default function TeacherSettingsPage() {
   const [teacher, setTeacher] = useState<Teacher | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ phone: '', email: '', bio: '' });
+  const [form, setForm] = useState({ phone: '', bio: '' });
 
   useEffect(() => {
     if (!teacherId) return;
@@ -34,7 +34,7 @@ export default function TeacherSettingsPage() {
         const t: Teacher | null = data.teacher || null;
         setTeacher(t);
         if (t) {
-          setForm({ phone: t.phone || '', email: t.email || '', bio: t.bio || '' });
+          setForm({ phone: t.phone || '', bio: t.bio || '' });
         }
       } catch (e) {
         if (!cancelled) toast.error('Không tải được hồ sơ giảng viên.');
@@ -62,7 +62,6 @@ export default function TeacherSettingsPage() {
           specialty: teacher.specialty,
           status: teacher.status,
           phone: form.phone.trim(),
-          email: form.email.trim(),
           bio: form.bio.trim(),
         }),
       });
@@ -73,7 +72,6 @@ export default function TeacherSettingsPage() {
           setTeacher(data.teacher);
           setForm({
             phone: data.teacher.phone || '',
-            email: data.teacher.email || '',
             bio: data.teacher.bio || '',
           });
         }
@@ -121,7 +119,7 @@ export default function TeacherSettingsPage() {
             <CardHeader
               icon={<UserRound size={18} />}
               title="Thông tin liên hệ"
-              subtitle="Số điện thoại, email và giới thiệu ngắn của bạn"
+              subtitle="Số điện thoại và giới thiệu ngắn của bạn"
             />
 
             {loading ? (
@@ -134,14 +132,6 @@ export default function TeacherSettingsPage() {
                       value={form.phone}
                       onChange={(e) => setForm({ ...form, phone: e.target.value })}
                       placeholder="0901234567"
-                    />
-                  </Field>
-                  <Field label="Email">
-                    <Input
-                      type="email"
-                      value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      placeholder="gv@edu.vn"
                     />
                   </Field>
                 </div>

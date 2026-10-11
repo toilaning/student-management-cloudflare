@@ -8,7 +8,7 @@ test('RBAC Suite: Phân quyền truy cập theo vai trò', async (t) => {
   const authService = new AuthService(repo);
 
   await t.test('Admin có toàn quyền trên tất cả tài nguyên', () => {
-    const resources = ['STUDENT', 'TEACHER', 'CLASSROOM', 'SCHEDULE', 'ATTENDANCE', 'PAYROLL', 'TUITION', 'AUDIT', 'REQUEST'] as const;
+    const resources = ['STUDENT', 'TEACHER', 'SCHEDULE', 'ATTENDANCE', 'PAYROLL', 'TUITION', 'AUDIT', 'REQUEST'] as const;
     const actions = ['CREATE', 'READ', 'UPDATE', 'DELETE', 'APPROVE'] as const;
 
     for (const res of resources) {

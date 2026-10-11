@@ -551,7 +551,7 @@ export default function AdminRequestsPage() {
                   </span>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Email: {selectedStudent?.email || 'N/A'} • SĐT: {selectedStudent?.phone || 'N/A'}
+                  SĐT: {selectedStudent?.phone || 'N/A'}
                 </div>
               </div>
 
@@ -577,7 +577,7 @@ export default function AdminRequestsPage() {
                       {formatSlotDate(selectedSlot.date)} — {formatSlotTime(selectedSlot)}
                     </p>
                     <p className="text-muted-foreground">
-                      Phòng: {selectedSlot.roomId} • GV: {selectedSlot.teacherId}
+                      GV: {selectedSlot.teacherId}
                     </p>
                   </div>
                 )}

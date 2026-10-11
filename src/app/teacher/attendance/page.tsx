@@ -386,7 +386,6 @@ function AttendanceContent() {
               </div>
               {currentSlot && (
                 <div className="text-[12px] text-muted-foreground">
-                  Phòng <strong className="text-foreground">{currentSlot.roomId}</strong> •{' '}
                   {currentSlot.startTime} - {currentSlot.endTime}
                 </div>
               )}

@@ -103,7 +103,6 @@ export class BulkScheduleService {
             endTime: cls.endTime,
             scheduleDays: [...(cls.scheduleDays || [])],
             teacherId: cls.teacherId,
-            roomId: cls.roomId,
             isActive: true,
             studentIds: [],
           },
@@ -188,7 +187,6 @@ export class BulkScheduleService {
           const slotStartTime = overrideStartTime || section.startTime || cls.startTime || defaultShift.startTime || '18:30';
           const slotEndTime = overrideEndTime || section.endTime || cls.endTime || defaultShift.endTime || '20:30';
           const slotTeacherId = section.teacherId || cls.teacherId;
-          const slotRoomId = section.roomId || cls.roomId;
 
           // Ưu tiên khớp theo sectionId; dữ liệu cũ chưa có sectionId thì khớp theo lớp + ngày.
           const existingSlot = workingSlots.find((s) => {
@@ -204,7 +202,6 @@ export class BulkScheduleService {
                 ...existingSlot,
                 sectionId: section.id || existingSlot.sectionId,
                 teacherId: slotTeacherId,
-                roomId: slotRoomId,
                 shiftId: currentShiftId,
                 startTime: slotStartTime,
                 endTime: slotEndTime,
@@ -240,7 +237,6 @@ export class BulkScheduleService {
             classId: cls.id,
             sectionId: section.id || undefined,
             teacherId: slotTeacherId,
-            roomId: slotRoomId,
             date: dateStr,
             shiftId: currentShiftId,
             startTime: slotStartTime,

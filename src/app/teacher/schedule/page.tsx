@@ -111,7 +111,6 @@ function legacySectionFromClass(cls: ClassEntity): ClassSection {
     endTime: cls.endTime,
     scheduleDays: cls.scheduleDays || [],
     teacherId: cls.teacherId,
-    roomId: cls.roomId,
     isActive: true,
   };
 }
@@ -640,10 +639,6 @@ export default function TeacherSchedulePage() {
                                     </h4>
 
                                     <div className="text-[11px] text-muted-foreground flex items-center gap-2 mt-1 flex-wrap">
-                                      <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                                        <MapPin size={11} className="text-muted-foreground" />
-                                        {slot.roomId}
-                                      </span>
                                       <span className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-foreground">
                                         <Users size={11} className="text-primary" />
                                         {studentCount} học viên
@@ -799,10 +794,6 @@ export default function TeacherSchedulePage() {
                           {!compact && (
                             <div className="mt-auto pt-1.5 flex items-center justify-between gap-2 flex-wrap">
                               <div className="text-[11px] text-muted-foreground flex items-center gap-2.5 flex-wrap">
-                                <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                                  <MapPin size={11} />
-                                  {slot.roomId}
-                                </span>
                                 <span className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-foreground">
                                   <Users size={11} className="text-primary" />
                                   {studentCount} học viên
@@ -893,12 +884,6 @@ export default function TeacherSchedulePage() {
                               <Calendar size={13} className="text-primary" /> Ngày học:
                             </span>
                             <span className="font-semibold">Thứ {days.join(', ')}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground flex items-center gap-1.5">
-                              <MapPin size={13} className="text-primary" /> Phòng học:
-                            </span>
-                            <span className="font-semibold">{sec.roomId || cls.roomId}</span>
                           </div>
                           <div className="flex items-center justify-between pt-1 border-t border-line">
                             <span className="text-muted-foreground flex items-center gap-1.5">

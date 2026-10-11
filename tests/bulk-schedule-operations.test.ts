@@ -26,7 +26,6 @@ const D_FUT3 = addDays(TODAY, 9);
 describe('Bulk Schedule Operations Suite', () => {
   const testClassId = 'CLS_BULK_TEST';
   const testTeacherId = 'GV_BULK_01';
-  const testRoomId = 'ROOM_BULK_A';
 
   it('Setup: Tạo các ca học giả lập phục vụ kiểm thử', async () => {
     await ShiftService.resetDefaults();
@@ -37,7 +36,6 @@ describe('Bulk Schedule Operations Suite', () => {
         id: 'SCH_BULK_01',
         classId: testClassId,
         teacherId: testTeacherId,
-        roomId: testRoomId,
         date: D_PAST,
         shiftId: 1,
         startTime: '08:00',
@@ -49,7 +47,6 @@ describe('Bulk Schedule Operations Suite', () => {
         id: 'SCH_BULK_02',
         classId: testClassId,
         teacherId: testTeacherId,
-        roomId: testRoomId,
         date: D_FUT1,
         shiftId: 1,
         startTime: '08:00',
@@ -61,7 +58,6 @@ describe('Bulk Schedule Operations Suite', () => {
         id: 'SCH_BULK_03',
         classId: testClassId,
         teacherId: testTeacherId,
-        roomId: testRoomId,
         date: D_FUT2,
         shiftId: 1,
         startTime: '08:00',
@@ -73,7 +69,6 @@ describe('Bulk Schedule Operations Suite', () => {
         id: 'SCH_BULK_04',
         classId: testClassId,
         teacherId: testTeacherId,
-        roomId: testRoomId,
         date: D_FUT3,
         shiftId: 1,
         startTime: '08:00',
@@ -92,7 +87,7 @@ describe('Bulk Schedule Operations Suite', () => {
   });
 
   it('1. Tính năng 1: Thay đổi lịch/ca học hàng loạt TỪ NAY VỀ SAU cho lớp học (Future Bulk Update)', async () => {
-    // Dời từ ngày 2026-10-05 trở đi sang Ca 2 (10:15 - 12:15) và đổi sang phòng ROOM_BULK_B
+    // Dời từ ngày D_FUT1 trở đi sang Ca 2 (10:15 - 12:15) và đổi giáo viên
     const req = new Request('http://localhost/api/schedule/bulk-update-future', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -100,7 +95,6 @@ describe('Bulk Schedule Operations Suite', () => {
         classId: testClassId,
         fromDate: D_FUT1,
         targetShiftId: 2,
-        targetRoomId: 'ROOM_BULK_B',
         targetTeacherId: 'GV_BULK_02',
       }),
     });
@@ -114,21 +108,18 @@ describe('Bulk Schedule Operations Suite', () => {
     // Slot 01 giữ nguyên
     const slot01 = await repo.getScheduleSlotById('SCH_BULK_01');
     assert.equal(slot01?.shiftId, 1);
-    assert.equal(slot01?.roomId, testRoomId);
     assert.equal(slot01?.teacherId, testTeacherId);
 
-    // Slot 02 cập nhật Ca 2, giờ 10:15 - 12:15, phòng B, GV 02
+    // Slot 02 cập nhật Ca 2, giờ 10:15 - 12:15, GV 02
     const slot02 = await repo.getScheduleSlotById('SCH_BULK_02');
     assert.equal(slot02?.shiftId, 2);
     assert.equal(slot02?.startTime, '10:15');
     assert.equal(slot02?.endTime, '12:15');
-    assert.equal(slot02?.roomId, 'ROOM_BULK_B');
     assert.equal(slot02?.teacherId, 'GV_BULK_02');
 
     // Slot 03 cũng được cập nhật
     const slot03 = await repo.getScheduleSlotById('SCH_BULK_03');
     assert.equal(slot03?.shiftId, 2);
-    assert.equal(slot03?.roomId, 'ROOM_BULK_B');
 
     // Slot 04 trạng thái 'Đã hủy' không bị đổi
     const slot04 = await repo.getScheduleSlotById('SCH_BULK_04');
@@ -180,24 +171,6 @@ describe('Bulk Schedule Operations Suite', () => {
     assert.equal(slot01Shift3?.shiftId, 3);
     assert.equal(slot01Shift3?.startTime, '13:30');
     assert.equal(slot01Shift3?.endTime, '15:30');
-
-    // 2.3 ROOM_MIGRATION: Chuyển sang phòng ROOM_LAB_X trong ngày D_PAST_MOVED
-    const reqRoom = new Request('http://localhost/api/schedule/bulk-daily-action', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        currentDate: D_PAST_MOVED,
-        action: 'ROOM_MIGRATION',
-        targetRoomId: 'ROOM_LAB_X',
-      }),
-    });
-    const resRoom = await bulkDailyAction(reqRoom);
-    const dataRoom = await resRoom.json();
-    assert.ok(dataRoom.success);
-    assert.equal(dataRoom.affectedCount, 1);
-
-    const slot01RoomX = await repo.getScheduleSlotById('SCH_BULK_01');
-    assert.equal(slot01RoomX?.roomId, 'ROOM_LAB_X');
 
     // 2.4 CANCEL_DAY: Hủy tất cả các ca trong ngày D_PAST_MOVED
     const reqCancel = new Request('http://localhost/api/schedule/bulk-daily-action', {

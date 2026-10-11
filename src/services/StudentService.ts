@@ -56,7 +56,6 @@ export class StudentService {
     }
 
     const studentId = await this.generateNextStudentId();
-    const studentEmail = `${studentId.toLowerCase()}@student.local`;
     const defaultPassword = '123456';
 
     const newStudent: Student = {
@@ -65,7 +64,6 @@ export class StudentService {
       dateOfBirth: '2008-01-01',
       gender: 'Nam',
       phone: phone.trim() || '0900000000',
-      email: studentEmail,
       address: 'TP. Hồ Chí Minh',
       status: 'Đang học',
       enrolledClassIds: [],
@@ -82,7 +80,6 @@ export class StudentService {
         passwordHash: authService.hashPassword(defaultPassword),
         role: 'STUDENT',
         name: newStudent.name,
-        email: studentEmail,
         isActive: true,
       });
     }

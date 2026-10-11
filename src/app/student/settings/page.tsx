@@ -36,7 +36,6 @@ export default function StudentSettingsPage() {
   const [form, setForm] = useState({
     name: '',
     phone: '',
-    email: '',
     parentPhone: '',
     dateOfBirth: '',
     gender: 'Nam' as 'Nam' | 'Nữ',
@@ -67,7 +66,6 @@ export default function StudentSettingsPage() {
             setForm({
               name: st.name || '',
               phone: st.phone || '',
-              email: st.email || '',
               parentPhone: st.parentPhone || '',
               dateOfBirth: st.dateOfBirth || '',
               gender: st.gender || 'Nam',
@@ -107,7 +105,6 @@ export default function StudentSettingsPage() {
       {
         name: form.name.trim(),
         phone: form.phone.trim(),
-        email: form.email.trim(),
         parentPhone: form.parentPhone.trim(),
         dateOfBirth: form.dateOfBirth.trim(),
         gender: form.gender,
@@ -214,14 +211,6 @@ export default function StudentSettingsPage() {
                         value={form.phone}
                         onChange={(e) => setField('phone', e.target.value)}
                         placeholder="0381234567"
-                      />
-                    </Field>
-                    <Field label="Email">
-                      <Input
-                        type="email"
-                        value={form.email}
-                        onChange={(e) => setField('email', e.target.value)}
-                        placeholder="email@example.com"
                       />
                     </Field>
                     <Field label="SĐT phụ huynh">

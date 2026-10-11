@@ -47,7 +47,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { classId, name, shiftId, startTime, endTime, scheduleDays, teacherId, roomId } = body;
+    const { classId, name, shiftId, startTime, endTime, scheduleDays, teacherId } = body;
     if (!classId) {
       return NextResponse.json({ error: 'Thiếu classId' }, { status: 400 });
     }
@@ -68,7 +68,6 @@ export async function POST(request: Request) {
       endTime: endTimeResolved,
       scheduleDays: Array.isArray(scheduleDays) ? scheduleDays.map(Number) : (cls.scheduleDays || []),
       teacherId: teacherId || cls.teacherId,
-      roomId: roomId || cls.roomId,
       isActive: true,
       studentIds: [],
     };
@@ -90,7 +89,6 @@ export async function PUT(request: Request) {
       endTime,
       scheduleDays,
       teacherId,
-      roomId,
       isActive,
       syncFutureSlots = true,
       actorId = 'ADMIN001',
@@ -106,7 +104,6 @@ export async function PUT(request: Request) {
     if (endTime !== undefined) sec.endTime = endTime;
     if (scheduleDays !== undefined && Array.isArray(scheduleDays)) sec.scheduleDays = scheduleDays.map(Number);
     if (teacherId !== undefined) sec.teacherId = teacherId || undefined;
-    if (roomId !== undefined) sec.roomId = roomId;
     if (isActive !== undefined) sec.isActive = Boolean(isActive);
     await repo.updateClassSection(sec);
 
@@ -156,10 +153,6 @@ export async function PUT(request: Request) {
         let changed = false;
         if (teacherId !== undefined && slot.teacherId !== teacherId) {
           slot.teacherId = teacherId || sec.teacherId || slot.teacherId;
-          changed = true;
-        }
-        if (roomId !== undefined && slot.roomId !== roomId) {
-          slot.roomId = roomId;
           changed = true;
         }
         if (startTime !== undefined && slot.startTime !== startTime) {

@@ -48,7 +48,6 @@ export async function runComprehensiveAudit() {
     password_hash: "hash123",
     role: "STUDENT",
     name: "Nguyễn Văn Test Audit",
-    email: `stu_${timestamp}@domain.com`,
     is_active: true
   });
 
@@ -58,7 +57,6 @@ export async function runComprehensiveAudit() {
     password_hash: "hash123",
     role: "TEACHER",
     name: "Thầy Giáo Test Audit",
-    email: `tch_${timestamp}@domain.com`,
     is_active: true
   });
 
@@ -72,7 +70,6 @@ export async function runComprehensiveAudit() {
   const testStudent = {
     id: testStudentUserId,
     name: "Nguyễn Văn Test Audit",
-    email: `stu_${timestamp}@domain.com`,
     phone: "0987654321",
     parent_phone: "0912345678",
     home_town: "Nam Định",
@@ -111,7 +108,6 @@ export async function runComprehensiveAudit() {
   const testTeacher = {
     id: testTeacherUserId,
     name: "Thầy Giáo Test Audit",
-    email: `tch_${timestamp}@domain.com`,
     phone: "0911223344",
     specialty: "Mỹ thuật đồ họa",
     hourly_rate: 200000,
@@ -216,7 +212,6 @@ export async function runComprehensiveAudit() {
       id: "slot-1",
       classId: "class-1",
       teacherId: "tch-1",
-      roomId: "room-online",
       date: "2026-10-02",
       shiftId: 1,
       startTime: "18:30",
@@ -232,12 +227,11 @@ export async function runComprehensiveAudit() {
 
   const engine = new ConflictEngine(mockRepo);
 
-  // 6.1: ConflictEngine Room & Teacher Rules for 100% Online
-  // Case A: Same teacher teaching parallel class
+  // 6.1: ConflictEngine Teacher & Class Rules for 100% Online
+  // Case A: Same teacher teaching parallel class (không chặn)
   const candidateSlotSameTeacher: Omit<ScheduleSlot, "id"> = {
     classId: "class-2",
     teacherId: "tch-1", // same teacher
-    roomId: "room-online-2",
     date: "2026-10-02",
     shiftId: 1,
     startTime: "18:30",
@@ -254,32 +248,10 @@ export async function runComprehensiveAudit() {
     { hasConflict: resultTeacher.hasConflict, conflicts: resultTeacher.conflicts }
   );
 
-  // Case B: Same online room
-  const candidateSlotSameRoom: Omit<ScheduleSlot, "id"> = {
-    classId: "class-3",
-    teacherId: "tch-2",
-    roomId: "room-online", // same room in online setup
-    date: "2026-10-02",
-    shiftId: 1,
-    startTime: "18:30",
-    endTime: "20:30",
-    subject: "Vẽ Tự Do",
-    status: "Đã lên lịch"
-  };
-
-  const resultRoom = await engine.checkScheduleConflict(candidateSlotSameRoom);
-  const roomConflict = resultRoom.conflicts.find(c => c.type === "ROOM_CONFLICT");
-  assert(
-    !roomConflict && resultRoom.hasConflict === false,
-    "ConflictEngine: Multiple online sessions do not block ROOM_CONFLICT",
-    { hasConflict: resultRoom.hasConflict, conflicts: resultRoom.conflicts }
-  );
-
   // Case C: Same class in overlapping time MUST trigger CLASS_CONFLICT
   const candidateSlotSameClass: Omit<ScheduleSlot, "id"> = {
     classId: "class-1", // same class
     teacherId: "tch-3",
-    roomId: "room-online-3",
     date: "2026-10-02",
     shiftId: 1,
     startTime: "18:30",

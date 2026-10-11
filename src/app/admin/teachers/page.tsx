@@ -49,7 +49,6 @@ export default function AdminTeachersPage() {
     specialty: '',
     hourlyRate: 350000,
     phone: '',
-    email: '',
     bio: '',
   });
 
@@ -62,7 +61,6 @@ export default function AdminTeachersPage() {
     specialty: '',
     hourlyRate: 350000,
     phone: '',
-    email: '',
     bio: '',
     status: 'Đang dạy' as 'Đang dạy' | 'Nghỉ phép',
   });
@@ -106,7 +104,7 @@ export default function AdminTeachersPage() {
       if (res.ok) {
         toast.success(data.message || 'Thêm giáo viên mới thành công');
         setShowAddSheet(false);
-        setFormData({ name: '', specialty: '', hourlyRate: 350000, phone: '', email: '', bio: '' });
+        setFormData({ name: '', specialty: '', hourlyRate: 350000, phone: '', bio: '' });
         await loadTeachers();
       } else {
         toast.error(data.error || 'Thêm giáo viên thất bại');
@@ -125,7 +123,6 @@ export default function AdminTeachersPage() {
       specialty: tc.specialty,
       hourlyRate: tc.hourlyRate || 350000,
       phone: tc.phone || '',
-      email: tc.email || '',
       bio: tc.bio || '',
       status: tc.status === 'Đang dạy' ? 'Đang dạy' : 'Nghỉ phép',
     });
@@ -218,8 +215,7 @@ export default function AdminTeachersPage() {
         t.name?.toLowerCase().includes(q) ||
         t.id?.toLowerCase().includes(q) ||
         t.specialty?.toLowerCase().includes(q) ||
-        t.phone?.toLowerCase().includes(q) ||
-        t.email?.toLowerCase().includes(q)
+        t.phone?.toLowerCase().includes(q)
       );
     });
   }, [teachers, statusFilter, searchTerm]);
@@ -240,11 +236,6 @@ export default function AdminTeachersPage() {
             <p className="font-semibold text-foreground text-[14px] leading-tight truncate">{row.name}</p>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="font-mono text-[11px] text-muted-foreground">{row.id}</span>
-              {row.email && (
-                <span className="text-[11px] text-subtle-foreground truncate max-w-[140px] sm:max-w-none">
-                  {row.email}
-                </span>
-              )}
             </div>
           </div>
         </div>
@@ -433,12 +424,6 @@ export default function AdminTeachersPage() {
                     <span className="text-muted-foreground block text-[11px]">Điện thoại</span>
                     <span className="font-mono text-foreground">{row.phone}</span>
                   </div>
-                  {row.email && (
-                    <div>
-                      <span className="text-muted-foreground block text-[11px]">Email</span>
-                      <span className="text-foreground truncate block">{row.email}</span>
-                    </div>
-                  )}
                 </div>
 
                 {row.bio && (
@@ -543,14 +528,6 @@ export default function AdminTeachersPage() {
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 />
               </Field>
-              <Field label="Địa chỉ Email">
-                <Input
-                  type="email"
-                  placeholder="giaovien@edu.vn"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                />
-              </Field>
             </div>
 
             <Field label="Mô tả / Tiểu sử ngắn">
@@ -630,14 +607,6 @@ export default function AdminTeachersPage() {
                 />
               </Field>
             </div>
-
-            <Field label="Địa chỉ Email">
-              <Input
-                type="email"
-                value={editFormData.email}
-                onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
-              />
-            </Field>
 
             <Field label="Mô tả / Tiểu sử">
               <Textarea

@@ -5,7 +5,6 @@ export type ExamBlock = 'KHOI_V' | 'KHOI_H';
 export interface Student {
   id: string; // ST001..ST400, 26xxx
   name: string;
-  email?: string;
   phone: string;
   dateOfBirth?: string;
   gender?: 'Nam' | 'Nữ';

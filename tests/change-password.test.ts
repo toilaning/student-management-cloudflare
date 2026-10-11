@@ -30,7 +30,6 @@ describe('Self-service Password Change Suite', () => {
       passwordHash: auth.hashPassword('matkhau_cu'),
       role: 'STUDENT',
       name: 'Học viên đổi mật khẩu',
-      email: 'st_pwd_01@student.local',
       isActive: true,
     });
   }

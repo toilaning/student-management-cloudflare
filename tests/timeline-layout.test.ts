@@ -11,7 +11,6 @@ function makeSlot(partial: Partial<ScheduleSlot> & { id: string }): ScheduleSlot
   return {
     classId: 'CLS01',
     teacherId: 'GV001',
-    roomId: 'ONLINE',
     date: '2026-10-05',
     shiftId: 1,
     startTime: '08:00',

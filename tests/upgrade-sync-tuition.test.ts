@@ -4,25 +4,14 @@ import { LocalRepository } from '../src/repositories/LocalRepository';
 import { AuthService } from '../src/services/AuthService';
 import { TuitionPayrollService } from '../src/services/TuitionPayrollService';
 
-test('Upgrade Suite: Fallback Email, 2-Way Sync & Manual Tuition Status', async (t) => {
+test('Upgrade Suite: 2-Way Sync & Manual Tuition Status', async (t) => {
   const repo = LocalRepository.getInstance();
   const authService = new AuthService(repo);
   const financeService = new TuitionPayrollService(repo);
 
-  await t.test('1. Fallback email format cho Học sinh và Giáo viên', async () => {
-    const studentId = 'ST991';
-    const fallbackStudentEmail = `${studentId.toLowerCase()}@student.local`;
-    assert.equal(fallbackStudentEmail, 'st991@student.local');
-
-    const teacherId = 'GV991';
-    const fallbackTeacherEmail = `${teacherId.toLowerCase()}@teacher.local`;
-    assert.equal(fallbackTeacherEmail, 'gv991@teacher.local');
-  });
-
-  await t.test('2. Đồng bộ Chiều 1: Thêm học sinh -> Tạo tài khoản user tương ứng', async () => {
+  await t.test('1. Đồng bộ Chiều 1: Thêm học sinh -> Tạo tài khoản user tương ứng', async () => {
     const stId = 'ST992';
     const stName = 'Nguyễn Văn Test Sync';
-    const studentEmail = `${stId.toLowerCase()}@student.local`;
 
     const newStudent = {
       id: stId,
@@ -30,7 +19,6 @@ test('Upgrade Suite: Fallback Email, 2-Way Sync & Manual Tuition Status', async 
       dateOfBirth: '2008-05-12',
       gender: 'Nam' as const,
       phone: '0988776655',
-      email: studentEmail,
       address: 'TP. Hồ Chí Minh',
       status: 'Đang học' as const,
       enrolledClassIds: [],
@@ -42,7 +30,6 @@ test('Upgrade Suite: Fallback Email, 2-Way Sync & Manual Tuition Status', async 
     // Kiểm tra học sinh đã tạo
     const savedSt = await repo.getStudentById(stId);
     assert.ok(savedSt, 'Học sinh phải được tạo trong repo');
-    assert.equal(savedSt.email, 'st992@student.local');
 
     // Tạo user tương ứng như trong route /api/students
     let user = await repo.getUserById(stId);
@@ -53,7 +40,6 @@ test('Upgrade Suite: Fallback Email, 2-Way Sync & Manual Tuition Status', async 
         passwordHash: authService.hashPassword('student123'),
         role: 'STUDENT',
         name: newStudent.name,
-        email: studentEmail,
         isActive: true,
       });
     }
@@ -62,17 +48,15 @@ test('Upgrade Suite: Fallback Email, 2-Way Sync & Manual Tuition Status', async 
     assert.ok(user, 'User phải tồn tại sau khi đồng bộ');
     assert.equal(user.username, 'st992');
     assert.equal(user.role, 'STUDENT');
-    assert.equal(user.email, 'st992@student.local');
 
     // Test xác thực đăng nhập
     const authResult = await authService.authenticate('st992', 'student123');
     assert.ok(authResult, 'Học sinh mới phải đăng nhập thành công với mật khẩu mặc định student123');
   });
 
-  await t.test('3. Đồng bộ Chiều 2: Tạo User STUDENT -> Tự động sinh Student tương ứng', async () => {
+  await t.test('2. Đồng bộ Chiều 2: Tạo User STUDENT -> Tự động sinh Student tương ứng', async () => {
     const userId = 'ST993';
     const userName = 'Trần Thị Test Sync';
-    const userEmail = `${userId.toLowerCase()}@student.local`;
 
     await repo.createUser({
       id: userId,
@@ -80,7 +64,6 @@ test('Upgrade Suite: Fallback Email, 2-Way Sync & Manual Tuition Status', async 
       passwordHash: authService.hashPassword('student123'),
       role: 'STUDENT',
       name: userName,
-      email: userEmail,
       isActive: true,
     });
 
@@ -90,7 +73,6 @@ test('Upgrade Suite: Fallback Email, 2-Way Sync & Manual Tuition Status', async 
       await repo.createStudent({
         id: userId,
         name: userName,
-        email: userEmail,
         phone: '0900000000',
         dateOfBirth: '2008-01-01',
         gender: 'Nữ',
@@ -104,11 +86,10 @@ test('Upgrade Suite: Fallback Email, 2-Way Sync & Manual Tuition Status', async 
     student = await repo.getStudentById(userId);
     assert.ok(student, 'Hồ sơ học viên phải được đồng bộ tạo tự động');
     assert.equal(student.name, userName);
-    assert.equal(student.email, 'st993@student.local');
     assert.equal(student.status, 'Đang học');
   });
 
-  await t.test('4. Cập nhật thủ công trạng thái hóa đơn: Đã nộp, Còn nợ, Quá hạn', async () => {
+  await t.test('3. Cập nhật thủ công trạng thái hóa đơn: Đã nộp, Còn nợ, Quá hạn', async () => {
     // Tạo 1 hóa đơn mẫu
     const invoice = await financeService.createInvoice({
       studentId: 'ST992',

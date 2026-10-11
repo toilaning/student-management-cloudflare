@@ -27,7 +27,6 @@ async function createClassWithTwoSections(
     name: subject + ' - Test ' + id,
     subject,
     teacherId,
-    roomId: 'P.101',
     studentIds: [],
     tuitionFee: 3500000,
     scheduleDays: days,
@@ -49,7 +48,6 @@ async function createClassWithTwoSections(
     endTime: sa.endTime,
     scheduleDays: days,
     teacherId,
-    roomId: 'P.101',
     isActive: true,
     studentIds: [],
   };

@@ -51,7 +51,6 @@ export default function AdminAccountsPage() {
   // Sheet Chỉnh sửa thông tin
   const [editingProfileUser, setEditingProfileUser] = useState<User | null>(null);
   const [editName, setEditName] = useState('');
-  const [editEmail, setEditEmail] = useState('');
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
   // Sheet Đổi mật khẩu
@@ -67,7 +66,6 @@ export default function AdminAccountsPage() {
     username: '',
     name: '',
     role: 'STUDENT' as Role,
-    email: '',
     password: 'password123',
   });
 
@@ -109,7 +107,6 @@ export default function AdminAccountsPage() {
         body: JSON.stringify({
           userId: editingProfileUser.id,
           newName: editName.trim(),
-          newEmail: editEmail.trim(),
         }),
       });
       const data = await res.json();
@@ -189,7 +186,6 @@ export default function AdminAccountsPage() {
           username: '',
           name: '',
           role: 'STUDENT',
-          email: '',
           password: 'password123',
         });
         await loadUsers();
@@ -256,8 +252,7 @@ export default function AdminAccountsPage() {
       return (
         u.id?.toLowerCase().includes(q) ||
         u.name?.toLowerCase().includes(q) ||
-        u.username?.toLowerCase().includes(q) ||
-        (u.email || '').toLowerCase().includes(q)
+        u.username?.toLowerCase().includes(q)
       );
     });
   }, [users, roleFilter, searchTerm]);
@@ -286,15 +281,6 @@ export default function AdminAccountsPage() {
             </div>
           </div>
         </div>
-      ),
-    },
-    {
-      key: 'email',
-      header: 'Địa chỉ Email',
-      render: (row) => (
-        <span className="text-[13px] text-muted-foreground truncate block max-w-xs">
-          {row.email || 'Chưa cập nhật'}
-        </span>
       ),
     },
     {
@@ -332,7 +318,6 @@ export default function AdminAccountsPage() {
               onClick={() => {
                 setEditingProfileUser(row);
                 setEditName(row.name || '');
-                setEditEmail(row.email || '');
               }}
               aria-label="Sửa thông tin"
             >
@@ -423,7 +408,7 @@ export default function AdminAccountsPage() {
                   setSearchTerm(v);
                   setCurrentPage(1);
                 }}
-                placeholder="Tìm mã ID, tên hiển thị, username, email..."
+                placeholder="Tìm mã ID, tên hiển thị, username..."
                 className="w-full sm:w-80"
               />
 
@@ -481,12 +466,6 @@ export default function AdminAccountsPage() {
                   </div>
 
                   <div className="text-[12px] space-y-1 pt-1 border-t border-line">
-                    {row.email && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Email:</span>
-                        <span className="text-foreground truncate">{row.email}</span>
-                      </div>
-                    )}
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Trạng thái:</span>
                       <Badge tone={row.isActive !== false ? 'success' : 'neutral'} dot>
@@ -503,7 +482,6 @@ export default function AdminAccountsPage() {
                       onClick={() => {
                         setEditingProfileUser(row);
                         setEditName(row.name || '');
-                        setEditEmail(row.email || '');
                       }}
                     >
                       Sửa thông tin
@@ -580,18 +558,10 @@ export default function AdminAccountsPage() {
               />
             </Field>
 
-            <Field label="Địa chỉ Email">
-              <Input
-                type="email"
-                value={editEmail}
-                onChange={(e) => setEditEmail(e.target.value)}
-              />
-            </Field>
-
             <div className="p-3 rounded-field bg-primary-soft/40 border border-primary-soft text-primary-ink text-[12px] flex items-start gap-2 leading-relaxed">
               <Info size={16} className="shrink-0 mt-0.5" />
               <span>
-                <strong>Đồng bộ tự động:</strong> Khi bạn thay đổi họ tên hoặc email, hệ thống sẽ tự động cập nhật ngay lập tức sang hồ sơ tại mục Quản lý học sinh hoặc Quản lý giáo viên tương ứng.
+                <strong>Đồng bộ tự động:</strong> Khi bạn thay đổi họ tên, hệ thống sẽ tự động cập nhật ngay lập tức sang hồ sơ tại mục Quản lý học sinh hoặc Quản lý giáo viên tương ứng.
               </span>
             </div>
           </form>
@@ -690,15 +660,6 @@ export default function AdminAccountsPage() {
                 <option value="TEACHER">Giáo viên (Teacher)</option>
                 <option value="ADMIN">Quản trị viên (Admin)</option>
               </Select>
-            </Field>
-
-            <Field label="Địa chỉ Email">
-              <Input
-                type="email"
-                placeholder="nguyenan@edu.vn"
-                value={newUserFormData.email}
-                onChange={(e) => setNewUserFormData({ ...newUserFormData, email: e.target.value })}
-              />
             </Field>
 
             <Field label="Mật khẩu khởi tạo" required hint="Mặc định: password123 (người dùng có thể đổi sau)">

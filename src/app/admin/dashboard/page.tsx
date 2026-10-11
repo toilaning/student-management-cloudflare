@@ -242,8 +242,6 @@ export default function AdminDashboardPage() {
                             <p className="text-[12px] text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
                               <span className="font-semibold text-foreground tabular">{slot.startTime} - {slot.endTime}</span>
                               <span>•</span>
-                              <span>Phòng {slot.roomId}</span>
-                              <span>•</span>
                               <span>GV: {slot.teacherId}</span>
                             </p>
                           </div>

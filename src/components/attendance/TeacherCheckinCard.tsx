@@ -144,9 +144,6 @@ export function TeacherCheckinCard({ teacherId }: { teacherId?: string }) {
                       <span className="inline-flex items-center gap-1">
                         <Clock size={12} /> {formatTimeHM(slot.startTime)} - {formatTimeHM(slot.endTime)}
                       </span>
-                      <span className="inline-flex items-center gap-1">
-                        <MapPin size={12} /> Phòng {slot.roomId}
-                      </span>
                     </div>
                     {(checkedIn || checkedOut) && (
                       <div className="flex items-center gap-3 text-[12px] pt-0.5 tabular">

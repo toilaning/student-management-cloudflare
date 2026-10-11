@@ -63,16 +63,14 @@ type DraftSection = {
   endTime: string;
   scheduleDays: number[];
   teacherId: string;
-  roomId: string;
 };
 
-const createEmptySection = (teacherId: string, roomId: string): DraftSection => ({
+const createEmptySection = (teacherId: string): DraftSection => ({
   shiftId: 1,
   startTime: '18:30',
   endTime: '20:30',
   scheduleDays: [2, 4, 6],
   teacherId: teacherId || '',
-  roomId: roomId || 'P.101',
 });
 
 export default function AdminClassesPage() {
@@ -84,7 +82,6 @@ export default function AdminClassesPage() {
     name: '',
     subject: '',
     teacherId: '',
-    roomId: 'P.101',
     shiftId: 1,
     startTime: '18:30',
     endTime: '20:30',
@@ -143,7 +140,6 @@ export default function AdminClassesPage() {
     endTime: '20:30',
     scheduleDays: [] as number[],
     teacherId: '',
-    roomId: '',
   });
 
   // Sheet đổi giáo viên quản lý lớp
@@ -167,7 +163,6 @@ export default function AdminClassesPage() {
     name: '',
     subject: '',
     teacherId: '',
-    roomId: '',
     startTime: '',
     endTime: '',
     scheduleDays: [] as number[],
@@ -226,7 +221,6 @@ export default function AdminClassesPage() {
         endTime: newClassFormData.endTime,
         scheduleDays: newClassFormData.scheduleDays,
         teacherId: newClassFormData.teacherId,
-        roomId: newClassFormData.roomId,
       };
       const extraSections = draftSections.filter(
         (s) => s.startTime && s.endTime && s.teacherId
@@ -247,7 +241,6 @@ export default function AdminClassesPage() {
           name: '',
           subject: '',
           teacherId: teachers[0]?.id || '',
-          roomId: 'P.101',
           shiftId: 1,
           startTime: '18:30',
           endTime: '20:30',
@@ -415,7 +408,6 @@ export default function AdminClassesPage() {
         endTime: sec.endTime || '20:30',
         scheduleDays: sec.scheduleDays && sec.scheduleDays.length > 0 ? [...sec.scheduleDays] : [],
         teacherId: sec.teacherId || '',
-        roomId: sec.roomId || '',
       });
     } else {
       setSectionForm({
@@ -429,7 +421,6 @@ export default function AdminClassesPage() {
             ? [...(selectedClass?.scheduleDays || [])]
             : [],
         teacherId: selectedClass?.teacherId || teachers[0]?.id || '',
-        roomId: selectedClass?.roomId || 'P.101',
       });
     }
   };
@@ -479,7 +470,6 @@ export default function AdminClassesPage() {
             endTime: sectionForm.endTime,
             scheduleDays: sectionForm.scheduleDays,
             teacherId: sectionForm.teacherId,
-            roomId: sectionForm.roomId,
             syncFutureSlots: true,
           }),
         });
@@ -502,7 +492,6 @@ export default function AdminClassesPage() {
                   endTime: data.section.endTime,
                   scheduleDays: data.section.scheduleDays,
                   teacherId: data.section.teacherId,
-                  roomId: data.section.roomId,
                 }
               : sec
           )
@@ -519,7 +508,6 @@ export default function AdminClassesPage() {
             endTime: sectionForm.endTime,
             scheduleDays: sectionForm.scheduleDays,
             teacherId: sectionForm.teacherId,
-            roomId: sectionForm.roomId,
           }),
         });
         const data = await res.json();
@@ -637,7 +625,6 @@ export default function AdminClassesPage() {
       name: cls.name || '',
       subject: cls.subject || '',
       teacherId: cls.teacherId || '',
-      roomId: cls.roomId || '',
       startTime: cls.startTime || '',
       endTime: cls.endTime || '',
       scheduleDays: cls.scheduleDays && cls.scheduleDays.length > 0 ? [...cls.scheduleDays] : [],
@@ -659,7 +646,6 @@ export default function AdminClassesPage() {
           name: editForm.name,
           subject: editForm.subject,
           teacherId: editForm.teacherId,
-          roomId: editForm.roomId,
           startTime: editForm.startTime,
           endTime: editForm.endTime,
           scheduleDays: editForm.scheduleDays,
@@ -678,7 +664,6 @@ export default function AdminClassesPage() {
                   name: editForm.name,
                   subject: editForm.subject,
                   teacherId: editForm.teacherId,
-                  roomId: editForm.roomId,
                   startTime: editForm.startTime,
                   endTime: editForm.endTime,
                   scheduleDays: editForm.scheduleDays,
@@ -715,8 +700,7 @@ export default function AdminClassesPage() {
         (c.name || '').toLowerCase().includes(q) ||
         (c.subject || '').toLowerCase().includes(q) ||
         (c.teacherId || '').toLowerCase().includes(q) ||
-        (teacherMap[c.teacherId] || '').toLowerCase().includes(q) ||
-        (c.roomId || '').toLowerCase().includes(q)
+        (teacherMap[c.teacherId] || '').toLowerCase().includes(q)
       );
     }
   );
@@ -803,7 +787,7 @@ export default function AdminClassesPage() {
   const addDraftSection = () => {
     setDraftSections((prev) => [
       ...prev,
-      createEmptySection(newClassFormData.teacherId || teachers[0]?.id || '', newClassFormData.roomId),
+      createEmptySection(newClassFormData.teacherId || teachers[0]?.id || ''),
     ]);
   };
 
@@ -1523,12 +1507,6 @@ export default function AdminClassesPage() {
                         ))}
                       </Select>
                     </Field>
-                    <Field label="Phòng học">
-                      <Input
-                        value={sec.roomId}
-                        onChange={(e) => updateDraftSection(index, { roomId: e.target.value })}
-                      />
-                    </Field>
                   </div>
                 </div>
               ))}
@@ -1811,7 +1789,7 @@ export default function AdminClassesPage() {
                           {st.id} - {st.name}
                         </div>
                         <div className="text-[11px] text-muted-foreground">
-                          {st.phone || '—'} {st.email ? '• ' + st.email : ''}
+                          {st.phone || '—'}
                         </div>
                       </div>
                       <Button
@@ -1997,12 +1975,6 @@ export default function AdminClassesPage() {
                   ))}
                 </Select>
               </Field>
-              <Field label="Phòng học">
-                <Input
-                  value={sectionForm.roomId}
-                  onChange={(e) => setSectionForm((prev) => ({ ...prev, roomId: e.target.value }))}
-                />
-              </Field>
             </div>
 
             <p className="text-xs text-muted-foreground">
@@ -2068,12 +2040,6 @@ export default function AdminClassesPage() {
                     </option>
                   ))}
                 </Select>
-              </Field>
-              <Field label="Phòng học">
-                <Input
-                  value={editForm.roomId}
-                  onChange={(e) => setEditForm({ ...editForm, roomId: e.target.value })}
-                />
               </Field>
             </div>
 
