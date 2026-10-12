@@ -1841,7 +1841,7 @@ export class SupabaseRepository implements IRepository {
     const { data, error } = await client
       .from('session_packages')
       .select('*')
-      .order('session_count', { ascending: true });
+      .order('created_at', { ascending: false });
     if (error) {
       throw new Error(error.message);
     }

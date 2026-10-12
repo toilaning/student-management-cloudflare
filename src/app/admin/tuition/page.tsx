@@ -942,7 +942,10 @@ export default function AdminTuitionPage() {
                 onChange={e => setPkgIsActive(e.target.checked)}
                 className="w-4 h-4 rounded accent-primary cursor-pointer"
               />
-              <span className="text-[13px] font-medium text-foreground">Mở bán cho học sinh chọn</span>
+              <span className="flex flex-col">
+                <span className="text-[13px] font-medium text-foreground">Hiển thị trên Portal học sinh</span>
+                <span className="text-[11px] text-muted-foreground">Tắt sẽ ẩn gói này khỏi Portal học sinh (dùng khi soạn gói trước, mở bán sau).</span>
+              </span>
             </label>
           </form>
         </Sheet>

@@ -96,6 +96,19 @@ export default function StudentTuitionPage() {
     loadPackages();
   }, [currentUser, isReady]);
 
+  // Khi tab quay lại focus, làm mới danh sách gói để gói admin vừa tạo hiện ngay mà không cần F5.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') loadPackages();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', loadPackages);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', loadPackages);
+    };
+  }, []);
+
   const totalBilled = invoices.reduce((s, i) => s + i.amount, 0);
   const totalPaid = invoices.reduce((s, i) => s + i.paidAmount, 0);
   const totalDebt = invoices.reduce((s, i) => s + i.remainingAmount, 0);
@@ -351,7 +364,12 @@ export default function StudentTuitionPage() {
                   >
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-2">
-                        <Badge tone="primary">{pkg.sessionCount} buổi học</Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge tone="primary">{pkg.sessionCount} buổi học</Badge>
+                          {pkg.createdAt && Date.now() - new Date(pkg.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000 && (
+                            <Badge tone="success" dot>Mới</Badge>
+                          )}
+                        </div>
                         <span className="text-xs font-mono font-medium text-muted-foreground">
                           {pkg.id}
                         </span>
