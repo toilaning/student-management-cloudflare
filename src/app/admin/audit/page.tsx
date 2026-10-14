@@ -34,6 +34,7 @@ const ACTION_LABELS: Record<string, { label: string; tone: 'neutral' | 'primary'
   SCHEDULE_CHANGE: { label: 'Đổi lịch', tone: 'warning' },
   PAYMENT_PROCESS: { label: 'Thanh toán', tone: 'success' },
   PACKAGE_PURCHASE: { label: 'Mua gói', tone: 'primary' },
+  CANCEL_INVOICE: { label: 'Hủy gói', tone: 'danger' },
   REQUEST_DECIDE: { label: 'Duyệt đơn', tone: 'primary' },
 };
 

@@ -86,17 +86,18 @@ export class TuitionPayrollService {
 
   public async getStudentTuitionSummary(studentId: string) {
     const invoices = await this.repo.getTuitionInvoicesByStudentId(studentId);
-    const totalBilled = invoices.reduce((sum, inv) => sum + inv.amount, 0);
-    const totalPaid = invoices.reduce((sum, inv) => sum + inv.paidAmount, 0);
-    const totalDebt = invoices.reduce((sum, inv) => sum + inv.remainingAmount, 0);
+    const activeInvoices = invoices.filter(inv => inv.status !== 'Đã hủy');
+    const totalBilled = activeInvoices.reduce((sum, inv) => sum + inv.amount, 0);
+    const totalPaid = activeInvoices.reduce((sum, inv) => sum + inv.paidAmount, 0);
+    const totalDebt = activeInvoices.reduce((sum, inv) => sum + inv.remainingAmount, 0);
 
     return {
       studentId,
       totalBilled,
       totalPaid,
       totalDebt,
-      invoiceCount: invoices.length,
-      unpaidInvoices: invoices.filter(inv => inv.remainingAmount > 0),
+      invoiceCount: activeInvoices.length,
+      unpaidInvoices: activeInvoices.filter(inv => inv.remainingAmount > 0),
     };
   }
 

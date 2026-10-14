@@ -197,7 +197,7 @@ create table if not exists public.tuition_invoices (
     note             text,
     created_at       timestamptz not null default now(),
     updated_at       timestamptz not null default now(),
-    constraint tuition_invoices_status_check check (status in ('Đã nộp', 'Còn nợ', 'Quá hạn', 'Miễn giảm', 'DA_NOP', 'CON_NO')),
+    constraint tuition_invoices_status_check check (status in ('Đã nộp', 'Còn nợ', 'Quá hạn', 'Miễn giảm', 'Đã hủy', 'DA_NOP', 'CON_NO')),
     constraint tuition_invoices_payment_method_check check (payment_method is null or payment_method in ('Chuyển khoản QR', 'Tiền mặt', 'Thẻ ngân hàng'))
 );
 
@@ -386,7 +386,7 @@ alter table public.class_requests drop constraint if exists class_requests_statu
 alter table public.class_requests add constraint class_requests_status_check check (status in ('CHỜ_DUYỆT', 'ĐÃ_DUYỆT', 'TỪ_CHỐI'));
 
 alter table public.tuition_invoices drop constraint if exists tuition_invoices_status_check;
-alter table public.tuition_invoices add constraint tuition_invoices_status_check check (status in ('Đã nộp', 'Còn nợ', 'Quá hạn', 'Miễn giảm', 'DA_NOP', 'CON_NO'));
+alter table public.tuition_invoices add constraint tuition_invoices_status_check check (status in ('Đã nộp', 'Còn nợ', 'Quá hạn', 'Miễn giảm', 'Đã hủy', 'DA_NOP', 'CON_NO'));
 
 alter table public.tuition_invoices drop constraint if exists tuition_invoices_payment_method_check;
 alter table public.tuition_invoices add constraint tuition_invoices_payment_method_check check (payment_method is null or payment_method in ('Chuyển khoản QR', 'Tiền mặt', 'Thẻ ngân hàng'));

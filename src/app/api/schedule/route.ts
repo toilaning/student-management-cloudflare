@@ -30,6 +30,8 @@ export async function GET(request: Request) {
   // Enrich normalized schedule rows with class-owned subject and meeting link.
   const allClasses = await repo.getAllClasses();
   const classMap = new Map(allClasses.map(cls => [cls.id, cls]));
+  // Lọc bỏ triệt để các slot mồ côi nếu lớp học đã bị xóa khỏi hệ thống
+  slots = slots.filter(slot => classMap.has(slot.classId));
   // Giờ thật phải theo ca (class_sections). Slot cũ có thể lưu giờ lệch, nên
   // ưu tiên giờ của ca để nút điểm danh / đổi ca tính đúng trạng thái.
   const allSections = await repo.getAllClassSections();
@@ -45,8 +47,8 @@ export async function GET(request: Request) {
     const teacher = teacherMap.get(slot.teacherId);
     return {
       ...slot,
-      startTime: (sec && sec.startTime) || slot.startTime,
-      endTime: (sec && sec.endTime) || slot.endTime,
+      startTime: (sec && sec.startTime) || slot.startTime || cls?.startTime || '18:30',
+      endTime: (sec && sec.endTime) || slot.endTime || cls?.endTime || '20:30',
       subject: slot.subject || cls?.subject || cls?.name || '',
       meetingLink: slot.meetingLink || cls?.meetingLink || '',
       teacherName: teacher?.name || '',

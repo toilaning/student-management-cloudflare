@@ -209,7 +209,7 @@ export default function TeacherSchedulePage() {
   const weekSlots = useMemo(
     () =>
       slots
-        .filter((s) => weekDateSet.has(s.date))
+        .filter((s) => weekDateSet.has(s.date) && s.status !== 'Đã hủy')
         .sort((a, b) => {
           if (a.date !== b.date) return a.date.localeCompare(b.date);
           return (a.startTime || '00:00').localeCompare(b.startTime || '00:00');

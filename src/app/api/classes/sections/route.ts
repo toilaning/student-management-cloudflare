@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { repo } from '@/repositories';
 import { ClassSection } from '@/types/classroom';
+import { ScheduleSlot } from '@/types/schedule';
+import { BulkScheduleService } from '@/services/BulkScheduleService';
+import { getTodayDateStr, getTodayDateStrByDate, dateToDayOfWeek } from '@/utils/date';
 
 export const dynamic = 'force-dynamic';
 
@@ -138,17 +141,17 @@ export async function PUT(request: Request) {
     // Đồng bộ các buổi học tương lai thuộc ca này (theo sectionId) lên thông tin mới.
     let syncedSlotsCount = 0;
     if (syncFutureSlots) {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getTodayDateStr();
       const allSlots = await repo.getAllScheduleSlots();
+      const slotsToUpdate: ScheduleSlot[] = [];
       const daysChanged =
         scheduleDays !== undefined &&
         JSON.stringify(scheduleDays.map(Number)) !== JSON.stringify(oldScheduleDays || []);
 
       for (const slot of allSlots) {
-        if (slot.sectionId !== undefined && slot.sectionId !== '' && slot.sectionId !== sec.id) continue;
-        // Dữ liệu cũ chưa gắn sectionId: chỉ đồng bộ nếu giờ/phòng/giáo viên khớp ca cũ của lớp.
-        if ((slot.sectionId === undefined || slot.sectionId === '') && slot.classId !== sec.classId) continue;
-        if (slot.date < today || slot.status === 'Đã hủy') continue;
+        if (slot.sectionId !== undefined && slot.sectionId !== "" && slot.sectionId !== sec.id) continue;
+        if ((slot.sectionId === undefined || slot.sectionId === "") && slot.classId !== sec.classId) continue;
+        if (slot.date < today || slot.status === "Đã hủy") continue;
 
         let changed = false;
         if (teacherId !== undefined && slot.teacherId !== teacherId) {
@@ -171,28 +174,27 @@ export async function PUT(request: Request) {
           slot.sectionId = sec.id;
           changed = true;
         }
+
+        // Khi thay đổi thứ: slot cũ không thuộc thứ mới thì hủy
+        if (daysChanged) {
+          const dow = dateToDayOfWeek(slot.date);
+          if (dow && !(sec.scheduleDays || []).includes(dow)) {
+            slot.status = "Đã hủy";
+            changed = true;
+          }
+        }
+
         if (changed) {
-          await repo.updateScheduleSlot(slot);
-          syncedSlotsCount++;
+          slotsToUpdate.push(slot);
         }
       }
 
-      // Khi thay đổi thứ (scheduleDays) của ca: các ngày cũ không còn thuộc ca nữa thì hủy,
-      // còn ngày thuộc thứ mới thì để admin lên lịch lại bằng "Lên lịch cho lớp".
-      if (daysChanged) {
-        for (const slot of allSlots) {
-          if (slot.sectionId !== sec.id) continue;
-          if (slot.date < today || slot.status === 'Đã hủy') continue;
-          const [yyyy, mm, dd] = slot.date.split('-').map(Number);
-          const dow = new Date(Date.UTC(yyyy, mm - 1, dd)).getUTCDay();
-          const dayOfWeek = dow === 0 ? 8 : dow + 1;
-          if (!(sec.scheduleDays || []).includes(dayOfWeek)) {
-            slot.status = 'Đã hủy';
-            await repo.updateScheduleSlot(slot);
-            syncedSlotsCount++;
-          }
-        }
+      if (slotsToUpdate.length > 0) {
+        await repo.updateScheduleSlotsBatch(slotsToUpdate);
       }
+      syncedSlotsCount = slotsToUpdate.length;
+
+      
     }
 
     await repo.addAuditLog({
@@ -220,16 +222,20 @@ export async function DELETE(request: Request) {
     const sec = await repo.getSectionById(id);
     if (!sec) return NextResponse.json({ error: 'Không tìm thấy ca học' }, { status: 404 });
 
-    // Hủy các buổi học tương lai của ca thay vì xóa cứng, giữ lịch sử.
-    const today = new Date().toISOString().split('T')[0];
+    // Hủy các buổi học tương lai của ca thay vì xóa cứng, dùng batch update để tránh lỗi subrequests.
+    const today = getTodayDateStr();
     const allSlots = await repo.getAllScheduleSlots();
     let cancelledSlotsCount = 0;
+    const slotsToCancel: ScheduleSlot[] = [];
     for (const slot of allSlots) {
       if (slot.sectionId !== id) continue;
-      if (slot.date < today || slot.status === 'Đã hủy') continue;
-      slot.status = 'Đã hủy';
-      await repo.updateScheduleSlot(slot);
+      if (slot.date < today || slot.status === "Đã hủy") continue;
+      slot.status = "Đã hủy";
+      slotsToCancel.push(slot);
       cancelledSlotsCount++;
+    }
+    if (slotsToCancel.length > 0) {
+      await repo.updateScheduleSlotsBatch(slotsToCancel);
     }
 
     // Nếu giáo viên của ca không còn ca nào khác trong lớp thì gỡ lớp khỏi assignedClassIds.

@@ -51,6 +51,7 @@ const STATUS_TABS = [
   { value: 'Còn nợ', label: 'Còn nợ' },
   { value: 'Quá hạn', label: 'Quá hạn' },
   { value: 'Miễn giảm', label: 'Miễn giảm' },
+  { value: 'Đã hủy', label: 'Đã hủy' },
 ];
 
 const money = (v: number) => (v || 0).toLocaleString('vi-VN') + ' đ';
@@ -541,9 +542,11 @@ export default function AdminTuitionPage() {
               QR
             </Button>
           )}
-          <Button size="sm" variant="secondary" onClick={() => openStatusModal(inv)}>
-            Thu tiền
-          </Button>
+          {inv.status !== 'Đã hủy' && (
+            <Button size="sm" variant="secondary" onClick={() => openStatusModal(inv)}>
+              Thu tiền
+            </Button>
+          )}
         </div>
       ),
     },

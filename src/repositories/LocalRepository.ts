@@ -214,6 +214,25 @@ export class LocalRepository implements IRepository {
 
   public async deleteClass(id: string): Promise<boolean> {
     const existed = this.classes.delete(id);
+    if (existed) {
+      for (const [secId, sec] of this.classSections.entries()) {
+        if (sec.classId === id) {
+          this.classSections.delete(secId);
+          this.classSectionStudents.delete(secId);
+          this.classSectionStudentDays.delete(secId);
+        }
+      }
+      for (const [recId, rec] of this.attendanceRecords.entries()) {
+        if (rec.classId === id) {
+          this.attendanceRecords.delete(recId);
+        }
+      }
+      for (const [reqId, req] of this.classRequests.entries()) {
+        if (req.classId === id) {
+          this.classRequests.delete(reqId);
+        }
+      }
+    }
     return existed;
   }
 
@@ -293,6 +312,7 @@ export class LocalRepository implements IRepository {
   public async deleteClassSection(id: string): Promise<boolean> {
     const existed = this.classSections.delete(id);
     this.classSectionStudents.delete(id);
+    this.classSectionStudentDays.delete(id);
     return existed;
   }
 

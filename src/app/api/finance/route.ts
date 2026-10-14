@@ -222,6 +222,57 @@ export async function POST(request: Request) {
   }
 }
 
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const invoiceId = searchParams.get('invoiceId') || searchParams.get('id');
+    const actorId = searchParams.get('actorId') || 'STUDENT001';
+    const actorName = searchParams.get('actorName') || 'Học viên';
+
+    if (!invoiceId) {
+      return NextResponse.json({ success: false, error: 'Thiếu thông tin mã hóa đơn (invoiceId)' }, { status: 400 });
+    }
+
+    const invoice = await repo.getTuitionInvoiceById(invoiceId);
+    if (!invoice) {
+      return NextResponse.json({ success: false, error: 'Không tìm thấy hóa đơn học phí với mã ' + invoiceId }, { status: 404 });
+    }
+
+    if (invoice.paidAmount > 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'Không thể hủy hóa đơn đã thanh toán. Vui lòng liên hệ quản trị viên để xử lý.',
+      }, { status: 400 });
+    }
+
+    if (invoice.status === 'Đã hủy') {
+      return NextResponse.json({ success: false, error: 'Hóa đơn này đã được hủy trước đó.' }, { status: 400 });
+    }
+
+    invoice.status = 'Đã hủy';
+    invoice.remainingAmount = 0;
+    await repo.updateTuitionInvoice(invoice);
+
+    await repo.addAuditLog({
+      action: 'CANCEL_INVOICE',
+      userId: actorId,
+      userName: actorName,
+      userRole: actorId.startsWith('TCH') ? 'TEACHER' : actorId.startsWith('ADMIN') ? 'ADMIN' : 'STUDENT',
+      targetResource: 'TUITION_INVOICE',
+      targetId: invoice.id,
+      details: 'Hủy hóa đơn [' + invoice.id + '] (' + invoice.title + ') trước khi thanh toán. Gói: ' + (invoice.packageName || 'N/A') + ', Giá: ' + invoice.amount.toLocaleString('vi-VN') + ' đ',
+    });
+
+    return NextResponse.json({
+      success: true,
+      invoice,
+      message: 'Đã hủy gói đã chọn. Hóa đơn được đánh dấu Đã hủy.',
+    });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message }, { status: 400 });
+  }
+}
+
 export async function PUT(request: Request) {
   try {
     const body = await request.json();

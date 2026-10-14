@@ -71,7 +71,7 @@ export default function AdminCalendarPage() {
   const [shifts, setShifts] = useState<TimeShift[]>(TIME_SHIFTS);
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED'>('ACTIVE');
   const [selectedTeacher, setSelectedTeacher] = useState<string>('ALL');
   const [selectedShift, setSelectedShift] = useState<string>('ALL');
 
@@ -606,8 +606,8 @@ export default function AdminCalendarPage() {
               value={statusFilter}
               onChange={v => setStatusFilter(v as any)}
               items={[
-                { value: 'ALL', label: 'Tất cả', count: slots.length },
                 { value: 'ACTIVE', label: 'Hoạt động', count: activeSlots.length },
+                { value: 'ALL', label: 'Tất cả', count: slots.length },
                 { value: 'COMPLETED', label: 'Hoàn thành', count: completedSlots.length },
                 { value: 'CANCELLED', label: 'Đã hủy', count: canceledSlots.length },
               ]}
@@ -833,12 +833,12 @@ export default function AdminCalendarPage() {
                 title="Không có ca học nào"
                 description={`Ngày ${selectedDate} không có ca học nào phù hợp với bộ lọc hiện tại.`}
                 action={
-                  (statusFilter !== 'ALL' || selectedTeacher !== 'ALL' || selectedShift !== 'ALL') ? (
+                  (statusFilter !== 'ACTIVE' || selectedTeacher !== 'ALL' || selectedShift !== 'ALL') ? (
                     <Button
                       variant="secondary"
                       size="sm"
                       onClick={() => {
-                        setStatusFilter('ALL');
+                        setStatusFilter('ACTIVE');
                         setSelectedTeacher('ALL');
                         setSelectedShift('ALL');
                       }}

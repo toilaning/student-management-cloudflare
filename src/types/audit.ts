@@ -8,6 +8,7 @@ export type AuditAction =
   | 'SCHEDULE_CHANGE' 
   | 'PAYMENT_PROCESS' 
   | 'PACKAGE_PURCHASE'
+  | 'CANCEL_INVOICE'
   | 'REQUEST_DECIDE';
 
 export interface AuditLog {

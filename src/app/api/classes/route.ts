@@ -3,6 +3,8 @@ import { repo } from '@/repositories';
 import { BulkScheduleService } from '@/services/BulkScheduleService';
 import { ShiftService } from '@/services/ShiftService';
 import { ClassSection } from '@/types/classroom';
+import { ScheduleSlot } from '@/types/schedule';
+import { getTodayDateStr, getTodayDateStrByDate, dateToDayOfWeek } from '@/utils/date';
 
 export const dynamic = 'force-dynamic';
 
@@ -120,11 +122,50 @@ export async function PUT(request: Request) {
       }
     }
 
-    // 3. Đồng bộ 2 chiều: Khi Admin đổi teacherId, startTime, endTime, scheduleDays, shiftId, hoặc meetingLink:
-    // Quét tất cả ScheduleSlot của lớp đó có date >= today, cập nhật các thuộc tính mới
-    const today = new Date().toISOString().split('T')[0];
+    // 3. Đồng bộ ca học (class_sections): đảm bảo bảng ca học có giờ/thứ/GV mới
+    // để các màn hình đọc qua ca học (như GET /api/schedule) hiển thị đúng ngay lập tức.
+    try {
+      const sections = await repo.getClassSections(classId);
+      if (sections && sections.length > 0) {
+        for (const sec of sections) {
+          let secChanged = false;
+          if (startTime !== undefined && sec.startTime !== startTime) {
+            sec.startTime = startTime;
+            secChanged = true;
+          }
+          if (endTime !== undefined && sec.endTime !== endTime) {
+            sec.endTime = endTime;
+            secChanged = true;
+          }
+          if (scheduleDays !== undefined && Array.isArray(scheduleDays)) {
+            sec.scheduleDays = scheduleDays.map(Number);
+            secChanged = true;
+          }
+          if (teacherId !== undefined && sec.teacherId !== teacherId) {
+            sec.teacherId = teacherId;
+            secChanged = true;
+          }
+          if (shiftId !== undefined && sec.shiftId !== Number(shiftId)) {
+            sec.shiftId = Number(shiftId);
+            secChanged = true;
+          }
+          if (secChanged) {
+            await repo.updateClassSection(sec);
+          }
+        }
+      }
+    } catch (secErr) {
+      console.warn("Lỗi đồng bộ class_sections khi sửa lớp:", secErr);
+    }
+
+    // 4. Đồng bộ 2 chiều các buổi học tương lai (ScheduleSlot):
+    // Sử dụng batch update để tránh lỗi "Too many subrequests" trên Cloudflare Workers.
+    const today = getTodayDateStr();
     const allSlots = await repo.getAllScheduleSlots();
-    
+    const slotsToUpdate: ScheduleSlot[] = [];
+    const newScheduleDays = scheduleDays && Array.isArray(scheduleDays) ? scheduleDays.map(Number) : undefined;
+    const daysChanged = newScheduleDays !== undefined;
+
     // Tìm thông tin shift nếu shiftId thay đổi mà không có startTime/endTime custom
     let shiftInfo = undefined;
     if (shiftId !== undefined) {
@@ -132,10 +173,19 @@ export async function PUT(request: Request) {
       shiftInfo = shifts.find(s => s.id === Number(shiftId));
     }
 
-    let syncedSlotsCount = 0;
     for (const slot of allSlots) {
-      if (slot.classId === classId && slot.date >= today && slot.status !== 'Đã hủy') {
+      if (slot.classId === classId && slot.date >= today && slot.status !== "Đã hủy") {
         let changed = false;
+
+        // Nếu thứ học thay đổi và slot này rơi vào ngày không còn thuộc lịch học mới -> Hủy slot cũ
+        if (daysChanged) {
+          const dow = dateToDayOfWeek(slot.date);
+          if (dow && !newScheduleDays.includes(dow)) {
+            slot.status = "Đã hủy";
+            slotsToUpdate.push(slot);
+            continue;
+          }
+        }
 
         if (teacherId !== undefined && slot.teacherId !== teacherId) {
           slot.teacherId = teacherId;
@@ -177,13 +227,45 @@ export async function PUT(request: Request) {
         }
 
         if (changed) {
-          await repo.updateScheduleSlot(slot);
-          syncedSlotsCount++;
+          slotsToUpdate.push(slot);
         }
       }
     }
 
-    // 4. Ghi Audit Log
+    if (slotsToUpdate.length > 0) {
+      await repo.updateScheduleSlotsBatch(slotsToUpdate);
+    }
+
+    // 5. Nếu thứ học thay đổi: tự động sinh bổ sung các buổi học tương lai theo thứ mới
+    let generatedCount = 0;
+    if (daysChanged && cls.isRecurring !== false) {
+      try {
+        const bulkService = new BulkScheduleService(repo);
+        const now = new Date();
+        const endDateObj = new Date(now);
+        endDateObj.setMonth(endDateObj.getMonth() + 3);
+        const endDate = getTodayDateStrByDate(endDateObj);
+
+        const genRes = await bulkService.generateRecurringSlots({
+          classIds: [classId],
+          startDate: today,
+          endDate,
+          scheduleDays: newScheduleDays,
+          startTime: cls.startTime,
+          endTime: cls.endTime,
+          shiftId: cls.shiftId,
+          overwriteExisting: false,
+          actorId,
+        });
+        generatedCount = genRes.summary.createdCount;
+      } catch (genErr) {
+        console.warn("Lỗi tự động sinh lịch mới khi đổi thứ học:", genErr);
+      }
+    }
+
+    const syncedSlotsCount = slotsToUpdate.length + generatedCount;
+
+    // 6. Ghi Audit Log
     await repo.addAuditLog({
       action: 'UPDATE',
       userId: actorId,
@@ -385,58 +467,75 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-    const actorId = searchParams.get('actorId') || 'ADMIN001';
+    const id = searchParams.get("id");
+    const actorId = searchParams.get("actorId") || "ADMIN001";
 
     if (!id) {
-      return NextResponse.json({ error: 'Thiếu mã lớp học cần xóa' }, { status: 400 });
+      return NextResponse.json({ error: "Thiếu mã lớp học cần xóa" }, { status: 400 });
     }
 
     const cls = await repo.getClassById(id);
     if (!cls) {
-      return NextResponse.json({ error: 'Không tìm thấy lớp học' }, { status: 404 });
+      return NextResponse.json({ error: "Không tìm thấy lớp học" }, { status: 404 });
     }
 
-    // Bỏ lớp khỏi assignedClassIds của giáo viên
-    if (cls.teacherId) {
-      const teacher = await repo.getTeacherById(cls.teacherId);
-      if (teacher && teacher.assignedClassIds) {
-        teacher.assignedClassIds = teacher.assignedClassIds.filter(cid => cid !== id);
-        await repo.updateTeacher(teacher);
+    // 1. Gỡ lớp khỏi assignedClassIds của giáo viên chính và các ca
+    const teachersToUpdate = new Set<string>();
+    if (cls.teacherId) teachersToUpdate.add(cls.teacherId);
+    try {
+      const sections = await repo.getClassSections(id);
+      for (const sec of sections) {
+        if (sec.teacherId) teachersToUpdate.add(sec.teacherId);
       }
+    } catch (_) {}
+
+    for (const tid of teachersToUpdate) {
+      try {
+        const teacher = await repo.getTeacherById(tid);
+        if (teacher && Array.isArray(teacher.assignedClassIds) && teacher.assignedClassIds.includes(id)) {
+          teacher.assignedClassIds = teacher.assignedClassIds.filter((cid) => cid !== id);
+          await repo.updateTeacher(teacher);
+        }
+      } catch (_) {}
     }
 
-    // Tự động xóa (hoặc đánh dấu 'Đã hủy') tất cả ScheduleSlot của lớp đó có date >= today
-    const today = new Date().toISOString().split('T')[0];
+    // 2. Đánh dấu hủy các ca tương lai bằng 1 thao tác batch (tránh vượt subrequests của Cloudflare Workers)
+    const today = getTodayDateStr();
     const allSlots = await repo.getAllScheduleSlots();
     let cancelledSlotsCount = 0;
+    const slotsToCancel: ScheduleSlot[] = [];
 
     for (const slot of allSlots) {
-      if (slot.classId === id && slot.date >= today && slot.status !== 'Đã hủy') {
-        slot.status = 'Đã hủy';
-        await repo.updateScheduleSlot(slot);
+      if (slot.classId === id && slot.date >= today && slot.status !== "Đã hủy") {
+        slot.status = "Đã hủy";
+        slotsToCancel.push(slot);
         cancelledSlotsCount++;
       }
     }
 
+    if (slotsToCancel.length > 0) {
+      await repo.updateScheduleSlotsBatch(slotsToCancel);
+    }
+
+    // 3. Xóa lớp học
     await repo.deleteClass(id);
 
     await repo.addAuditLog({
-      action: 'DELETE',
+      action: "DELETE",
       userId: actorId,
-      userName: actorId === 'ADMIN001' ? 'Quản trị viên' : actorId,
-      userRole: 'ADMIN',
-      targetResource: 'CLASS',
+      userName: actorId === "ADMIN001" ? "Quản trị viên" : actorId,
+      userRole: "ADMIN",
+      targetResource: "CLASS",
       targetId: id,
-      details: `Xóa lớp học ${id} - ${cls.name} và hủy ${cancelledSlotsCount} ca học tương lai (date >= ${today})`,
+      details: "Xóa lớp học " + id + " - " + cls.name + " và hủy " + cancelledSlotsCount + " ca học tương lai (date >= " + today + ")",
     });
 
     return NextResponse.json({
       success: true,
       cancelledSlotsCount,
-      message: `Đã xóa lớp học ${id} (${cls.name}) và hủy ${cancelledSlotsCount} ca học tương lai thành công`,
+      message: "Đã xóa lớp học " + id + " (" + cls.name + ") và hủy " + cancelledSlotsCount + " ca học tương lai thành công",
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Lỗi khi xóa lớp học' }, { status: 500 });
+    return NextResponse.json({ error: error?.message || "Lỗi khi xóa lớp học" }, { status: 500 });
   }
 }

@@ -1,4 +1,4 @@
-export type TuitionStatus = 'Đã nộp' | 'Còn nợ' | 'Quá hạn' | 'Miễn giảm' | 'DA_NOP' | 'CON_NO';
+export type TuitionStatus = 'Đã nộp' | 'Còn nợ' | 'Quá hạn' | 'Miễn giảm' | 'Đã hủy' | 'DA_NOP' | 'CON_NO';
 
 export interface TuitionInvoice {
   id: string; // TUI001..

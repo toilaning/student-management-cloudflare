@@ -62,6 +62,7 @@ export const TUITION_TONE: Record<string, Tone> = {
   CON_NO: 'warning',
   'Quá hạn': 'danger',
   'Miễn giảm': 'info',
+  'Đã hủy': 'neutral',
   'CHƯA_NỘP': 'neutral',
   'ĐÃ_NỘP': 'success',
   'CÒN_NỢ': 'warning',

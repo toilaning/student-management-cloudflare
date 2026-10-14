@@ -25,6 +25,7 @@ import {
   Package,
   Sparkles,
   Loader2,
+  Trash2,
 } from 'lucide-react';
 
 function money(v?: number) {
@@ -45,6 +46,7 @@ export default function StudentTuitionPage() {
   const [loading, setLoading] = useState(true);
   const [loadingPackages, setLoadingPackages] = useState(true);
   const [buyingPackageId, setBuyingPackageId] = useState<string | null>(null);
+  const [cancelingInvoiceId, setCancelingInvoiceId] = useState<string | null>(null);
 
   const [bankConfig, setBankConfig] = useState<AdminBankConfig>(DEFAULT_BANK_CONFIG);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -109,11 +111,12 @@ export default function StudentTuitionPage() {
     };
   }, []);
 
-  const totalBilled = invoices.reduce((s, i) => s + i.amount, 0);
-  const totalPaid = invoices.reduce((s, i) => s + i.paidAmount, 0);
-  const totalDebt = invoices.reduce((s, i) => s + i.remainingAmount, 0);
+  const activeInvoices = invoices.filter((i) => i.status !== 'Đã hủy');
+  const totalBilled = activeInvoices.reduce((s, i) => s + i.amount, 0);
+  const totalPaid = activeInvoices.reduce((s, i) => s + i.paidAmount, 0);
+  const totalDebt = activeInvoices.reduce((s, i) => s + i.remainingAmount, 0);
 
-  const packageStats = invoices.reduce(
+  const packageStats = activeInvoices.reduce(
     (acc, inv) => {
       if (inv.sessionCount) {
         acc.totalSessions += inv.sessionCount;
@@ -129,6 +132,33 @@ export default function StudentTuitionPage() {
     setSelectedInvoice(inv);
     setShowQrModal(true);
     setPaymentSuccess(false);
+  };
+
+  const handleCancelInvoice = async (inv: TuitionInvoice) => {
+    if (!currentUser?.id) return;
+    const ok = window.confirm(
+      `Hủy gói "${inv.packageName || inv.title}" (${money(inv.amount)})?\n\nGói chưa thanh toán sẽ được đánh dấu "Đã hủy" và không còn tính vào công nợ của bạn.`
+    );
+    if (!ok) return;
+
+    setCancelingInvoiceId(inv.id);
+    try {
+      const res = await fetch(`/api/finance?invoiceId=${inv.id}&actorId=${currentUser.id}&actorName=${encodeURIComponent(currentUser.name || 'Học viên')}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Không thể hủy gói đã chọn');
+      }
+
+      toast.success('Đã hủy gói. Hóa đơn được đánh dấu Đã hủy.');
+      await loadInvoices();
+    } catch (err: any) {
+      toast.error(err.message || 'Lỗi kết nối khi hủy gói');
+    } finally {
+      setCancelingInvoiceId(null);
+    }
   };
 
   const handleCopyText = (text: string, fieldName: string, label: string) => {
@@ -274,18 +304,38 @@ export default function StudentTuitionPage() {
       header: 'Thao tác',
       align: 'right',
       render: (inv) =>
-        inv.remainingAmount > 0 ? (
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleOpenPayment(inv);
-            }}
-            icon={<QrCode size={14} />}
-          >
-            Quét QR
-          </Button>
+        inv.status === 'Đã hủy' ? (
+          <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-muted-foreground">
+            <Trash2 size={14} /> Đã hủy
+          </span>
+        ) : inv.remainingAmount > 0 ? (
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenPayment(inv);
+              }}
+              icon={<QrCode size={14} />}
+            >
+              Quét QR
+            </Button>
+            {inv.paidAmount === 0 && (
+              <Button
+                size="sm"
+                variant="danger-outline"
+                loading={cancelingInvoiceId === inv.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCancelInvoice(inv);
+                }}
+                icon={<Trash2 size={14} />}
+              >
+                Hủy gói
+              </Button>
+            )}
+          </div>
         ) : (
           <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-success">
             <CheckCircle2 size={14} /> Đã nộp đủ
@@ -480,16 +530,34 @@ export default function StudentTuitionPage() {
                       </div>
                     )}
 
-                    {inv.remainingAmount > 0 ? (
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        fullWidth
-                        onClick={() => handleOpenPayment(inv)}
-                        icon={<QrCode size={14} />}
-                      >
-                        Quét QR thanh toán
-                      </Button>
+                    {inv.status === 'Đã hủy' ? (
+                      <div className="text-center py-1 text-xs font-semibold text-muted-foreground flex items-center justify-center gap-1">
+                        <Trash2 size={14} /> Đã hủy
+                      </div>
+                    ) : inv.remainingAmount > 0 ? (
+                      <div className="space-y-2">
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          fullWidth
+                          onClick={() => handleOpenPayment(inv)}
+                          icon={<QrCode size={14} />}
+                        >
+                          Quét QR thanh toán
+                        </Button>
+                        {inv.paidAmount === 0 && (
+                          <Button
+                            size="sm"
+                            variant="danger-outline"
+                            fullWidth
+                            loading={cancelingInvoiceId === inv.id}
+                            onClick={() => handleCancelInvoice(inv)}
+                            icon={<Trash2 size={14} />}
+                          >
+                            Hủy gói
+                          </Button>
+                        )}
+                      </div>
                     ) : (
                       <div className="text-center py-1 text-xs font-semibold text-success flex items-center justify-center gap-1">
                         <CheckCircle2 size={14} /> Đã hoàn thành
